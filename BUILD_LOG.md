@@ -9,7 +9,8 @@ Time is tracked in two columns: **human** (my own time: deciding, directing, rev
 | Brainstorming & design | 1 h 30 min | — |
 | English pass, agent instructions, ticket plan | 20 min | ~85 min |
 | UI review and design brainstorming (v0.7) | 30 min | ~30 min |
-| **Total** | **2 h 20 min** | **~1 h 55 min** |
+| Foundation T00–T02 (+ T11 Vercel setup) | 30 min (20 min + 10 min Vercel setup) | ~35 min (+ ~8 min parallel subagent) |
+| **Total** | **2 h 50 min** | **~2 h 30 min** |
 
 ## Entries
 
@@ -84,3 +85,27 @@ Time is tracked in two columns: **human** (my own time: deciding, directing, rev
 - Agent installed pnpm and the Vercel CLI and started Docker; logins stay with me.
 - Hub behind one shared password; identity from `git config user.email`; no demo in tonight's build.
 - Decided the build runs overnight: two agents push to `feature/hub-and-vs-code-extension`, each only its own files; I merge the PR in the morning. Rules in AGENTS.md, procedure in docs/two-agent-build.md.
+
+### 2026-11-19 — Foundation: T00, T01, T02 (human 30 min, agent ~35 min + ~8 min parallel)
+
+**What I did**
+- 20 min: wrote the session prompt (scope, branch rules, order, stop for review), stayed at the computer for the macOS dialogs during the T01 toolchain smoke test, and the review.
+- 10 min: Vercel setup for T11 (`vercel login` + `vercel link`, Blob store, Neon via the Marketplace, `HUB_PASSWORD`).
+
+**What I delegated**
+- Everything that was built: branch `feature/hub-and-vs-code-extension`, T00 spike, T01 scaffolding and smoke test, T02 contracts, the agent rows of T11.
+- The agent forked T00 (real `claude -p` runs) into a parallel subagent while it scaffolded T01. That subagent made ~22 small paid calls (~$2 API equivalent, mostly the plan-mode experiments), more than the ~15 planned.
+
+**What I reviewed / decided myself**
+- Pending: the foundation review ([`docs/foundation-review.md`](docs/foundation-review.md)) before the contracts are frozen and the overnight agents start.
+
+**What I wrote by hand**
+- The session prompt only.
+
+**What went wrong / changed course**
+- The smoke test did its job: four problems surfaced while I was there, not at 3 a.m. The cached Playwright Chromium was for an older Playwright. `@vscode/test-electron` failed because a VS Code terminal exports `ELECTRON_RUN_AS_NODE=1` (now cleared in `runTest.ts`). `vercel deploy` failed on the root `prepare` script and then on the 100 MB upload limit (the 375 MB VS Code test download; `.vercelignore`).
+- T00 findings changed the adapter design: usage must come from `result.modelUsage`, not from streamed messages; plan mode is unusable in the runner (non-deterministic, switched models); user-level settings leak into `claude -p` unless `--setting-sources project`.
+- The extension package is named `vscode` so the documented `pnpm --filter vscode` works.
+- The first `openapi.json` test required byte equality with the stub, which would have gone red as soon as HUB regenerated the file overnight. It now checks compatibility instead.
+- The fixture runs are synthetic (no runner exists yet); they are labelled so.
+- The recorded T00 transcripts listed the recording user's claude.ai connectors; they are blanked in the fixtures and in the scrubber.
