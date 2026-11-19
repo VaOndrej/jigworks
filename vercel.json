@@ -1,0 +1,18 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "services": {
+    "hub-web": {
+      "root": "apps/hub-web",
+      "framework": "vite",
+      "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+    },
+    "hub-api": {
+      "root": "apps/hub-api",
+      "entrypoint": "hub_api/main.py"
+    }
+  },
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": { "service": "hub-api" } },
+    { "source": "/(.*)", "destination": { "service": "hub-web" } }
+  ]
+}

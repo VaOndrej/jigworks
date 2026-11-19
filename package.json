@@ -1,0 +1,16 @@
+{
+  "name": "jigworks",
+  "private": true,
+  "packageManager": "pnpm@12.21.0",
+  "scripts": {
+    "prepare": "git rev-parse --git-dir >/dev/null 2>&1 && git config core.hooksPath .githooks || true",
+    "test": "pnpm -r test",
+    "verify:hub": "bash e2e/hub/verify.sh",
+    "verify:local": "bash e2e/local/verify.sh",
+    "verify:e2e": "bash e2e/integration/verify.sh",
+    "smoke": "bash scripts/smoke-toolchain.sh"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.65.1"
+  }
+}

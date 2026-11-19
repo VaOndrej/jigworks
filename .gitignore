@@ -1,7 +1,30 @@
+# OS
 .DS_Store
-.env
-.env*.local
+
+# Secrets: every .env file is ignored except the documented example
+.env*
+!.env.example
+
+# Vercel
 .vercel/
+
+# Claude Code per-worktree settings (JIGWORKS_AGENT lives here)
+.claude/settings.local.json
+
+# Node / TS
 node_modules/
+dist/
+out/
+*.tsbuildinfo
+*.vsix
+.vscode-test/
+
+# Python
 .venv/
 __pycache__/
+.pytest_cache/
+*.egg-info/
+
+# Playwright
+test-results/
+playwright-report/
