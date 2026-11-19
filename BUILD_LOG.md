@@ -7,8 +7,8 @@ Time is tracked in two columns: **human** (my own time: deciding, directing, rev
 | Phase | Human | Agent |
 |---|---|---|
 | Brainstorming & design | 1 h 30 min | — |
-| English pass, agent instructions, ticket plan | 15 min | ~65 min |
-| **Total** | **1 h 45 min** | **~65 min** |
+| English pass, agent instructions, ticket plan | 20 min | ~85 min |
+| **Total** | **1 h 50 min** | **~85 min** |
 
 ## Entries
 
@@ -32,12 +32,13 @@ Time is tracked in two columns: **human** (my own time: deciding, directing, rev
 - The first scope was far too big for the time box; after re-reading the brief, governance (audit trail, independent review, human approval) moved from "out of MVP" into the core, and the prototype was cut to three demo-able slices.
 - "Software Factory" as a name collides with an existing AI coding company (Factory), so it was renamed.
 
-### 2026-11-19 — English pass, agent instructions, ticket plan (human 15 min, agent ~65 min)
+### 2026-11-19 — English pass, agent instructions, ticket plan (human 20 min, agent ~85 min)
 
 **What I delegated**
 - Translating `docs/design.md` v0.6 from Czech to English (faithful, no content changes).
 - Writing `AGENTS.md` (modeled on the structure of an agent-instructions file from another project of mine), `CLAUDE.md` and `.gitignore`.
 - UI mockups of the hub, the Python editor, the graph view, the publish flow and the VS Code extension (a claude.ai artifact, not in the repo).
+- A draft split for two build agents (hub vs local) with self-testing → [`docs/two-agent-build.md`](docs/two-agent-build.md).
 - Breaking design.md §1 into tickets with verifiable acceptance criteria → [`docs/plan.md`](docs/plan.md).
 
 **What I reviewed / decided myself**
@@ -47,6 +48,8 @@ Time is tracked in two columns: **human** (my own time: deciding, directing, rev
 - Tickets live in the repo (`tickets/prototype/`), not as GitHub issues.
 - One repo for everything (hub, runner, extension, sample-repo, demo); the demo PR is opened against this repo.
 - VS Code extension shape: workflows and parallel sessions on the left, the prompt in the middle, a run view with the graph position and % of the plan. Added T16 and T17.
+- Human delta loop: what a human changes after approving AI code flows back to the hub as a diff, for analytics (merged as-is vs edited) and supervised workflow improvement. Architecture only (design.md v0.7), not built.
+- Hub tabs: Runs & analytics merged into one; "HR department" renamed "Non-coding teams".
 - Deep dives for the presentation: Q3, Q6, Q5.
 - The hub computes `get_graph()` only on Vercel (Sandbox), behind a "Show graph" CTA.
 
