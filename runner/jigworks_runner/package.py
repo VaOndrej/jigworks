@@ -1,0 +1,105 @@
+"""Loading a workflow package (design.md §5) from a directory or an unpacked bundle.
+
+The package is imported under a synthetic module name derived from its digest, so two
+releases (or two packages that both have `graph.py` and `steps/`) never collide in
+`sys.modules`. Package code uses relative imports (`from .steps import nodes`).
+"""
+
+from __future__ import annotations
+
+import importlib
+import sys
+import tomllib
+import types
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Callable
+
+import jigworks_contracts as contracts
+from jigworks_contracts import bundle
+from jigworks_contracts.graph import normalize_langgraph_json
+
+# Development-only files that are not part of a release bundle.
+DEV_ONLY = ("tests/", "pyproject.toml", ".pytest_cache/", ".hypothesis/")
+
+
+def bundle_files(root: Path) -> dict[str, bytes]:
+    files = bundle.files_from_dir(root)
+    return {p: b for p, b in files.items() if not any(p == d or p.startswith(d) for d in DEV_ONLY)}
+
+
+def build_package_bundle(root: Path) -> tuple[bytes, str]:
+    data = bundle.build_bundle(bundle_files(root))
+    return data, bundle.digest(data)
+
+
+@dataclass
+class WorkflowPackage:
+    root: Path
+    manifest: dict[str, Any]
+    digest: str
+    module_name: str
+    build_graph: Callable[[], Any]
+
+    @property
+    def name(self) -> str:
+        return self.manifest["name"]
+
+    @property
+    def version(self) -> str:
+        return self.manifest["version"]
+
+    @property
+    def release(self) -> str:
+        return f"{self.name}@{self.version}"
+
+    @property
+    def planned_path(self) -> list[str]:
+        return list(self.manifest.get("plannedPath", []))
+
+    @property
+    def weights(self) -> dict[str, float]:
+        return {k: float(v) for k, v in self.manifest.get("weights", {}).items()}
+
+    def model_for(self, node: str) -> str:
+        models = self.manifest["models"]
+        return models.get("nodes", {}).get(node) or models["default"]
+
+    def allowed_tools(self) -> list[str] | None:
+        perms = self.manifest.get("permissions") or {}
+        return list(perms["allowedTools"]) if "allowedTools" in perms else None
+
+    def graph_json(self) -> dict[str, Any]:
+        raw = self.build_graph().compile().get_graph().to_json()
+        out = normalize_langgraph_json(
+            raw,
+            weights=self.weights,
+            interrupt_nodes=self.manifest.get("interruptNodes", []),
+            workflow_id=self.name,
+            release=self.release,
+        )
+        contracts.assert_valid("GraphJSON", out)
+        return out
+
+
+def read_manifest(root: Path) -> dict[str, Any]:
+    with (root / "workflow.toml").open("rb") as fh:
+        manifest = tomllib.load(fh)
+    contracts.assert_valid("WorkflowManifest", manifest)
+    return manifest
+
+
+def load_package(root: str | Path, digest: str | None = None) -> WorkflowPackage:
+    root = Path(root).resolve()
+    manifest = read_manifest(root)
+    if digest is None:
+        _, digest = build_package_bundle(root)
+    module_name = "jigworks_pkg_" + digest.split(":", 1)[-1][:16]
+    if module_name not in sys.modules:
+        pkg = types.ModuleType(module_name)
+        pkg.__path__ = [str(root)]  # type: ignore[attr-defined]
+        pkg.__package__ = module_name
+        sys.modules[module_name] = pkg
+    mod_name, _, attr = manifest["entrypoint"].partition(":")
+    module = importlib.import_module(f"{module_name}.{mod_name}")
+    return WorkflowPackage(root, manifest, digest, module_name, getattr(module, attr or "build_graph"))

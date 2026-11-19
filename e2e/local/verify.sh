@@ -7,7 +7,8 @@ echo "== verify:local"
 pnpm --filter contracts build   # consumers import dist/
 
 echo "== python: runner, workflows, sample-repo (fake adapter, recorded fixtures, property tests)"
-uv run pytest runner workflows sample-repo -q
+# Keep temp dirs only for failing tests (each workflow test copies a git repo).
+uv run pytest runner workflows sample-repo -q -o tmp_path_retention_policy=failed
 
 echo "== sample-repo: planted bugs must be caught by the property tests"
 bash sample-repo/scripts/break-invariant.sh all

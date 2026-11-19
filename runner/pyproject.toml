@@ -4,7 +4,10 @@ version = "0.0.0"
 description = "Local Jigworks runner and CLI agent adapters."
 requires-python = ">=3.12"
 dependencies = [
+    "bandit>=1.8",
     "jigworks-contracts",
+    "langgraph>=1.2",
+    "langgraph-checkpoint-sqlite>=2",
 ]
 
 [build-system]

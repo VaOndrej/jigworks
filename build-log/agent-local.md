@@ -45,3 +45,24 @@ Agent: Claude Code (Opus 5.5), worktree `~/Development/jigworks-local`, branch `
   known whether the call was paused); plan mode raises in `AgentOptions`; agent_output text is
   clipped at 4000 chars per block.
 - **Open:** auto-memory isolation (spike §7) not verified; usage-limit stream is synthetic.
+
+### T05 · feature-development workflow — done
+
+- **Built:** the package (graph, nodes, gate, secret rules, 6 prompts, manifest 1.4.0, lock) and
+  the runner core it needs: `WorkflowRun` engine, `Ledger` (pure fold over events → summary and
+  audit), package loader with synthetic module names, fake adapter, git helpers.
+- **Proof:** 17 fake-adapter tests over every path with the real gate (pytest, property tests,
+  secret scan, bandit, scope); `export_graph` prints GraphJSON.
+- **Decisions:**
+  - The package never imports the runner: the runtime is injected as
+    `config["configurable"]["jigworks"]`.
+  - Bookkeeping lives in the event log, so T06 resume = replay events + LangGraph checkpoint.
+  - gitleaks/semgrep are missing → built-in secret rules + bandit.
+  - Version 1.4.0.
+  - Event conventions copied from the recorded runs (request changes → `cancelled`, reject →
+    `failed`, interruptId `int_<run>_<node>_<attempt>`).
+- **Went wrong:** `functools.wraps` hid the `config` parameter from LangGraph (it follows
+  `__wrapped__`); fixed. Test bug with a remote-only branch.
+- **Environment:** the disk filled up (153 MB free; Docker 22 GB, caches 22 GB, not mine). I
+  deleted only my own pytest temp dirs and set `tmp_path_retention_policy=failed` in verify.
+  **Human:** please free disk space; the VS Code tests and screenshots need room.
