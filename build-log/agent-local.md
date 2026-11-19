@@ -34,3 +34,14 @@ Agent: Claude Code (Opus 5.5), worktree `~/Development/jigworks-local`, branch `
   `--apply` writes into the tree for a live demo; `hypothesis` is a runtime dependency of the
   sample-repo package because the root `pyproject.toml` is not mine.
 - **Went wrong:** nothing material; first draft had two filler tests, removed.
+
+### T04 · Claude adapter — done
+
+- **Built:** `EventSink` (contract validation on every emit, seq from 0), `ClaudeAdapter` +
+  `StreamParser`, login preflight `auth_status()`, `PriceTable` with validity + `cross_check`.
+- **Proof:** 25 adapter tests on the T00 recordings; cost reproduces the CLI's `total_cost_usd`
+  on all 6 recordings; one live haiku smoke run passed.
+- **Decisions:** usage limit `rejected` is reported at the end of the call (only then is it
+  known whether the call was paused); plan mode raises in `AgentOptions`; agent_output text is
+  clipped at 4000 chars per block.
+- **Open:** auto-memory isolation (spike §7) not verified; usage-limit stream is synthetic.

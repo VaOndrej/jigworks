@@ -419,6 +419,12 @@ requires-dist = [
 name = "jigworks-runner"
 version = "0.0.0"
 source = { editable = "runner" }
+dependencies = [
+    { name = "jigworks-contracts" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "jigworks-contracts", editable = "packages/contracts" }]
 
 [[package]]
 name = "jigworks-sample-repo"

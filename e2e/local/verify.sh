@@ -1,9 +1,24 @@
 #!/usr/bin/env bash
-# `pnpm verify:local` — LOCAL fills this in (docs/two-agent-build.md §4).
-# Foundation stub: runs the local side's current tests only.
+# `pnpm verify:local` (docs/two-agent-build.md §4). LOCAL fills it in ticket by ticket.
+#   JIGWORKS_LIVE=1 pnpm verify:local   # also runs the opt-in live `claude -p` tests (Max subscription)
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
-echo "== verify:local (foundation stub: unit tests + extension skeleton test)"
+echo "== verify:local"
 pnpm --filter contracts build   # consumers import dist/
-uv run pytest runner workflows sample-repo
+
+echo "== python: runner, workflows, sample-repo (fake adapter, recorded fixtures, property tests)"
+uv run pytest runner workflows sample-repo -q
+
+echo "== sample-repo: planted bugs must be caught by the property tests"
+bash sample-repo/scripts/break-invariant.sh all
+
+echo "== vscode: @vscode/test-electron"
 pnpm --filter vscode test
+
+if [[ "${JIGWORKS_LIVE:-}" == "1" ]]; then
+  echo "== live: real claude -p calls"
+  uv run pytest runner workflows -m live -q
+else
+  echo "== live: skipped (set JIGWORKS_LIVE=1)"
+fi
+echo "== verify:local OK"
