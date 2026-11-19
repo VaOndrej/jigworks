@@ -12,6 +12,8 @@
 
 ## Goal
 
+Visual spec: [`docs/mockups/jigworks-ui.html`](../../docs/mockups/jigworks-ui.html).
+
 The engineer starts work from VS Code and runs several sessions in parallel, each with its own workflow (design.md §7, mockup "VS Code — new session"). Example: a feature is being implemented, a customer bug comes in, the engineer starts a second session for the bug and switches between them.
 
 ## Acceptance criteria

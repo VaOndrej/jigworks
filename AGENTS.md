@@ -3,7 +3,8 @@
 These instructions apply to the whole repository and to every agent working in
 it (Claude Code, Codex, subagents, workflow nodes run by the Jigworks runner).
 
-`docs/design.md` is the canonical design (v0.6). Read the relevant section before
+`docs/design.md` is the canonical design (v0.7). `docs/mockups/jigworks-ui.html`
+is the visual spec for the hub and the extension. Read the relevant section before
 you change anything. Do not re-open decisions recorded there; if something is
 ambiguous, ask the human instead of guessing. `docs/plan.md` is the ticket plan;
 the tickets themselves are Markdown files in `tickets/` (conventions in
@@ -38,7 +39,7 @@ jigworks/
   sample-repo/         # synthetic order-handling service with invariants
   demo/                # later
   e2e/                 # Playwright
-  docs/                # design.md, plan.md
+  docs/                # design.md, plan.md, two-agent-build.md, mockups/
   tickets/             # one Markdown file per ticket
 ```
 

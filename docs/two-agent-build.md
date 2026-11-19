@@ -82,8 +82,68 @@ One entry point per side; its output is pasted into the ticket's Evidence.
 5. Both agents push to `feature/hub-and-vs-code-extension`, never to `main`; each pushes only its own files. Pushes produce Vercel preview deploys.
 6. The human merges the PR into `main` in the morning.
 
-## 8. Open points
+7. The foundation (T00–T02) is built this evening and reviewed by the human before the overnight start.
 
-1. **Who builds the foundation (T00–T02)?** One agent this evening, with the human reviewing it before the overnight start (recommended), or LOCAL first thing in the night while HUB waits?
-2. **Permissions for unattended runs:** `--permission-mode acceptEdits` plus an allowlist in `.claude/settings.json` (pnpm, uv, git, docker, vercel, playwright, claude) and the hooks above (recommended), or `bypassPermissions`? The latter is not advisable on a laptop that holds your credentials.
-3. **Presentation tickets (P01–P04)** stay with the human, not the overnight run: agreed?
+## 8. What each agent builds overnight
+
+Visual spec for both: [`docs/mockups/jigworks-ui.html`](mockups/jigworks-ui.html) (open it in a browser). Behaviour spec: `docs/design.md` v0.7 and the tickets.
+
+### Foundation, this evening (one agent, human reviews ≈ 10 min)
+
+| Ticket | Result the night depends on |
+|---|---|
+| T00 | Facts about `claude -p` stream-json, recorded fixtures, the login check, how usage limits show up |
+| T01 | pnpm + uv workspaces, folder skeleton, `vercel.json`, `docker-compose.yml` (Postgres), hooks, `scripts/check-ownership.sh`, `scripts/overnight.sh`, `prompts/overnight-*.md`, and a **toolchain smoke test** (below) |
+| T02 | Frozen contracts: schemas, generated types, `openapi` shapes, and fixtures: recorded runs, a sample workflow bundle (`.zip` + digest) and its `get_graph()` JSON |
+
+### HUB (Vercel)
+
+| Ticket | Builds | Done when |
+|---|---|---|
+| T11 (agent part) | `vercel env pull`, health endpoint, first preview | preview `/api/health` returns `{"ok":true}` |
+| T12 | FastAPI: workflows, draft, validate (Sandbox), publish (bundle → Blob, digest), releases, channels, bundle download, runs + events ingest, usage analytics with a price table; seeded from contract fixtures | `pytest` green on Docker Postgres; curl transcript against the preview |
+| T13 | React: **Workflows** (overview, editor with Code/Graph, new file/folder, GitHub bar as Planned), **Runs & analytics** (numbers, cost chart, outcomes as Planned, version comparison, runs, run detail), **Non-coding teams** text tab | Playwright at 390 + 1440 px on localhost and on the preview, matching the mockups |
+
+### LOCAL (runner + VS Code)
+
+| Ticket | Builds | Done when |
+|---|---|---|
+| T03 | `sample-repo`: order handling with invariants + property tests | tests green; `break-invariant.sh` makes them fail |
+| T04 | Claude adapter (stream-json, resume, allowedTools, models from the workflow, usage limit handling) | tests on T00 fixtures |
+| T05 | `feature-development` workflow incl. request changes, security scan in the gate, `first_result_commit` | fake-adapter tests for every path |
+| T06 | Runner CLI: worktrees, checkpoints, resume, parallel runs, progress %, `jigworks graph`, audit log | tests + one live run with a fix loop |
+| T07 | Evals (3–5 tasks) | results file committed |
+| T17 | `bugfix-with-repro` workflow + synthetic P&L bug | fake-adapter tests |
+| T08 | Extension bridge: several runner processes, login preflight | `@vscode/test-electron` with two runs |
+| T09 | Sidebar (workflows, sessions, Review badge), new-session prompt, tabs | standalone webview screenshots 390 + 1440 px |
+| T16 | Run view: graph with NOW marker, % of plan, activity / agent output, Approve / Request changes / Reject | same |
+| T10 | `.zip` import with digest check | valid + tampered zip tests |
+| T14, T15 | Runner → hub sync; extension syncs `stable` | against the OpenAPI mock, then the hub preview |
+| e2e | publish in hub → sync → run → events in hub | `pnpm verify:e2e` |
+
+### Human (not overnight)
+
+P01 answers to the brief's 9 questions, P02 demo script, P03 backup recording, P04 final build log and README. These are the presentation, which the human owns; the agents only provide the evidence they cite.
+
+## 9. Human checklist before the overnight start
+
+Things only you can do (logins, dashboards, macOS prompts), checked on 19 Nov 2026:
+
+| Item | State now | What to do |
+|---|---|---|
+| pnpm | missing | `npm install -g pnpm` (Node 26 no longer ships corepack) |
+| Vercel CLI | missing | `npm install -g vercel && vercel login`, then `vercel link` in the repo (project `jigworks`) |
+| Docker | installed, **not running** | start Docker Desktop; enable "start at login" |
+| Vercel dashboard | — | Neon via Marketplace, Blob store, Sandbox; Deployment Protection → "Protection Bypass for Automation" token |
+| Claude Code | installed | `claude -p "say ok"` returns ok on your Max account |
+| GitHub | logged in | nothing |
+| Playwright Chromium | cached | nothing; the smoke test confirms it |
+| Sleep | prevented only while something holds `caffeinate` | `scripts/overnight.sh` wraps itself in `caffeinate -dimsu`; keep the laptop on power |
+
+**Toolchain smoke test (part of T01, run with you watching):** one Playwright headless screenshot, one `@vscode/test-electron` run of a hello-world extension (it downloads its own VS Code; macOS may ask once to allow it), `docker compose up db` + a query, `vercel deploy` of the skeleton, and `claude -p` with the login check. Any macOS permission dialog appears then, while you are there, not at 3 a.m.
+
+## 10. Open points
+
+1. **Identity in the hub:** the MVP has no login. Proposal: the runner sends `git config user.email` as "who started / who approved"; the hub trusts it, and the presentation names this as a known limit.
+2. **Live proof overnight (T06):** opening a real PR from the night would push `demo/*` branches to this repo, against the push rule. Proposal: overnight the PR step targets a local bare remote; the real PR happens in the demo rehearsal with you.
+3. **Screenshots of the real VS Code window (T09, T16):** taking them unattended needs macOS Screen Recording permission for the terminal. Proposal: the agents prove the UI with standalone Playwright screenshots and `@vscode/test-electron`; you take the real VS Code screenshot in the morning (5 min).

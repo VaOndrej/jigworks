@@ -12,6 +12,8 @@
 
 ## Goal
 
+Visual spec: [`docs/mockups/jigworks-ui.html`](../../docs/mockups/jigworks-ui.html).
+
 While a session runs, the engineer sees where it is in the workflow graph and how far along it is, as a share of the whole plan rather than a time estimate (mockup "VS Code — running session").
 
 ## Acceptance criteria
