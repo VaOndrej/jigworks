@@ -1,0 +1,20 @@
+[project]
+name = "jigworks-contracts"
+version = "0.1.0"
+description = "Frozen Jigworks contracts: pydantic models generated from schema/jigworks.schema.json."
+requires-python = ">=3.12"
+dependencies = [
+    "pydantic>=2.9",
+    "jsonschema>=4.23",
+    "rfc3339-validator>=0.1.4",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["jigworks_contracts"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"schema/jigworks.schema.json" = "jigworks_contracts/jigworks.schema.json"
