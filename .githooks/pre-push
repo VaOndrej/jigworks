@@ -4,6 +4,10 @@
 set -euo pipefail
 zero="0000000000000000000000000000000000000000"
 status=0
+root="$(git rev-parse --show-toplevel)"
+# shellcheck source=../scripts/ownership.sh
+source "$root/scripts/ownership.sh"
+agent="$(detect_agent "$root")"
 while read -r local_ref local_sha remote_ref remote_sha; do
   [[ -z "${remote_ref:-}" ]] && continue
   if [[ "$remote_ref" == "refs/heads/main" || "$remote_ref" == "refs/heads/master" ]]; then
@@ -24,8 +28,8 @@ while read -r local_ref local_sha remote_ref remote_sha; do
       status=1; continue
     fi
   fi
-  if [[ -n "${JIGWORKS_AGENT:-}" && "$remote_sha" != "$zero" ]]; then
-    "$(git rev-parse --show-toplevel)/scripts/check-ownership.sh" "$JIGWORKS_AGENT" --range "${remote_sha}..${local_sha}" || status=1
+  if [[ -n "$agent" && "$remote_sha" != "$zero" ]]; then
+    "$root/scripts/check-ownership.sh" "$agent" --range "${remote_sha}..${local_sha}" || status=1
   fi
 done
 exit $status
