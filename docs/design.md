@@ -1,185 +1,185 @@
-# Jigworks — společný brainstorming a architektonický návrh
+# Jigworks — joint brainstorming and architecture design
 
-- **Verze:** 0.6 (zúžené MVP + rozsah prototypu pro case study)
-- **Datum aktualizace:** 19. 11. 2026
-- **Stav:** pracovní návrh, ne hotová technická specifikace
-- **Kontext:** take-home case study „Design Your Software Factory" (AI Engineer, FTMO & OANDA); doporučený čas ~4 h, živé demo + záložní nahrávka, repo vč. agent instrukcí, promptů, testů, evalů a build logu; jen veřejná/syntetická data.
-- **Primární použití:** AI-first software development (cílovka = vývojáři)
-- **Budoucí použití:** další týmové procesy (HR, právní, ops) — v MVP jen jako ukázka směru
-- **Licence:** FSL-1.1-ALv2 (viz `LICENSE.md`)
+- **Version:** 0.6 (narrowed MVP + prototype scope for the case study)
+- **Last updated:** 19 Nov 2026
+- **Status:** working design, not a finished technical specification
+- **Context:** take-home case study "Design Your Software Factory" (AI Engineer, FTMO & OANDA); recommended time ~4 h, live demo + backup recording, repo incl. agent instructions, prompts, tests, evals and build log; public/synthetic data only.
+- **Primary use:** AI-first software development (target audience = developers)
+- **Future use:** other team processes (HR, legal, ops) — in the MVP only as a pointer to the direction
+- **License:** FSL-1.1-ALv2 (see `LICENSE.md`)
 
-**Zásada projektu:** Stavíme webový hub pro psaní, verzování a distribuci existujících LangGraph workflow do VS Code a lokální runner, který je vykoná. Nestavíme vlastní náhradu LangGraphu. Jediný zdroj pravdy je publikovaná verze vykonatelného Python workflow.
+**Project principle:** We are building a web hub for writing, versioning and distributing existing LangGraph workflows to VS Code, and a local runner that executes them. We are not building our own replacement for LangGraph. The single source of truth is the published version of the executable Python workflow.
 
-**Jméno:** „Software Factory" kolidovalo s firmou Factory (factory.ai, AI coding agenti). Pracovní jméno **Jigworks** — *jig* je výrobní přípravek, který vede nástroj tak, aby každý řez byl stejný; workflow dělá totéž s agentem.
+**Name:** "Software Factory" collided with the company Factory (factory.ai, AI coding agents). Working name **Jigworks** — a *jig* is a manufacturing fixture that guides the tool so that every cut is the same; a workflow does the same with an agent.
 
 ---
 
-## 1. Rozsah
+## 1. Scope
 
-### Tři produktové části
+### Three product parts
 
-1. **Web Hub** (React + TypeScript, Vite): psaní workflow jako **normální Python kód** přímo ve webu; graf je **jen read-only vizualizace** přes LangGraph `get_graph()` → React Flow (se zvýrazněním běžících uzlů). Verzování, publikování, přehled běhů, audit log a cena. Textová záložka „HR oddělení".
-2. **VS Code extension** (TypeScript + React Webview): výběr publikovaného workflow, prompt, spuštění, živý průběh kroků, tlačítko Schválit/Zamítnout (human-in-the-loop). Přes lokální Python runner vykonává LangGraph graf, který volá `claude -p` (později další CLI).
-3. **Hub API** (Python + FastAPI + PostgreSQL) na Vercelu: drafty a releasy workflow, distribuce do extension, příjem událostí běhů, analytika usage/ceny.
+1. **Web Hub** (React + TypeScript, Vite): workflows are written as **normal Python code** directly in the web; the graph is **only a read-only visualization** via LangGraph `get_graph()` → React Flow (with running nodes highlighted). Versioning, publishing, run overview, audit log and cost. A text tab "HR department".
+2. **VS Code extension** (TypeScript + React Webview): pick a published workflow, prompt, run, live step progress, Approve/Reject button (human-in-the-loop). Through a local Python runner it executes the LangGraph graph, which calls `claude -p` (other CLIs later).
+3. **Hub API** (Python + FastAPI + PostgreSQL) on Vercel: workflow drafts and releases, distribution to the extension, ingest of run events, usage/cost analytics.
 
-### Rozsah prototypu (case study, v pořadí stavby)
+### Prototype scope (case study, in build order)
 
-Každý krok musí jít ukázat samostatně; když 3 nestihneme, demo stojí na 1 + 2 a Hub je v prezentaci jako „co jsem vyškrtl".
+Each step must be demo-able on its own; if we don't make it to 3, the demo stands on 1 + 2 and the Hub appears in the presentation as "what I cut".
 
-1. **Runner + workflow `feature-development` (jádro)**
-   - `plan → testy ze zadání (jiný agent) → implement → nezávislý review → gate → schválení člověkem (interrupt) → PR`
-   - Ukázkové repo: malá **syntetická order-handling služba s invarianty** hlídanými property testy (odpověď senior engineerovi: „agenti tiše rozbíjí invarianty").
-   - Audit log: kdo spustil, verze workflow (digest), model, změněné soubory, tokeny, cena.
-2. **VS Code extension:** výběr workflow, prompt, živé kroky, Schválit/Zamítnout.
-3. **Hub na Vercelu (minimální):** Python editor + publish verze, `get_graph()` graf, seznam běhů s audit logem a cenou, textová záložka HR.
+1. **Runner + `feature-development` workflow (core)**
+   - `plan → tests from the spec (different agent) → implement → independent review → gate → human approval (interrupt) → PR`
+   - Sample repo: a small **synthetic order-handling service with invariants** guarded by property tests (the answer to the senior engineer: "agents silently break invariants").
+   - Audit log: who started it, workflow version (digest), model, changed files, tokens, cost.
+2. **VS Code extension:** workflow picker, prompt, live steps, Approve/Reject.
+3. **Hub on Vercel (minimal):** Python editor + publish a version, `get_graph()` graph, list of runs with audit log and cost, HR text tab.
 
-### Výslovně mimo
+### Explicitly out
 
-- Vizuální editace grafu (jen read-only `get_graph()`), vlastní graph engine, DSL, katalog node typů.
-- Serverové CI/CD gates, automatický production deploy, governance napříč všemi nástroji.
-- HR/právní funkcionalita (jen textová záložka), veřejné API, marketplace, JetBrains, cloudové runnery.
-- Integrace s otevřenou chat session oficiální Claude Code extension.
+- Visual graph editing (read-only `get_graph()` only), custom graph engine, DSL, node type catalog.
+- Server-side CI/CD gates, automatic production deploy, governance across all tools.
+- HR/legal functionality (text tab only), public API, marketplace, JetBrains, cloud runners.
+- Integration with an open chat session of the official Claude Code extension.
 
-**Produktová hranice:** workflow může vyžadovat review/testy/schválení a runner to v rámci řízeného běhu vykoná. Nelze tvrdit, že zabráníme použít jiný nástroj nebo obejít kontroly při mergi.
+**Product boundary:** a workflow can require review/tests/approval and the runner enforces that within a controlled run. We cannot claim to prevent using another tool or bypassing checks at merge time.
 
-## 2. Mapování na lidi ze zadání
+## 2. Mapping to the people in the brief
 
-| Kdo | Problém | Odpověď v návrhu |
+| Who | Problem | Answer in the design |
 |---|---|---|
-| Senior engineer (trading) | agent tiše rozbíjí invarianty | testy/invarianty píše jiný agent ze zadání **před** implementací; property testy jako gate |
-| Early adopter | velké PR, testy od stejného agenta, povrchní review | nezávislý review uzel, gate před člověkem, malé kroky |
-| Team lead | každý má vlastní setup, odchází s ním; neví, jestli jsou rychlejší | workflow sdílené a verzované v Hubu; porovnání verzí (cena, počet oprav, úspěšnost) |
-| Long-task engineer | agent ztrácí kontext napříč sessions | LangGraph checkpoint + git snapshot per uzel; stav běhu je mimo kontext agenta |
-| Platform engineer | laptopy, vlastní credentials, žádný záznam ani cena | audit log každého běhu, analytika ceny, izolace do git worktree; deklarace oprávnění agenta per release (návrh) |
-| Security & compliance | audit trail, approver ≠ author, autorství | události běhu = audit trail; `interrupt` = lidské schválení; autor = člověk, který běh spustil a schválil |
-| Ops analytik (ne-inženýr) | shadow IT na laptopu | mimo prototyp; v Hubu záložka popisující směr (workflow + varianty pro oddělení, běh mimo IDE) |
+| Senior engineer (trading) | agent silently breaks invariants | tests/invariants are written by a different agent from the spec **before** implementation; property tests as a gate |
+| Early adopter | large PRs, tests from the same agent, shallow review | independent review node, gate before the human, small steps |
+| Team lead | everyone has their own setup and leaves with it; doesn't know if they are faster | workflows shared and versioned in the Hub; version comparison (cost, number of fixes, success rate) |
+| Long-task engineer | agent loses context across sessions | LangGraph checkpoint + git snapshot per node; run state lives outside the agent's context |
+| Platform engineer | laptops, personal credentials, no record or cost | audit log of every run, cost analytics, isolation in a git worktree; per-release declaration of agent permissions (proposal) |
+| Security & compliance | audit trail, approver ≠ author, authorship | run events = audit trail; `interrupt` = human approval; author = the human who started and approved the run |
+| Ops analyst (non-engineer) | shadow IT on a laptop | outside the prototype; a tab in the Hub describing the direction (workflow + department variants, running outside the IDE) |
 
-## 3. Technologie
+## 3. Technology
 
-| Vrstva | Technologie | Stav |
+| Layer | Technology | Status |
 |---|---|---|
-| Web Hub frontend | React + TypeScript (Vite) | Schváleno |
-| Graf | React Flow (`@xyflow/react`), read-only z `get_graph()` | Schváleno |
-| Hub API | Python + FastAPI | Schváleno |
-| Hosting | Vercel, jeden projekt `jigworks`, **Vercel Services** (Beta) pro web + API | Schváleno |
-| Databáze | PostgreSQL (Neon přes Vercel Marketplace) | Schváleno |
-| Úložiště balíčků | Vercel Blob | Návrh |
-| Izolovaná validace kódu workflow | Vercel Sandbox | Návrh |
-| Workflow execution | LangGraph (Python) | Schváleno |
-| Python prostředí | `uv`, jedno venv per digest releasu | Schváleno |
-| IDE klient | VS Code extension (TS) + React Webview, instalace lokálně přes `.vsix` | Schváleno |
-| Agent | `claude -p --output-format stream-json`; později Codex | Schváleno |
-| Účty | primárně firemní API klíč; Pro účty mají pro `claude -p` samostatný programatický kredit (ověřit v code.claude.com/docs/en/legal-and-compliance) | K ověření |
-| Rust | nepoužít | Rozhodnuto |
+| Web Hub frontend | React + TypeScript (Vite) | Approved |
+| Graph | React Flow (`@xyflow/react`), read-only from `get_graph()` | Approved |
+| Hub API | Python + FastAPI | Approved |
+| Hosting | Vercel, one project `jigworks`, **Vercel Services** (Beta) for web + API | Approved |
+| Database | PostgreSQL (Neon via Vercel Marketplace) | Approved |
+| Package storage | Vercel Blob | Proposal |
+| Isolated validation of workflow code | Vercel Sandbox | Proposal |
+| Workflow execution | LangGraph (Python) | Approved |
+| Python environment | `uv`, one venv per release digest | Approved |
+| IDE client | VS Code extension (TS) + React Webview, installed locally via `.vsix` | Approved |
+| Agent | `claude -p --output-format stream-json`; Codex later | Approved |
+| Accounts | primarily a company API key; Pro accounts have a separate programmatic credit for `claude -p` (verify at code.claude.com/docs/en/legal-and-compliance) | To verify |
+| Rust | do not use | Decided |
 
-Langflow / LangSmith Studio: jen inspirace. LangSmith Studio už graf vizualizuje a trasuje, ale je vázané na LangSmith (self-host jen Enterprise). Odlišujeme se: VS Code + lokální CLI agenti + distribuce verzí týmu + varianty pro oddělení.
+Langflow / LangSmith Studio: inspiration only. LangSmith Studio already visualizes and traces the graph, but it is tied to LangSmith (self-hosting only on Enterprise). We differentiate: VS Code + local CLI agents + distribution of versions to the team + department variants.
 
-## 4. Architektura
+## 4. Architecture
 
 ```
                  WEB HUB (React, Vite)            ┐
-        Python editor | get_graph() graf | běhy   │ Vercel projekt "jigworks"
-        audit | cena | záložka HR                 │ (Vercel Services)
+        Python editor | get_graph() graph | runs  │ Vercel project "jigworks"
+        audit | cost | HR tab                     │ (Vercel Services)
                         |                         │
                  HUB API (FastAPI)                │
         Postgres | releases | channels | events   ┘
                         |
-              HTTPS REST (+ SSE s reconnectem / polling)
+              HTTPS REST (+ SSE with reconnect / polling)
                         |
               VS CODE EXTENSION (TS)
-        Webview: workflow | prompt | kroky | Schválit
+        Webview: workflow | prompt | steps | Approve
                         |
-                 lokální proces
+                 local process
                         |
               LOCAL RUNNER (Python, uv venv per digest)
-        LangGraph graf | checkpoint + git snapshot | audit log
+        LangGraph graph | checkpoint + git snapshot | audit log
                         |
-              CLI AGENT ADAPTÉRY
-        claude -p (stream-json) | později Codex
+              CLI AGENT ADAPTERS
+        claude -p (stream-json) | Codex later
                         |
-              repo | git worktree | testy | Playwright
+              repo | git worktree | tests | Playwright
 ```
 
-- Hub vlastní publikované verze, přiřazení a souhrnnou historii. Nepotřebuje přístup ke kódu ani k CLI credentials.
-- Runner vlastní vykonávání; streamuje události do extension i hubu. Při výpadku spojení fronta lokálně a sync po obnovení.
-- SSE na Vercel funkcích má časový limit → klient musí počítat s reconnectem (případně polling).
+- The Hub owns published versions, assignments and the summary history. It needs no access to the code or to CLI credentials.
+- The runner owns execution; it streams events to the extension and to the hub. When the connection drops, it queues locally and syncs after recovery.
+- SSE on Vercel functions has a time limit → the client must handle reconnects (or polling).
 
-## 5. Web Hub: workflow jako Python
+## 5. Web Hub: workflow as Python
 
-- Workflow se píše jako standardní Python LangGraph (`StateGraph`, `add_node`, `add_edge`, `add_conditional_edges`, `interrupt`).
-- Graf se zobrazuje **jen pro čtení**: kód se zkompiluje v izolovaném prostředí, `get_graph()` → JSON → React Flow. Žádný roundtrip, žádné tiché přepisování kódu.
-- AI úpravy: návrh změny jako diff; před uložením syntax/import/compile v izolaci.
+- A workflow is written as standard Python LangGraph (`StateGraph`, `add_node`, `add_edge`, `add_conditional_edges`, `interrupt`).
+- The graph is displayed **read-only**: the code is compiled in an isolated environment, `get_graph()` → JSON → React Flow. No roundtrip, no silent rewriting of the code.
+- AI edits: the proposed change is shown as a diff; before saving, syntax/import/compile checks run in isolation.
 
-### Workflow balíček
+### Workflow package
 
 ```
 feature-development/
-  graph.py            # StateGraph, vstupní bod
-  steps/              # node funkce
-  prompts/            # prompty fází
-  workflow.toml       # name, entrypoint, min runner version, inputs, oprávnění agenta (návrh)
+  graph.py            # StateGraph, entry point
+  steps/              # node functions
+  prompts/            # phase prompts
+  workflow.toml       # name, entrypoint, min runner version, inputs, agent permissions (proposal)
   requirements.lock   # uv lock
   README.md
 ```
 
-Kód publikovaných workflow se nikdy nevykonává v procesu Hub API.
+The code of published workflows is never executed in the Hub API process.
 
-## 6. Verze a distribuce
+## 6. Versions and distribution
 
-`Draft → Validate → Publish immutable release (workflowId, version, digest) → Channel (stable/beta) → Sync do extension → Run pinned version`
+`Draft → Validate → Publish immutable release (workflowId, version, digest) → Channel (stable/beta) → Sync to extension → Run pinned version`
 
-- **Distribuce přes Hub API:**
+- **Distribution via Hub API:**
   - `GET /api/workflows/{id}/channels/stable` → release id + digest
   - `GET /api/releases/{id}/bundle` → `.zip`
-  - extension ověří digest, rozbalí do vlastní cache, `uv` venv per digest
-- **Fallback:** příkaz „Import workflow ze souboru" ve VS Code (stejný `.zip`).
-- Rollback = přesměrování kanálu na starší release. Běžící úkol se novou verzí nikdy nezmění.
-- Nová verze se nabídne, ale nespustí se bez explicitního režimu nastaveného týmem.
+  - the extension verifies the digest, unpacks into its own cache, `uv` venv per digest
+- **Fallback:** an "Import workflow from file" command in VS Code (the same `.zip`).
+- Rollback = pointing the channel to an older release. A running task never changes to a new version.
+- A new version is offered, but it does not run without an explicit mode set by the team.
 
 ## 7. VS Code extension
 
-- Výběr workspace, workflow (`feature-development@1.3.0`), agenta/modelu.
-- Prompt + volitelné přílohy z workspace.
-- Start / stop / resume; živé kroky, tool calls, tokeny, cena, odkazy na diff a Playwright artefakty.
-- **Human-in-the-loop:** LangGraph `interrupt` → Schválit/Zamítnout v extension (schválení plánu, schválení před PR).
-- Paralelní běhy v samostatných git worktrees.
-- Remote SSH / Dev Containers: runner a CLI musí běžet u workspace.
+- Pick the workspace, workflow (`feature-development@1.3.0`), agent/model.
+- Prompt + optional attachments from the workspace.
+- Start / stop / resume; live steps, tool calls, tokens, cost, links to the diff and Playwright artifacts.
+- **Human-in-the-loop:** LangGraph `interrupt` → Approve/Reject in the extension (plan approval, approval before the PR).
+- Parallel runs in separate git worktrees.
+- Remote SSH / Dev Containers: the runner and the CLI must run next to the workspace.
 
-### Rozhraní agenta
+### Agent interface
 
 - `run(prompt, cwd, options) → result + events`
-- Claude adapter: `claude -p --output-format stream-json`, `--resume` pro navazující session, oprávnění přes `--allowedTools` / `--permission-mode`. Auth patří Claude Code, ne Jigworks.
+- Claude adapter: `claude -p --output-format stream-json`, `--resume` for a follow-up session, permissions via `--allowedTools` / `--permission-mode`. Auth belongs to Claude Code, not to Jigworks.
 
-## 8. Hub API, analytika, audit
+## 8. Hub API, analytics, audit
 
-| Endpoint | Použití |
+| Endpoint | Use |
 |---|---|
-| `GET /api/workflows` | seznam workflow |
+| `GET /api/workflows` | list of workflows |
 | `GET/PUT /api/workflows/{id}/draft` | draft |
-| `POST /api/workflows/{id}/validate` | validace v izolaci |
-| `POST /api/workflows/{id}/publish` | nový release |
-| `GET /api/workflows/{id}/releases` | verze |
-| `GET /api/workflows/{id}/channels/{name}` | resolve kanálu |
-| `GET /api/releases/{id}/bundle` | stažení `.zip` |
-| `POST /api/runs` | registrace běhu + pinned release |
-| `POST /api/runs/{id}/events` | ingest událostí |
+| `POST /api/workflows/{id}/validate` | validation in isolation |
+| `POST /api/workflows/{id}/publish` | new release |
+| `GET /api/workflows/{id}/releases` | versions |
+| `GET /api/workflows/{id}/channels/{name}` | channel resolution |
+| `GET /api/releases/{id}/bundle` | download the `.zip` |
+| `POST /api/runs` | register a run + pinned release |
+| `POST /api/runs/{id}/events` | event ingest |
 | `GET /api/runs/{id}/events/stream` | SSE |
 | `GET /api/analytics/usage` | reporting |
 
-### Analytika (vlastní, bez LangSmith/Langfuse)
+### Analytics (own, without LangSmith/Langfuse)
 
-- Zdroj: závěrečná zpráva `stream-json` (`usage`, `total_cost_usd`) — přesná pole ověřit ve spiku B.
-- Ukládat **surové tokeny per volání**: `runId, node, attempt, model, adapter, input, output, cache_write, cache_read`.
-- **Ceník jako tabulka s platností:** `model, token_type, price_per_mtok, valid_from`; cena se počítá při čtení.
-- Cache tokeny oceňovat zvlášť (v agentních smyčkách tvoří většinu).
-- U Pro účtů štítek „API ekvivalent". `total_cost_usd` z CLI jen jako kontrola.
-- Adaptér normalizuje do stejných polí (Codex hlásí jinak).
+- Source: the final `stream-json` message (`usage`, `total_cost_usd`) — verify the exact fields in spike B.
+- Store **raw tokens per call**: `runId, node, attempt, model, adapter, input, output, cache_write, cache_read`.
+- **Price list as a table with validity:** `model, token_type, price_per_mtok, valid_from`; cost is computed at read time.
+- Price cache tokens separately (they make up the majority in agentic loops).
+- For Pro accounts, label it "API equivalent". `total_cost_usd` from the CLI only as a cross-check.
+- The adapter normalizes into the same fields (Codex reports differently).
 
 ### Audit
 
-Každý běh: kdo spustil, release + digest, model, kroky, změněné soubory (git snapshot per uzel), výsledky gate, kdo schválil a kdy, tokeny a cena.
+Every run: who started it, release + digest, model, steps, changed files (git snapshot per node), gate results, who approved and when, tokens and cost.
 
-### Události běhu (příklad)
+### Run events (example)
 
 ```json
 {
@@ -192,65 +192,65 @@ Každý běh: kdo spustil, release + digest, model, kroky, změněné soubory (g
 }
 ```
 
-## 9. První workflow `feature-development`
+## 9. First workflow `feature-development`
 
 ```
-START → plan → [human approve plan] → write_tests (jiný agent, ze zadání)
-      → implement → review (nezávislý agent)
-            review FAIL → fix → review          (limit iterací)
-            review PASS → gate (testy + property testy invariantů)
+START → plan → [human approve plan] → write_tests (different agent, from the spec)
+      → implement → review (independent agent)
+            review FAIL → fix → review          (iteration limit)
+            review PASS → gate (tests + invariant property tests)
             gate FAIL → fix → gate
             gate PASS → [human approve] → open PR → summary → END
 ```
 
-- Kroky jsou běžné Python funkce přes `add_node`; smyčky přes `add_conditional_edges`; checkpointy LangGraph + git commit per uzel (hash ve stavu grafu).
-- Akceptace: runner projde aspoň jednou opravnou smyčkou a extension zobrazí průběh i schválení.
+- Steps are ordinary Python functions via `add_node`; loops via `add_conditional_edges`; LangGraph checkpoints + a git commit per node (hash in the graph state).
+- Acceptance: the runner goes through at least one fix loop and the extension shows the progress and the approval.
 
-## 10. Odloženo
+## 10. Deferred
 
-- HR/právní/ops: jen textová záložka v Hubu (Ondřej popíše use-casy, např. automatický CV screening). Budoucí tvar: základní workflow + varianta oddělení s přidanými kontrolními/schvalovacími uzly (subgrafy + `interrupt`) a běh mimo IDE.
-- Veřejné API, JetBrains, cloud runnery, scheduling, marketplace, pokročilá oprávnění, fakturace, server-side CI enforcement.
+- HR/legal/ops: only a text tab in the Hub (Ondřej describes the use cases, e.g. automatic CV screening). Future shape: a base workflow + a department variant with added check/approval nodes (subgraphs + `interrupt`) and running outside the IDE.
+- Public API, JetBrains, cloud runners, scheduling, marketplace, advanced permissions, billing, server-side CI enforcement.
 
-## 11. Otevřené otázky
+## 11. Open questions
 
-1. Checkpoint + git snapshot: obnova po restartu IDE bez dvojího side-effectu.
-2. Deklarace oprávnění agenta per release (`--allowedTools`, síť, zápis) a její zobrazení před instalací.
-3. Porovnání verzí workflow z analytiky (cena, opravy, úspěšnost).
-4. Granularita telemetrie `stream-json` — ověřit ve spiku B.
-5. Billing Pro účtů pro `claude -p` — ověřit aktuální podmínky.
+1. Checkpoint + git snapshot: recovery after an IDE restart without a duplicate side effect.
+2. Per-release declaration of agent permissions (`--allowedTools`, network, write) and showing it before installation.
+3. Comparing workflow versions from analytics (cost, fixes, success rate).
+4. Granularity of `stream-json` telemetry — verify in spike B.
+5. Pro account billing for `claude -p` — verify the current terms.
 
-## 12. Repo struktura (plán)
+## 12. Repo structure (plan)
 
 ```
 jigworks/
-  AGENTS.md            # instrukce pro agenty; povinná Playwright kontrola vizuálu (390 px + 1440 px)
-  CLAUDE.md            # odkaz na AGENTS.md
+  AGENTS.md            # agent instructions; mandatory Playwright check of visuals (390 px + 1440 px)
+  CLAUDE.md            # pointer to AGENTS.md
   LICENSE.md           # FSL-1.1-ALv2
-  BUILD_LOG.md         # čas a co bylo delegováno/reviewováno/ručně/co se pokazilo
+  BUILD_LOG.md         # time and what was delegated/reviewed/hand-written/what went wrong
   vercel.json          # Services: hub-web + hub-api
   apps/hub-api/        # FastAPI
   apps/hub-web/        # Vite + React + React Flow
-  clients/vscode/      # extension; později jetbrains/, hr-portal/
-  runner/              # lokální runner + adaptéry
-  packages/contracts/  # schéma událostí a API → TS + Python typy
+  clients/vscode/      # extension; later jetbrains/, hr-portal/
+  runner/              # local runner + adapters
+  packages/contracts/  # event and API schema → TS + Python types
   workflows/feature-development/
-  sample-repo/         # syntetická order-handling služba s invarianty
-  demo/                # později
+  sample-repo/         # synthetic order-handling service with invariants
+  demo/                # later
   e2e/                 # Playwright
   docs/
 ```
 
-Nástroje: pnpm workspace (TS), uv workspace (Python).
+Tooling: pnpm workspace (TS), uv workspace (Python).
 
-## 13. Historie rozhodnutí
+## 13. Decision history
 
-- **v0.6 (19. 11. 2026):** projekt pojmenován Jigworks, licence FSL-1.1-ALv2. Web Hub = psaní Pythonu + read-only `get_graph()` graf (vizuální editace vyřazena). Distribuce přes Hub API + fallback import `.zip`. Analytika vlastní (tokeny × ceník s platností). Hosting Vercel Services + Neon. Cílovka vývojáři, HR jen textová záložka. Governance prvky (audit, nezávislý review, human approval) přesunuty do jádra kvůli zadání case study. Rozsah prototypu: runner → extension → minimální Hub.
-- **v0.5:** striktně tříčásté MVP, bez policy engine a DSL, lokální vykonávání Python LangGraph balíčku.
+- **v0.6 (19 Nov 2026):** project named Jigworks, license FSL-1.1-ALv2. Web Hub = writing Python + read-only `get_graph()` graph (visual editing dropped). Distribution via Hub API + `.zip` import fallback. Own analytics (tokens × price list with validity). Hosting on Vercel Services + Neon. Target audience is developers, HR only as a text tab. Governance elements (audit, independent review, human approval) moved into the core because of the case study brief. Prototype scope: runner → extension → minimal Hub.
+- **v0.5:** strictly three-part MVP, no policy engine and no DSL, local execution of a Python LangGraph package.
 - **v0.4:** FastAPI REST/SSE hub, VS Code TS/React Webview, releases, live usage.
-- **v0.3:** React/TS, React Flow, Python/FastAPI + LangGraph; Rust volitelný.
-- **v0.2:** lokální vykonávání s centrálně publikovanými workflow.
+- **v0.3:** React/TS, React Flow, Python/FastAPI + LangGraph; Rust optional.
+- **v0.2:** local execution with centrally published workflows.
 
-## 14. Odkazy
+## 14. Links
 
 - LangGraph Graph API: https://docs.langchain.com/oss/python/langgraph/graph-api
 - LangGraph conditional routing: https://reference.langchain.com/python/langgraph/graph/state/StateGraph/add_conditional_edges
