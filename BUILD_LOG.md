@@ -8,7 +8,8 @@ Time is tracked in two columns: **human** (my own time: deciding, directing, rev
 |---|---|---|
 | Brainstorming & design | 1 h 30 min | — |
 | English pass, agent instructions, ticket plan | 20 min | ~85 min |
-| **Total** | **1 h 50 min** | **~85 min** |
+| UI review and design brainstorming (v0.7) | 30 min | ~30 min |
+| **Total** | **2 h 20 min** | **~1 h 55 min** |
 
 ## Entries
 
@@ -60,3 +61,22 @@ Time is tracked in two columns: **human** (my own time: deciding, directing, rev
 - The agent could not find the brief: it was in a claude.ai chat, not in Claude Code history. I supplied the PDF by hand.
 - Critical-path human time in the plan adds up to the whole remaining budget, so milestone 3 (hub) is realistically below the cut line.
 - A gap check of the tickets against the brief found two misses: no secret/vulnerability scan for the security lead, and no resume-after-restart proof for the long-task engineer. Both were added to T05 and T06.
+
+### 2026-11-19 — UI review and design brainstorming (human 30 min, agent ~30 min)
+
+**What I did**
+- Reviewed the UI mockups screen by screen and brainstormed the next round of product decisions.
+
+**What I delegated**
+- Redrawing the mockups, updating design.md (v0.7), the tickets and the two-agent draft.
+
+**What I reviewed / decided myself**
+- A session waiting for review shows a "Review" badge instead of its %; approved steps are green; the current step gets a clear "NOW" marker.
+- Optional live agent output in VS Code for people who want to watch.
+- Models are set by the workflow in the hub, not picked in VS Code.
+- Human delta baseline = the first result of a session; follow-up prompts count as corrections just like hand edits. Added "Request changes" to the review step.
+- Hub editor: Code/Graph toggle only, new file/folder, GitHub repo connection shown as planned. Hub overview toned down.
+- Answers to the two-agent decisions: contracts frozen, Docker Postgres, agents commit and I merge and push.
+
+**What went wrong / changed course**
+- The first redesign of the hub overview was over-decorated (KPI tiles, sparklines, coloured step bars); I asked for it to be toned down.
