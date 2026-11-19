@@ -66,7 +66,7 @@ actual="sha256:$(shasum -a 256 "$tmp/bundle.zip" | awk '{print $1}')"
 echo "\$ curl $bundle_url  [X-Jigworks-Key]"
 echo "  → $(wc -c <"$tmp/bundle.zip" | tr -d ' ') bytes, X-Jigworks-Digest=$header_digest, sha256(bytes)=$actual"
 [[ "$actual" == "$digest" && "$header_digest" == "$digest" ]] || { echo "FAIL: digest mismatch" >&2; exit 1; }
-unzip -l "$tmp/bundle.zip" | tail -n +4 | head -n -2 | awk '{print "    " $4}'
+echo "  files: $(unzip -Z1 "$tmp/bundle.zip" | paste -sd' ' -)"
 
 echo; echo "# register a run → post events (twice) → read usage"
 run_id="run_smoke_$(date +%s)"

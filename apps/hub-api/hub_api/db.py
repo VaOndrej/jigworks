@@ -15,6 +15,9 @@ from psycopg.types.json import Jsonb
 from .config import settings
 
 SCHEMA_VERSION = "1"
+# Timestamps leave the API as UTC ("…Z") whatever the server's TimeZone is. SET LOCAL (not a startup
+# option) because Neon's pooled endpoint rejects startup options and pools per transaction.
+UTC = "SET LOCAL TIME ZONE 'UTC'"
 _ready: set[str] = set()
 _ready_lock = threading.Lock()
 
@@ -29,6 +32,7 @@ def connect() -> Iterator[psycopg.Connection]:
     url = settings().database_url
     ensure_ready(url)
     with psycopg.connect(url, row_factory=dict_row) as conn:
+        conn.execute(UTC)
         yield conn
 
 
@@ -42,6 +46,7 @@ def ensure_ready(url: str) -> None:
         from .seed import seed_if_empty  # noqa: PLC0415 (import cycle)
 
         with psycopg.connect(url, row_factory=dict_row) as conn:
+            conn.execute(UTC)
             conn.execute("SELECT pg_advisory_xact_lock(4242001)")
             conn.execute(schema_sql())
             seed_if_empty(conn)
