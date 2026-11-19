@@ -7,7 +7,8 @@ Time is tracked in two columns: **human** (my own time: deciding, directing, rev
 | Phase | Human | Agent |
 |---|---|---|
 | Brainstorming & design | 1 h 30 min | — |
-| **Total** | **1 h 30 min** | **—** |
+| English pass, agent instructions, ticket plan | 10 min | ~25 min |
+| **Total** | **1 h 40 min** | **~25 min** |
 
 ## Entries
 
@@ -30,3 +31,22 @@ Time is tracked in two columns: **human** (my own time: deciding, directing, rev
 **What went wrong / changed course**
 - The first scope was far too big for the time box; after re-reading the brief, governance (audit trail, independent review, human approval) moved from "out of MVP" into the core, and the prototype was cut to three demo-able slices.
 - "Software Factory" as a name collides with an existing AI coding company (Factory), so it was renamed.
+
+### 2026-11-19 — English pass, agent instructions, ticket plan (human 10 min, agent ~25 min)
+
+**What I delegated**
+- Translating `docs/design.md` v0.6 from Czech to English (faithful, no content changes).
+- Writing `AGENTS.md` (modeled on the structure of an agent-instructions file from another project of mine), `CLAUDE.md` and `.gitignore`.
+- Breaking design.md §1 into tickets with verifiable acceptance criteria → [`docs/plan.md`](docs/plan.md).
+
+**What I reviewed / decided myself**
+- The rules that go into `AGENTS.md`: English only, Playwright at 390 px + 1440 px for visuals, test output as proof for logic, build log per session.
+- Build order: `claude -p` stream-json spike first, cut line after the VS Code extension.
+- Agent may commit but not push; pushing stays with me.
+
+**What I wrote by hand**
+- The session prompt only.
+
+**What went wrong / changed course**
+- The brief's 9 questions are not in the repo, so the presentation ticket cannot list them yet (open question Q1 in the plan).
+- Critical-path human time in the plan adds up to the whole remaining budget, so milestone 3 (hub) is realistically below the cut line.
