@@ -4,5 +4,6 @@ A software factory prototype: versioned LangGraph workflows, written in Python i
 
 - Design: [docs/design.md](docs/design.md)
 - Agent instructions: [AGENTS.md](AGENTS.md)
+- Ticket plan: [docs/plan.md](docs/plan.md)
 - Build log: [BUILD_LOG.md](BUILD_LOG.md)
 - License: [FSL-1.1-ALv2](LICENSE.md)
