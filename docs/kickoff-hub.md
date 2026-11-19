@@ -14,9 +14,10 @@ Worktree: `~/Development/jigworks-hub`, local branch `agent/hub`, `JIGWORKS_AGEN
 
 ## Before the first ticket
 
-1. Start `caffeinate -dimsu` as a **background** command (run_in_background) and leave it running for the whole session, so the Mac stays awake all night.
-2. Make sure Docker runs: `docker info`. If it fails, `open -a Docker`, then wait until `docker info` succeeds.
-3. Confirm `echo $JIGWORKS_AGENT` prints `hub` and `git rev-parse --abbrev-ref HEAD` prints `agent/hub`. Both must hold before you write anything.
+1. **Your home is `~/Development/jigworks-hub`**, wherever this session was started. Start every Bash command with `cd ~/Development/jigworks-hub && …`, and give the Read/Edit/Write tools absolute paths under `/Users/ondrej/Development/jigworks-hub/`. `~/Development/jigworks` is the human's checkout: read-only for you. The ownership guard and the git hooks know you are `hub` from the worktree's `.claude/settings.local.json`, even when `$JIGWORKS_AGENT` is empty in this session.
+2. Confirm `cd ~/Development/jigworks-hub && git rev-parse --abbrev-ref HEAD` prints `agent/hub`.
+3. Start `caffeinate -dimsu` as a **background** command (run_in_background) and leave it running for the whole session, so the Mac stays awake all night.
+4. Make sure Docker runs: `docker info`. If it fails, `open -a Docker`, then wait until `docker info` succeeds.
 
 ## Your queue
 
