@@ -1,10 +1,12 @@
+import * as fs from "node:fs";
 import * as path from "node:path";
 import * as vscode from "vscode";
 import type { RunEvent } from "@jigworks/contracts";
+import { installBundle, sidecarDigest } from "./bundles";
 import { RunnerBridge } from "./runner/bridge";
 import { checkClaude } from "./runner/preflight";
 import { WorkflowRegistry } from "./workflows";
-import type { HostState, Preflight, ToHost, ToWebview, ViewKind } from "./shared/messages";
+import type { HostState, Preflight, ToHost, ToWebview, ViewKind, WorkflowInfo } from "./shared/messages";
 import { foldEvents } from "./shared/session";
 
 export interface JigworksApi {
@@ -292,6 +294,39 @@ class Host {
   statusText(): string {
     return this.status.text;
   }
+
+  /** "Import workflow from file" (design.md §6 fallback): the same .zip the hub serves. */
+  async importZip(zipPath?: string, digest?: string): Promise<WorkflowInfo | undefined> {
+    let file = zipPath;
+    if (!file) {
+      const picked = await vscode.window.showOpenDialog({ filters: { "Workflow bundle": ["zip"] }, openLabel: "Import" });
+      file = picked?.[0]?.fsPath;
+      if (!file) return undefined;
+    }
+    let expected = digest ?? sidecarDigest(file);
+    if (!expected) {
+      expected = await vscode.window.showInputBox({
+        prompt: "Digest of the release (sha256:…), as shown in the hub",
+        validateInput: (v) => (/^sha256:[0-9a-f]{64}$/.test(v.trim()) ? undefined : "expected sha256: followed by 64 hex digits"),
+      });
+      if (!expected) return undefined;
+    }
+    try {
+      const out = await installBundle(this.bridge, this.cacheDir(), fs.readFileSync(file), expected, {
+        source: "imported",
+        fileName: path.basename(file),
+      });
+      const wf = await this.registry.add(out.path, "imported", undefined, out.digest);
+      this.selected = wf.key;
+      this.broadcast();
+      void vscode.window.showInformationMessage(`Jigworks: imported ${wf.release} (${wf.digest.slice(0, 19)}…).`);
+      return wf;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      void vscode.window.showErrorMessage(`Jigworks: import refused. ${msg}`);
+      throw err;
+    }
+  }
 }
 
 class SidebarProvider implements vscode.WebviewViewProvider {
@@ -319,6 +354,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Jigwor
     }),
     vscode.commands.registerCommand("jigworks.resume", (runId: string) => host.onMessage({ type: "resume", runId })),
     vscode.commands.registerCommand("jigworks.refresh", () => host.init()),
+    vscode.commands.registerCommand("jigworks.importWorkflow", (zipPath?: string, digest?: string) => host.importZip(zipPath, digest)),
     vscode.commands.registerCommand("jigworks.preflight", () => host.preflight()),
     vscode.commands.registerCommand("jigworks.openWorktree", async (runId: string) => {
       const rows = await host.bridge.list();

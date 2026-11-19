@@ -105,5 +105,23 @@ def load_package(root: str | Path, digest: str | None = None) -> WorkflowPackage
         pkg.__package__ = module_name
         sys.modules[module_name] = pkg
     mod_name, _, attr = manifest["entrypoint"].partition(":")
-    module = importlib.import_module(f"{module_name}.{mod_name}")
+    module = _import_entry(root, f"{module_name}.{mod_name}")
     return WorkflowPackage(root, manifest, digest, module_name, getattr(module, attr or "build_graph"))
+
+
+def _import_entry(root: Path, qualified: str) -> types.ModuleType:
+    """Import the entry module. Packages may use relative imports (`from .steps import nodes`,
+    preferred) or absolute ones (`from steps import nodes`, like the T02 fixture bundles). For the
+    latter the root is on sys.path only during the import, and the top-level modules it loaded are
+    dropped from sys.modules afterwards, so another package's `steps` never resolves to this one."""
+    before = set(sys.modules)
+    sys.path.insert(0, str(root))
+    try:
+        return importlib.import_module(qualified)
+    finally:
+        sys.path.remove(str(root))
+        for name in set(sys.modules) - before:
+            mod = sys.modules.get(name)
+            file = getattr(mod, "__file__", None) or ""
+            if not name.startswith("jigworks_pkg_") and file.startswith(str(root)):
+                del sys.modules[name]

@@ -133,6 +133,30 @@ suite("Jigworks extension", () => {
     assert.deepEqual(a.panels().sort(), [runA, runB].sort());
   });
 
+  test("import a workflow .zip: valid bundle accepted, tampered bundle refused", async () => {
+    const a = await api();
+    const bundles = path.join(process.env.JIGWORKS_REPO_ROOT!, "packages/contracts/fixtures/bundles");
+    const valid = path.join(bundles, "feature-development-1.3.0.zip");
+    const digest = fs.readFileSync(`${valid}.sha256`, "utf8").trim();
+
+    const wf = (await vscode.commands.executeCommand("jigworks.importWorkflow", valid)) as { release: string; digest: string; source: string; path: string };
+    assert.equal(wf.release, "feature-development@1.3.0");
+    assert.equal(wf.digest, digest, "the verified bundle digest is the release's identity");
+    assert.equal(wf.source, "imported");
+    assert.ok(fs.existsSync(path.join(wf.path, "workflow.toml")));
+    const listed = a.state().workflows.find((w) => w.source === "imported" && w.release === "feature-development@1.3.0");
+    assert.ok(listed && listed.graph?.nodes.some((n) => n.id === "approve_pr" && n.kind === "interrupt"));
+    assert.equal(a.state().selectedWorkflow, listed!.key, "the imported workflow becomes the active one");
+
+    const cache = path.dirname(path.dirname(wf.path));
+    const before = fs.readdirSync(cache).sort();
+    await assert.rejects(
+      () => Promise.resolve(vscode.commands.executeCommand("jigworks.importWorkflow", path.join(bundles, "feature-development-1.3.0.tampered.zip"), digest)),
+      /digest_mismatch/,
+    );
+    assert.deepEqual(fs.readdirSync(cache).sort(), before, "nothing was unpacked from the tampered bundle");
+  });
+
   test("sessions survive a webview reload and a window reload", async () => {
     const a = await api();
     const before = a.bridge.snapshot();

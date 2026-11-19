@@ -108,3 +108,13 @@ Agent: Claude Code (Opus 5.5), worktree `~/Development/jigworks-local`, branch `
   - Agent output is off by default (Activity tab first).
 - **Open:** T16's real VS Code screenshot (human, morning).
 - **Note:** `code --install-extension` installed the `.vsix` into the human's VS Code profile.
+
+### T10 · .zip import — done
+
+- **Built:** `jigworks unpack` (the contract's `read_bundle`, staging dir, nothing written on
+  failure), the extension's import command (its own sha256 first, sidecar or prompted digest,
+  unpack into the extension cache, registry, becomes the active workflow).
+- **Proof:** 6 runner tests (valid 1.2.0/1.3.0, tampered, wrong digest, `../` path, our own
+  bundle round trip); extension test with valid and tampered zip.
+- **Went wrong:** the fixture bundles use absolute imports, which my loader did not support;
+  fixed with a scoped `sys.path` and module cleanup.

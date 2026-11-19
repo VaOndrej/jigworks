@@ -304,6 +304,46 @@ def cmd_inspect(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_unpack(args: argparse.Namespace) -> int:
+    """Verify a release bundle against its digest and unpack it (T10 import, T15 sync).
+
+    The digest check and the unsafe-path check are the frozen contract's `read_bundle`. Nothing
+    is written unless both pass; the package lands in <dest>/package/ with jigworks-source.json."""
+    import shutil
+
+    from jigworks_contracts import bundle as cbundle
+
+    data = Path(args.zip).read_bytes()
+    expected = args.digest
+    if not expected:
+        sidecar = Path(args.zip + ".sha256")
+        if not sidecar.exists():
+            raise UsageError("no --digest and no <zip>.sha256 next to the bundle")
+        expected = sidecar.read_text().strip()
+    try:
+        files = cbundle.read_bundle(data, expected)
+    except ValueError as exc:
+        eprint(f"jigworks: {exc}")
+        return 3
+    dest = Path(args.dest)
+    staging = dest.with_name(dest.name + ".partial")
+    if staging.exists():
+        shutil.rmtree(staging)
+    for rel, content in files.items():
+        p = staging / "package" / rel
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_bytes(content)
+    pkg = load_package(staging / "package", digest=expected)
+    meta = {"source": args.source, "channel": args.channel, "digest": expected, "release": pkg.release,
+            "importedFrom": Path(args.zip).name}
+    (staging / "jigworks-source.json").write_text(json.dumps({k: v for k, v in meta.items() if v}, indent=2))
+    if dest.exists():
+        shutil.rmtree(dest)
+    staging.rename(dest)
+    print(json.dumps({**meta, "path": str(dest / "package"), "manifest": pkg.manifest}, indent=2))
+    return 0
+
+
 def cmd_preflight(args: argparse.Namespace) -> int:
     """`claude auth status`, reduced to what may be shown (no email, no org)."""
     status = auth_status(os.environ.get("JIGWORKS_CLAUDE_BIN", "claude"))
@@ -365,6 +405,13 @@ def build_parser() -> argparse.ArgumentParser:
     i = sub.add_parser("inspect", help="print manifest, digest and graph of a workflow package")
     i.add_argument("workflow")
     i.set_defaults(fn=cmd_inspect)
+    u = sub.add_parser("unpack", help="verify a release .zip against its digest and unpack it")
+    u.add_argument("zip")
+    u.add_argument("--digest", help="expected sha256:… (default: <zip>.sha256)")
+    u.add_argument("--dest", required=True, help="target directory (gets package/ and jigworks-source.json)")
+    u.add_argument("--source", choices=["imported", "hub"], default="imported")
+    u.add_argument("--channel")
+    u.set_defaults(fn=cmd_unpack)
     pf = sub.add_parser("preflight", help="check that claude is installed and logged in")
     pf.set_defaults(fn=cmd_preflight)
     return p
