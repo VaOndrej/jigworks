@@ -1,0 +1,614 @@
+{
+  "summary": {
+    "runId": "run_fd_0002",
+    "workflowId": "feature-development",
+    "release": "feature-development@1.3.0",
+    "releaseId": "rel_fd_1_3_0",
+    "digest": "sha256:e941f267e18b97560bcb4292047781b0844c70f6fea282c8c2a1c14733854c30",
+    "status": "succeeded",
+    "title": "Cap refunds at the captured amount",
+    "authorEmail": "bob@example.com",
+    "startedAt": "2026-11-18T13:05:00Z",
+    "updatedAt": "2026-11-18T14:03:00Z",
+    "models": {
+      "default": "claude-sonnet-5",
+      "nodes": {
+        "write_tests": "claude-haiku-4-5-20251001",
+        "summary": "claude-haiku-4-5-20251001"
+      }
+    },
+    "adapter": "claude",
+    "followUpPrompts": 1,
+    "fixLoops": 3,
+    "changedFiles": [
+      "sample-repo/tests/test_refunds.py",
+      "sample-repo/sample_repo/refunds.py"
+    ],
+    "usage": {
+      "input": 282,
+      "output": 26300,
+      "cache_write": 111500,
+      "cache_read": 1526000,
+      "cliCostUsd": 1.368252
+    },
+    "branch": "jigworks/run_fd_0002",
+    "progress": 100.0,
+    "step": 9,
+    "stepsPlanned": 9,
+    "finishedAt": "2026-11-18T14:03:00Z",
+    "approverEmail": "bob@example.com",
+    "approvedAt": "2026-11-18T14:01:00Z",
+    "firstResultCommit": "2007754d1b89",
+    "finalCommit": "7888fd62620c",
+    "prUrl": "file:///tmp/jigworks-remote.git#jigworks/run_fd_0002"
+  },
+  "audit": {
+    "runId": "run_fd_0002",
+    "workflowId": "feature-development",
+    "release": "feature-development@1.3.0",
+    "digest": "sha256:e941f267e18b97560bcb4292047781b0844c70f6fea282c8c2a1c14733854c30",
+    "status": "succeeded",
+    "authorEmail": "bob@example.com",
+    "startedAt": "2026-11-18T13:05:00Z",
+    "models": {
+      "default": "claude-sonnet-5",
+      "nodes": {
+        "write_tests": "claude-haiku-4-5-20251001",
+        "summary": "claude-haiku-4-5-20251001"
+      }
+    },
+    "adapter": "claude",
+    "steps": [
+      {
+        "node": "plan",
+        "attempt": 1,
+        "status": "succeeded",
+        "startedAt": "2026-11-18T13:05:00Z",
+        "model": "claude-sonnet-5",
+        "finishedAt": "2026-11-18T13:08:00Z"
+      },
+      {
+        "node": "approve_plan",
+        "attempt": 1,
+        "status": "succeeded",
+        "startedAt": "2026-11-18T13:08:00Z",
+        "finishedAt": "2026-11-18T13:09:00Z"
+      },
+      {
+        "node": "write_tests",
+        "attempt": 1,
+        "status": "succeeded",
+        "startedAt": "2026-11-18T13:09:00Z",
+        "model": "claude-haiku-4-5-20251001",
+        "finishedAt": "2026-11-18T13:13:00Z",
+        "commit": "56b23b850b2a",
+        "changedFiles": [
+          "sample-repo/tests/test_refunds.py"
+        ]
+      },
+      {
+        "node": "implement",
+        "attempt": 1,
+        "status": "succeeded",
+        "startedAt": "2026-11-18T13:13:00Z",
+        "model": "claude-sonnet-5",
+        "finishedAt": "2026-11-18T13:23:00Z",
+        "commit": "f9ac05b9f40e",
+        "changedFiles": [
+          "sample-repo/sample_repo/refunds.py"
+        ]
+      },
+      {
+        "node": "review",
+        "attempt": 1,
+        "status": "failed",
+        "startedAt": "2026-11-18T13:23:00Z",
+        "model": "claude-sonnet-5",
+        "finishedAt": "2026-11-18T13:26:00Z"
+      },
+      {
+        "node": "fix",
+        "attempt": 1,
+        "status": "succeeded",
+        "startedAt": "2026-11-18T13:26:00Z",
+        "model": "claude-sonnet-5",
+        "finishedAt": "2026-11-18T13:30:00Z",
+        "commit": "b0e66b139930",
+        "changedFiles": [
+          "sample-repo/sample_repo/refunds.py"
+        ]
+      },
+      {
+        "node": "review",
+        "attempt": 2,
+        "status": "succeeded",
+        "startedAt": "2026-11-18T13:30:00Z",
+        "model": "claude-sonnet-5",
+        "finishedAt": "2026-11-18T13:33:00Z"
+      },
+      {
+        "node": "gate",
+        "attempt": 1,
+        "status": "failed",
+        "startedAt": "2026-11-18T13:33:00Z",
+        "finishedAt": "2026-11-18T13:35:00Z",
+        "gate": {
+          "passed": false,
+          "checks": [
+            {
+              "name": "pytest",
+              "kind": "tests",
+              "passed": true,
+              "summary": "ok"
+            },
+            {
+              "name": "hypothesis invariants",
+              "kind": "property_tests",
+              "passed": false,
+              "summary": "invariant total_matches_lines falsified",
+              "findings": 1
+            },
+            {
+              "name": "gitleaks",
+              "kind": "secret_scan",
+              "passed": true,
+              "summary": "ok"
+            },
+            {
+              "name": "bandit",
+              "kind": "security_scan",
+              "passed": true,
+              "summary": "ok"
+            }
+          ]
+        }
+      },
+      {
+        "node": "fix",
+        "attempt": 2,
+        "status": "succeeded",
+        "startedAt": "2026-11-18T13:35:00Z",
+        "model": "claude-sonnet-5",
+        "finishedAt": "2026-11-18T13:39:00Z",
+        "commit": "2007754d1b89",
+        "changedFiles": [
+          "sample-repo/sample_repo/refunds.py"
+        ]
+      },
+      {
+        "node": "gate",
+        "attempt": 2,
+        "status": "succeeded",
+        "startedAt": "2026-11-18T13:39:00Z",
+        "finishedAt": "2026-11-18T13:41:00Z",
+        "gate": {
+          "passed": true,
+          "checks": [
+            {
+              "name": "pytest",
+              "kind": "tests",
+              "passed": true,
+              "summary": "ok"
+            },
+            {
+              "name": "hypothesis invariants",
+              "kind": "property_tests",
+              "passed": true,
+              "summary": "ok"
+            },
+            {
+              "name": "gitleaks",
+              "kind": "secret_scan",
+              "passed": true,
+              "summary": "ok"
+            },
+            {
+              "name": "bandit",
+              "kind": "security_scan",
+              "passed": true,
+              "summary": "ok"
+            }
+          ]
+        }
+      },
+      {
+        "node": "approve_pr",
+        "attempt": 1,
+        "status": "cancelled",
+        "startedAt": "2026-11-18T13:41:00Z",
+        "finishedAt": "2026-11-18T13:50:00Z"
+      },
+      {
+        "node": "fix",
+        "attempt": 3,
+        "status": "succeeded",
+        "startedAt": "2026-11-18T13:50:00Z",
+        "model": "claude-sonnet-5",
+        "finishedAt": "2026-11-18T13:55:00Z",
+        "commit": "7888fd62620c",
+        "changedFiles": [
+          "sample-repo/sample_repo/refunds.py"
+        ]
+      },
+      {
+        "node": "gate",
+        "attempt": 3,
+        "status": "succeeded",
+        "startedAt": "2026-11-18T13:55:00Z",
+        "finishedAt": "2026-11-18T13:57:00Z",
+        "gate": {
+          "passed": true,
+          "checks": [
+            {
+              "name": "pytest",
+              "kind": "tests",
+              "passed": true,
+              "summary": "ok"
+            },
+            {
+              "name": "hypothesis invariants",
+              "kind": "property_tests",
+              "passed": true,
+              "summary": "ok"
+            },
+            {
+              "name": "gitleaks",
+              "kind": "secret_scan",
+              "passed": true,
+              "summary": "ok"
+            },
+            {
+              "name": "bandit",
+              "kind": "security_scan",
+              "passed": true,
+              "summary": "ok"
+            }
+          ]
+        }
+      },
+      {
+        "node": "approve_pr",
+        "attempt": 2,
+        "status": "succeeded",
+        "startedAt": "2026-11-18T13:57:00Z",
+        "finishedAt": "2026-11-18T14:01:00Z"
+      },
+      {
+        "node": "open_pr",
+        "attempt": 1,
+        "status": "succeeded",
+        "startedAt": "2026-11-18T14:01:00Z",
+        "finishedAt": "2026-11-18T14:02:00Z"
+      },
+      {
+        "node": "summary",
+        "attempt": 1,
+        "status": "succeeded",
+        "startedAt": "2026-11-18T14:02:00Z",
+        "model": "claude-haiku-4-5-20251001",
+        "finishedAt": "2026-11-18T14:03:00Z"
+      }
+    ],
+    "decisions": [
+      {
+        "stage": "plan",
+        "decision": "approve",
+        "approverEmail": "bob@example.com",
+        "at": "2026-11-18T13:09:00Z"
+      },
+      {
+        "stage": "pr",
+        "decision": "request_changes",
+        "approverEmail": "bob@example.com",
+        "at": "2026-11-18T13:50:00Z",
+        "comment": "Use Decimal instead of float for amounts."
+      },
+      {
+        "stage": "pr",
+        "decision": "approve",
+        "approverEmail": "bob@example.com",
+        "at": "2026-11-18T14:01:00Z"
+      }
+    ],
+    "changedFiles": [
+      "sample-repo/tests/test_refunds.py",
+      "sample-repo/sample_repo/refunds.py"
+    ],
+    "usage": [
+      {
+        "runId": "run_fd_0002",
+        "node": "plan",
+        "attempt": 1,
+        "model": "claude-sonnet-5",
+        "adapter": "claude",
+        "input": 40,
+        "output": 2100,
+        "cache_write": 18400,
+        "cache_read": 96000,
+        "sessionId": "e2bf77f5-0000-4000-8000-83e492b3a189",
+        "cliCostUsd": 0.17082,
+        "at": "2026-11-18T13:08:00Z"
+      },
+      {
+        "runId": "run_fd_0002",
+        "node": "write_tests",
+        "attempt": 1,
+        "model": "claude-haiku-4-5-20251001",
+        "adapter": "claude",
+        "input": 35,
+        "output": 3900,
+        "cache_write": 14200,
+        "cache_read": 120000,
+        "sessionId": "8b2bb7e5-0000-4000-8000-a61c98754685",
+        "cliCostUsd": 0.059935,
+        "at": "2026-11-18T13:13:00Z"
+      },
+      {
+        "runId": "run_fd_0002",
+        "node": "implement",
+        "attempt": 1,
+        "model": "claude-sonnet-5",
+        "adapter": "claude",
+        "input": 60,
+        "output": 7800,
+        "cache_write": 31000,
+        "cache_read": 410000,
+        "sessionId": "e2267965-0000-4000-8000-c5f23cb1f806",
+        "cliCostUsd": 0.42618,
+        "at": "2026-11-18T13:23:00Z"
+      },
+      {
+        "runId": "run_fd_0002",
+        "node": "review",
+        "attempt": 1,
+        "model": "claude-sonnet-5",
+        "adapter": "claude",
+        "input": 30,
+        "output": 1600,
+        "cache_write": 9800,
+        "cache_read": 150000,
+        "sessionId": "48d528d5-0000-4000-8000-2452ae9b44a0",
+        "cliCostUsd": 0.12789,
+        "at": "2026-11-18T13:26:00Z"
+      },
+      {
+        "runId": "run_fd_0002",
+        "node": "fix",
+        "attempt": 1,
+        "model": "claude-sonnet-5",
+        "adapter": "claude",
+        "input": 25,
+        "output": 2900,
+        "cache_write": 8100,
+        "cache_read": 180000,
+        "sessionId": "ac101070-0000-4000-8000-e876c35f388f",
+        "cliCostUsd": 0.146175,
+        "at": "2026-11-18T13:30:00Z"
+      },
+      {
+        "runId": "run_fd_0002",
+        "node": "review",
+        "attempt": 2,
+        "model": "claude-sonnet-5",
+        "adapter": "claude",
+        "input": 30,
+        "output": 1600,
+        "cache_write": 9800,
+        "cache_read": 150000,
+        "sessionId": "48d528d5-0000-4000-8000-2452ae9b44a0",
+        "cliCostUsd": 0.12789,
+        "at": "2026-11-18T13:33:00Z"
+      },
+      {
+        "runId": "run_fd_0002",
+        "node": "fix",
+        "attempt": 2,
+        "model": "claude-sonnet-5",
+        "adapter": "claude",
+        "input": 25,
+        "output": 2900,
+        "cache_write": 8100,
+        "cache_read": 180000,
+        "sessionId": "ac101070-0000-4000-8000-e876c35f388f",
+        "cliCostUsd": 0.146175,
+        "at": "2026-11-18T13:39:00Z"
+      },
+      {
+        "runId": "run_fd_0002",
+        "node": "fix",
+        "attempt": 3,
+        "model": "claude-sonnet-5",
+        "adapter": "claude",
+        "input": 25,
+        "output": 2900,
+        "cache_write": 8100,
+        "cache_read": 180000,
+        "sessionId": "ac101070-0000-4000-8000-e876c35f388f",
+        "cliCostUsd": 0.146175,
+        "at": "2026-11-18T13:55:00Z"
+      },
+      {
+        "runId": "run_fd_0002",
+        "node": "summary",
+        "attempt": 1,
+        "model": "claude-haiku-4-5-20251001",
+        "adapter": "claude",
+        "input": 12,
+        "output": 600,
+        "cache_write": 4000,
+        "cache_read": 60000,
+        "sessionId": "7f173c5e-0000-4000-8000-f0930f3f5cce",
+        "cliCostUsd": 0.017012,
+        "at": "2026-11-18T14:03:00Z"
+      }
+    ],
+    "cliCostUsd": 1.368252,
+    "finishedAt": "2026-11-18T14:03:00Z",
+    "approverEmail": "bob@example.com",
+    "approvedAt": "2026-11-18T14:01:00Z",
+    "firstResultCommit": "2007754d1b89",
+    "finalCommit": "7888fd62620c",
+    "prUrl": "file:///tmp/jigworks-remote.git#jigworks/run_fd_0002"
+  },
+  "graph": {
+    "nodes": [
+      {
+        "id": "__start__",
+        "kind": "start"
+      },
+      {
+        "id": "plan",
+        "kind": "step",
+        "label": "plan",
+        "weight": 10
+      },
+      {
+        "id": "approve_plan",
+        "kind": "interrupt",
+        "label": "approve plan",
+        "weight": 2
+      },
+      {
+        "id": "write_tests",
+        "kind": "step",
+        "label": "write tests",
+        "weight": 15
+      },
+      {
+        "id": "implement",
+        "kind": "step",
+        "label": "implement",
+        "weight": 30
+      },
+      {
+        "id": "review",
+        "kind": "step",
+        "label": "review",
+        "weight": 10
+      },
+      {
+        "id": "fix",
+        "kind": "step",
+        "label": "fix",
+        "weight": 0
+      },
+      {
+        "id": "gate",
+        "kind": "step",
+        "label": "gate",
+        "weight": 10
+      },
+      {
+        "id": "approve_pr",
+        "kind": "interrupt",
+        "label": "approve pr",
+        "weight": 3
+      },
+      {
+        "id": "open_pr",
+        "kind": "step",
+        "label": "open pr",
+        "weight": 5
+      },
+      {
+        "id": "summary",
+        "kind": "step",
+        "label": "summary",
+        "weight": 5
+      },
+      {
+        "id": "__end__",
+        "kind": "end"
+      }
+    ],
+    "edges": [
+      {
+        "source": "__start__",
+        "target": "plan",
+        "conditional": false
+      },
+      {
+        "source": "approve_plan",
+        "target": "__end__",
+        "conditional": true
+      },
+      {
+        "source": "approve_plan",
+        "target": "write_tests",
+        "conditional": true
+      },
+      {
+        "source": "approve_pr",
+        "target": "__end__",
+        "conditional": true
+      },
+      {
+        "source": "approve_pr",
+        "target": "fix",
+        "conditional": true
+      },
+      {
+        "source": "approve_pr",
+        "target": "open_pr",
+        "conditional": true
+      },
+      {
+        "source": "fix",
+        "target": "gate",
+        "conditional": true
+      },
+      {
+        "source": "fix",
+        "target": "review",
+        "conditional": true
+      },
+      {
+        "source": "gate",
+        "target": "approve_pr",
+        "conditional": true
+      },
+      {
+        "source": "gate",
+        "target": "fix",
+        "conditional": true
+      },
+      {
+        "source": "implement",
+        "target": "review",
+        "conditional": false
+      },
+      {
+        "source": "open_pr",
+        "target": "summary",
+        "conditional": false
+      },
+      {
+        "source": "plan",
+        "target": "approve_plan",
+        "conditional": false
+      },
+      {
+        "source": "review",
+        "target": "fix",
+        "conditional": true
+      },
+      {
+        "source": "review",
+        "target": "gate",
+        "conditional": true
+      },
+      {
+        "source": "write_tests",
+        "target": "implement",
+        "conditional": false
+      },
+      {
+        "source": "summary",
+        "target": "__end__",
+        "conditional": false
+      }
+    ],
+    "workflowId": "feature-development",
+    "release": "feature-development@1.3.0"
+  }
+}

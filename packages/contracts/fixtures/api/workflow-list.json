@@ -1,0 +1,19 @@
+{
+  "workflows": [
+    {
+      "id": "feature-development",
+      "name": "Feature development",
+      "description": "Plan, tests from the spec, implement, independent review, gate, human approval, PR.",
+      "ownerEmail": "carol@example.com",
+      "updatedAt": "2026-11-18T09:00:00Z",
+      "latestVersion": "1.3.0",
+      "channels": {
+        "stable": "1.3.0",
+        "beta": "1.3.0"
+      },
+      "hasUnpublishedDraft": false,
+      "runs7d": 7,
+      "source": "hub"
+    }
+  ]
+}
