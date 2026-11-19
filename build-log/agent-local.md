@@ -139,3 +139,16 @@ Agent: Claude Code (Opus 5.5), worktree `~/Development/jigworks-local`, branch `
 - **Proof:** 4 tests, including a network cut mid-run with 13 queued events delivered afterwards.
 - **Not done:** the live check against the preview. The permission check refused loading
   `.env.local` secrets; the script `e2e/local/hub-live.sh` is ready for the human.
+
+### T15 · extension syncs stable — done (fake hub)
+
+- **Built:**
+  - Hub client with a clear 401 message.
+  - Password in SecretStorage.
+  - Sync of `stable` per workflow: the channel resolution's digest decides; the cache is reused
+    when the digest matches.
+  - The runner gets the hub URL and key, so runs from VS Code also sync events.
+  - `jigworks bundle` to build release zips.
+  - `GET /api/workflows` in the fake hub.
+- **Proof:** extension test publish v1 → run → v2 → rollback → v1, plus the wrong-password error.
+- **Not done:** live check against the preview (secrets), beta channel, upgrade prompt.

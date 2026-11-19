@@ -50,6 +50,10 @@
         "title": "Jigworks: Sync workflows from the hub"
       },
       {
+        "command": "jigworks.setHubPassword",
+        "title": "Jigworks: Set hub password"
+      },
+      {
         "command": "jigworks.refresh",
         "title": "Jigworks: Refresh"
       },
@@ -133,7 +137,7 @@
         "jigworks.hubUrl": {
           "type": "string",
           "default": "",
-          "description": "Jigworks hub URL. The key is HUB_PASSWORD from the environment or the workspace .env.local."
+          "description": "Jigworks hub URL. The hub password is kept in VS Code's secret storage (command “Jigworks: Set hub password”), never in settings."
         }
       }
     }

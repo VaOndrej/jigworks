@@ -130,6 +130,14 @@ class FakeHub:
                 status_box.append(401)
                 return self._error(h, 401, "unauthorized", "missing or wrong X-Jigworks-Key")
             body = json.loads(raw) if raw and h.headers.get("content-type", "").startswith("application/json") else None
+            if method == "GET" and path == "/api/workflows":
+                ids = sorted({r["workflowId"] for r in self.releases.values()})
+                listing = {"workflows": [
+                    {"id": wid, "name": wid, "updatedAt": "2026-11-19T00:00:00Z", "source": "hub",
+                     "channels": {ch: self.releases[rid]["version"] for (w, ch), rid in self.channels.items() if w == wid}}
+                    for wid in ids]}
+                contracts.assert_valid("WorkflowList", listing)
+                return send(200, listing)
             if method == "POST" and path == "/api/runs":
                 errors = contracts.validate("RunCreate", body)
                 if errors:

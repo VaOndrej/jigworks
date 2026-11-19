@@ -344,6 +344,20 @@ def cmd_inspect(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_bundle(args: argparse.Namespace) -> int:
+    """Build the deterministic release .zip of a workflow package (what the hub publishes)."""
+    from .package import build_package_bundle
+
+    root = Path(args.workflow)
+    data, digest = build_package_bundle(root)
+    pkg = load_package(root, digest=digest)
+    Path(args.out).write_bytes(data)
+    Path(args.out + ".sha256").write_text(digest + "\n")
+    print(json.dumps({"release": pkg.release, "workflowId": pkg.name, "version": pkg.version, "digest": digest,
+                      "path": str(Path(args.out).resolve()), "bytes": len(data)}))
+    return 0
+
+
 def cmd_unpack(args: argparse.Namespace) -> int:
     """Verify a release bundle against its digest and unpack it (T10 import, T15 sync).
 
@@ -451,6 +465,10 @@ def build_parser() -> argparse.ArgumentParser:
     i = sub.add_parser("inspect", help="print manifest, digest and graph of a workflow package")
     i.add_argument("workflow")
     i.set_defaults(fn=cmd_inspect)
+    b = sub.add_parser("bundle", help="build the release .zip (+ .sha256) of a workflow package")
+    b.add_argument("workflow")
+    b.add_argument("--out", required=True)
+    b.set_defaults(fn=cmd_bundle)
     u = sub.add_parser("unpack", help="verify a release .zip against its digest and unpack it")
     u.add_argument("zip")
     u.add_argument("--digest", help="expected sha256:… (default: <zip>.sha256)")

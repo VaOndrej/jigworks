@@ -54,6 +54,11 @@ export class RunnerBridge extends EventEmitter {
     super();
   }
 
+  /** Extra environment for every runner process started from now on (e.g. hub URL and key). */
+  setEnv(extra: Record<string, string | undefined>): void {
+    this.opts.env = { ...this.opts.env, ...extra };
+  }
+
   static newRunId(): string {
     const ts = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14);
     return `run_${ts}_${randomBytes(3).toString("hex")}`;

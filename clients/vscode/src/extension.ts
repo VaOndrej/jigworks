@@ -3,6 +3,7 @@ import * as path from "node:path";
 import * as vscode from "vscode";
 import type { RunEvent } from "@jigworks/contracts";
 import { installBundle, sidecarDigest } from "./bundles";
+import { HubClient, HubError } from "./hub";
 import { RunnerBridge } from "./runner/bridge";
 import { checkClaude } from "./runner/preflight";
 import { WorkflowRegistry } from "./workflows";
@@ -93,6 +94,9 @@ class Host {
   async init(): Promise<void> {
     const roots = (vscode.workspace.workspaceFolders ?? []).map((f) => f.uri.fsPath);
     await Promise.allSettled([this.registry.scanWorkspace(roots), this.registry.scanCache(this.cacheDir())]);
+    if (config().get<string>("hubUrl")) {
+      await this.syncWorkflows({ quiet: true }).catch(() => undefined); // offline or no password: keep going
+    }
     this.selected = this.selected ?? this.registry.list()[0]?.key;
     try {
       await this.bridge.load();
@@ -295,6 +299,70 @@ class Host {
     return this.status.text;
   }
 
+  private static SECRET = "jigworks.hubPassword";
+
+  async hubClient(): Promise<HubClient | undefined> {
+    const url = config().get<string>("hubUrl", "").trim();
+    if (!url) return undefined;
+    const key = await this.ctx.secrets.get(Host.SECRET);
+    if (!key) throw new HubError("No hub password yet. Run “Jigworks: Set hub password”.");
+    // Runs started from here sync their events to the same hub (T14), with the same key.
+    this.bridge.setEnv({ JIGWORKS_HUB_URL: url, HUB_PASSWORD: key });
+    return new HubClient(url, key);
+  }
+
+  async setHubPassword(password?: string): Promise<void> {
+    const value =
+      password ?? (await vscode.window.showInputBox({ prompt: "Jigworks hub password", password: true, ignoreFocusOut: true }));
+    if (value === undefined) return;
+    await this.ctx.secrets.store(Host.SECRET, value);
+  }
+
+  /** Resolve `stable` of every hub workflow, download what changed, verify, install (T15). */
+  async syncWorkflows(opts: { quiet?: boolean } = {}): Promise<WorkflowInfo[]> {
+    const hub = await this.hubClient();
+    if (!hub) {
+      if (!opts.quiet) void vscode.window.showWarningMessage("Jigworks: set `jigworks.hubUrl` to sync workflows from the hub.");
+      return [];
+    }
+    const synced: WorkflowInfo[] = [];
+    try {
+      const { workflows } = await hub.workflows();
+      for (const w of workflows.filter((x) => x.channels.stable)) {
+        const res = await hub.channel(w.id, "stable");
+        const current = this.registry.list().find((x) => x.source === "hub" && x.name === w.id);
+        if (current && current.digest === res.digest) {
+          synced.push(current);
+          continue;
+        }
+        const cached = path.join(this.cacheDir(), res.digest.replace("sha256:", "").slice(0, 16));
+        let pkgPath = path.join(cached, "package");
+        if (!fs.existsSync(path.join(cached, "jigworks-source.json"))) {
+          const { data } = await hub.bytes(res.bundleUrl ?? `/api/releases/${res.releaseId}/bundle`);
+          // The digest comes from the channel resolution; the bundle must match it byte for byte.
+          const out = await installBundle(this.bridge, this.cacheDir(), data, res.digest, {
+            source: "hub",
+            channel: "stable",
+            fileName: `${w.id}-${res.version}.zip`,
+          });
+          pkgPath = out.path;
+        }
+        this.registry.remove((x) => x.source === "hub" && x.name === w.id);
+        const wf = await this.registry.add(pkgPath, "hub", "stable", res.digest);
+        if (!this.selected || this.registry.get(this.selected) === undefined) this.selected = wf.key;
+        synced.push(wf);
+      }
+      if (!opts.quiet) void vscode.window.showInformationMessage(`Jigworks: ${synced.map((s) => s.release).join(", ") || "no workflows"} on stable.`);
+      return synced;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (!opts.quiet) void vscode.window.showErrorMessage(`Jigworks: sync failed. ${msg}`);
+      throw err;
+    } finally {
+      this.broadcast();
+    }
+  }
+
   /** "Import workflow from file" (design.md §6 fallback): the same .zip the hub serves. */
   async importZip(zipPath?: string, digest?: string): Promise<WorkflowInfo | undefined> {
     let file = zipPath;
@@ -355,6 +423,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<Jigwor
     vscode.commands.registerCommand("jigworks.resume", (runId: string) => host.onMessage({ type: "resume", runId })),
     vscode.commands.registerCommand("jigworks.refresh", () => host.init()),
     vscode.commands.registerCommand("jigworks.importWorkflow", (zipPath?: string, digest?: string) => host.importZip(zipPath, digest)),
+    vscode.commands.registerCommand("jigworks.syncWorkflows", () => host.syncWorkflows()),
+    vscode.commands.registerCommand("jigworks.setHubPassword", (password?: string) => host.setHubPassword(password)),
     vscode.commands.registerCommand("jigworks.preflight", () => host.preflight()),
     vscode.commands.registerCommand("jigworks.openWorktree", async (runId: string) => {
       const rows = await host.bridge.list();

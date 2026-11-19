@@ -29,6 +29,11 @@ export class WorkflowRegistry {
     return this.items.get(key);
   }
 
+  /** Drop entries (e.g. the previous `stable` of a hub workflow after a channel moved). */
+  remove(pred: (w: WorkflowInfo) => boolean): void {
+    for (const [k, w] of this.items) if (pred(w)) this.items.delete(k);
+  }
+
   async add(dir: string, source: WorkflowInfo["source"], channel?: string, digest?: string): Promise<WorkflowInfo> {
     const info = (await this.bridge.inspect(dir)) as unknown as Inspected;
     const m = info.manifest;
@@ -72,14 +77,17 @@ export class WorkflowRegistry {
     }
   }
 
-  /** Packages unpacked into the extension's cache: <cache>/<name>@<version>/ with jigworks-source.json. */
+  /** Packages unpacked into the extension's cache: <cache>/<digest prefix>/ with jigworks-source.json.
+   *  Hub releases are not restored from the cache: the next sync says which one is `stable` now. */
   async scanCache(cacheDir: string): Promise<void> {
     if (!fs.existsSync(cacheDir)) return;
     for (const name of fs.readdirSync(cacheDir)) {
+      if (name.startsWith(".") || name.endsWith(".partial")) continue;
       const dir = path.join(cacheDir, name);
       const metaFile = path.join(dir, "jigworks-source.json");
       if (!fs.existsSync(metaFile)) continue;
       const meta = JSON.parse(fs.readFileSync(metaFile, "utf8")) as { source: WorkflowInfo["source"]; channel?: string; digest: string };
+      if (meta.source === "hub") continue;
       try {
         await this.add(path.join(dir, "package"), meta.source, meta.channel, meta.digest);
       } catch {
