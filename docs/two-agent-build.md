@@ -1,65 +1,89 @@
-# Two-agent build — draft for discussion
+# Two-agent overnight build
 
-- **Status:** draft. Once agreed, the rules move into `AGENTS.md` and this file is deleted or kept as the rationale.
-- **Goal:** two AI agents build the prototype end to end in parallel, one for the Vercel hub and one for the local side (runner + VS Code extension), and each proves its own work without a human running tests.
+- **Status:** agreed rules are mirrored in `AGENTS.md` ("Parallel build"); this file keeps the rationale, the overnight procedure and the open points.
+- **Goal:** two AI agents build the prototype end to end overnight, unattended, one for the Vercel hub (**HUB**) and one for the local side (**LOCAL**: runner, workflows, sample-repo, VS Code extension). Each proves its own work. In the morning the human reviews one PR into `main` and merges it.
 
-## 1. Who owns what
+## 1. Branch and push model
 
-| | Agent **HUB** | Agent **LOCAL** |
+- One shared branch: **`feature/hub-and-vs-code-extension`**. Nothing is pushed to `main`; the human merges the PR in the morning.
+- Git does not allow the same branch in two worktrees, so each agent works in its own worktree on a local branch and pushes to the shared remote branch:
+  - HUB: `../jigworks-hub`, local branch `agent/hub`
+  - LOCAL: `../jigworks-local`, local branch `agent/local`
+  - push: `git pull --rebase origin feature/hub-and-vs-code-extension && git push origin HEAD:feature/hub-and-vs-code-extension`
+- Every push triggers a Vercel preview deploy through the GitHub integration, which HUB uses for its preview tests.
+- Never `--force`, never push to `main`, never rewrite pushed history.
+
+## 2. Ownership
+
+| | **HUB** | **LOCAL** |
 |---|---|---|
-| Directories (write) | `apps/hub-api/`, `apps/hub-web/`, `vercel.json` | `runner/`, `workflows/`, `sample-repo/`, `clients/vscode/` |
-| Tickets | T11 (agent part), T12, T13, hub side of T14 | T03–T10, T16, T17, runner side of T14, T15 |
-| Branch / worktree | `agent/hub` in `../jigworks-hub` | `agent/local` in `../jigworks-local` |
+| Writes | `apps/hub-api/`, `apps/hub-web/`, `vercel.json`, `e2e/hub/` | `runner/`, `workflows/`, `sample-repo/`, `clients/vscode/`, `e2e/local/`, `e2e/integration/` |
+| Tickets | T12, T13, agent part of T11 | T03–T10, T14, T15, T16, T17 |
+| Log | `build-log/agent-hub.md` | `build-log/agent-local.md` |
 
-**Shared, built first by one agent before the split:** T00 spike, T01 scaffolding, T02 `packages/contracts`. After T02 merges, `packages/contracts/` is **frozen**: a change needs a separate commit that the human approves, and both agents rebase onto it.
+- **Foundation (T00–T02) is built before the split** and reviewed by the human; after that, `packages/contracts/` is frozen. If an agent needs a change overnight, it writes the proposal in its log and marks the ticket `blocked`; neither agent edits contracts. Exception: HUB regenerates `packages/contracts/openapi.json` from FastAPI.
+- The hub side of event ingest is part of T12 (`POST /api/runs/{id}/events`); T14 is only the runner side. The workloads do not have to be equal.
+- **Shared files:**
+  - `pnpm-lock.yaml`, `uv.lock`: on a rebase conflict, take the remote version, re-run `pnpm install` / `uv lock`, commit.
+  - Ticket files: each agent edits only its own tickets (status, checkboxes, evidence).
+  - Nobody edits `BUILD_LOG.md` overnight; the human folds the two agent logs into it in the morning.
+- **Enforcement:**
+  - `scripts/check-ownership.sh <hub|local>` runs before every commit.
+  - A Claude Code `PreToolUse` hook blocks Edit/Write outside the agent's paths (agent from `JIGWORKS_AGENT`).
+  - A git `pre-push` hook blocks pushes to `main` and force pushes.
 
-`e2e/` (cross-system tests) is written by LOCAL after both sides exist; HUB owns the hub side of T14 (ingest endpoint), LOCAL the runner side and T15.
+## 3. The seam: contracts and recorded runs
 
-**Enforcement:** `scripts/check-ownership.sh <agent>` fails if the branch touches files outside that agent's directories (plus its ticket files and `BUILD_LOG.md`). Both agents run it before every commit.
+- `packages/contracts/`: schemas (`RunEvent`, `UsageRecord`, `AuditRecord`, API shapes) → generated TS + Python types.
+- `packages/contracts/fixtures/runs/*.jsonl`: recorded runs (from T00, later T06). HUB seeds Runs & analytics with them; LOCAL replays them in the extension without spending tokens.
+- Until a preview deploy of the hub exists, LOCAL tests T14/T15 against a mock server generated from `openapi.json`.
 
-## 2. The seam: contracts and recorded runs
+## 4. Self-testing
 
-The two sides never wait for each other because they meet in two artifacts in `packages/contracts/`:
-
-1. **Schemas** (`RunEvent`, `UsageRecord`, `AuditRecord`, the API request/response shapes) → generated TS + Python types.
-2. **Recorded runs** (`packages/contracts/fixtures/runs/*.jsonl`): real event streams captured from the runner (first from T00, then from T06).
-   - HUB uses them as seed data for Runs & analytics and to test event ingest.
-   - LOCAL uses them to replay a run in the extension without spending tokens.
-
-HUB also publishes the FastAPI OpenAPI spec to `packages/contracts/openapi.json`; LOCAL's T14/T15 tests run against a mock generated from it until the preview deploy exists.
-
-## 3. How each agent tests itself
-
-One entry point per side; the output of that command is the ticket's evidence.
+One entry point per side; its output is pasted into the ticket's Evidence.
 
 **LOCAL — `pnpm verify:local`**
-- `uv run pytest runner workflows sample-repo`: fake adapter, recorded `stream-json` fixtures, no tokens spent. Includes the property tests, the planted-secret gate test and the kill-and-resume test.
-- `pnpm --filter vscode test`: `@vscode/test-electron` drives the real extension headless: start two sessions with the fake adapter, receive events, approve at the interrupt, see the run finish.
-- `pnpm --filter vscode test:ui`: the webview React app runs standalone with recorded runs; Playwright screenshots at 390 px and 1440 px into `e2e/screenshots/local/`.
-- **Live check, opt-in:** `JIGWORKS_LIVE=1 uv run pytest -m live` runs one real `claude -p` run on `sample-repo`, with a budget cap.
+- `uv run pytest runner workflows sample-repo`: fake adapter, recorded fixtures. Includes the property tests, the planted-secret gate test and the kill-and-resume test.
+- `pnpm --filter vscode test`: `@vscode/test-electron` drives the real extension headless: two sessions in parallel, events, request changes, approve.
+- `pnpm --filter vscode test:ui`: the webview runs standalone with recorded runs; Playwright screenshots at 390 px and 1440 px → `e2e/local/screenshots/`.
+- `JIGWORKS_LIVE=1 uv run pytest -m live`: one real `claude -p` run on `sample-repo`, plus the extension's login preflight. Uses the Max subscription.
 
 **HUB — `pnpm verify:hub`**
-- `uv run pytest apps/hub-api` against a local Postgres.
-- `vercel dev` + Playwright on `localhost`: the three tabs at 390 px and 1440 px into `e2e/screenshots/hub/`.
-- Sandbox validation is mocked locally and runs for real only on the preview deploy.
-- After a preview deploy, the same Playwright suite runs against the preview URL.
+- `docker compose up -d db` and `uv run pytest apps/hub-api` against local Postgres.
+- `vercel dev` + Playwright on localhost: the three tabs at 390 px and 1440 px → `e2e/hub/screenshots/`.
+- After a push: the same Playwright suite against the branch preview URL, through `vercel curl` or a protection-bypass header for the protected deploy.
 
-**Integration — `pnpm verify:e2e`** (LOCAL, after T14/T15): publish a workflow in the hub → the extension syncs `stable` → fake-adapter run → events appear in the hub's runs list.
+**Integration — `pnpm verify:e2e`** (LOCAL, last): publish in the hub preview → the extension syncs `stable` → fake-adapter run → events appear in Runs & analytics.
 
-## 4. Human checkpoints
+## 5. Overnight loop
 
-The agents work unattended between these points; each costs a few minutes of review.
+`scripts/overnight.sh <hub|local>` keeps an agent working until its tickets are done or blocked:
 
-1. After T00–T02 (contracts frozen).
-2. After T06 live proof (one real run with a fix loop).
-3. Before each merge of `agent/hub` or `agent/local` into `main`. Agents commit; only the human merges and pushes.
-4. Before recording the demo.
+1. `git pull --rebase` the shared branch.
+2. Start a **fresh** `claude -p` session with `prompts/overnight-<agent>.md`: pick the next ticket owned by this agent with status `todo` whose dependencies are `done`; implement it; run the verify command; tick the criteria; paste the evidence; commit; push.
+3. One ticket per session, so the context stays small and the state lives in the ticket files and git, not in the agent's memory.
+4. A ticket that fails verification three times becomes `blocked` with the reason, and the loop moves to the next independent ticket.
+5. If the subscription's usage limit is reached, the loop waits and retries instead of exiting.
+6. When nothing is left, the agent writes its summary to its log. The last agent to finish opens a **draft PR** `feature/hub-and-vs-code-extension → main` with a per-ticket table: status, evidence and blocked reasons.
 
-## 5. Decisions (answered 19 Nov 2026)
+## 6. Before the human goes to sleep
 
-1. **Contracts frozen after T02**; changes only with the human's approval. Agreed.
-2. **Integration split:** HUB owns the hub side of T14 (event ingest endpoint, offline replay acceptance); LOCAL owns the runner side, T15 and `e2e/`. The two agents do not need equal workloads.
-3. **Live `claude -p` runs:** the human has a Max subscription, so there is no per-dollar bill; the limit is the subscription's rolling usage window. Live runs stay opt-in (`JIGWORKS_LIVE=1`) and are used for the T06 live proof, the extension's login check and demo rehearsal. The extension must verify it is using the logged-in Claude Code (preflight in T08, check found in T00).
-4. **Local Postgres for HUB:** Docker.
-5. **Preview deploys:** the Vercel project is linked to the GitHub repo, so every pushed branch gets a preview deploy automatically. Because agents do not push (decision 6), HUB self-tests with `vercel deploy` (CLI preview) and `vercel curl` for protected URLs; the human's pushes produce the Git previews. **Open:** may HUB push its own `agent/hub` branch (never `main`) to get Git previews instead?
-6. **Merging:** agents only commit on their branches; the human merges and pushes. Agreed.
+1. Foundation T00–T02 done and reviewed (≈ 10 min).
+2. T11 dashboard steps done: Neon, Blob, Sandbox; `vercel link`; env pulled.
+3. `claude`, `gh` and `vercel` logged in; Docker running; laptop on power with sleep disabled.
+4. Start both loops; after 10 minutes check that both have pushed their first commit.
+
+## 7. Decisions taken (19 Nov 2026)
+
+1. Contracts are frozen after T02; changes only with the human's approval.
+2. HUB owns the hub side of event ingest (in T12); LOCAL owns the runner side (T14), T15 and the integration tests. Workloads need not be equal.
+3. Live `claude -p` runs use the human's Max subscription: no per-dollar bill, the limit is the subscription's usage window. Live runs stay opt-in (`JIGWORKS_LIVE=1`). The extension verifies it uses the logged-in Claude Code (preflight in T08, check found in T00).
+4. Local Postgres for HUB runs in Docker.
+5. Both agents push to `feature/hub-and-vs-code-extension`, never to `main`; each pushes only its own files. Pushes produce Vercel preview deploys.
+6. The human merges the PR into `main` in the morning.
+
+## 8. Open points
+
+1. **Who builds the foundation (T00–T02)?** One agent this evening, with the human reviewing it before the overnight start (recommended), or LOCAL first thing in the night while HUB waits?
+2. **Permissions for unattended runs:** `--permission-mode acceptEdits` plus an allowlist in `.claude/settings.json` (pnpm, uv, git, docker, vercel, playwright, claude) and the hooks above (recommended), or `bypassPermissions`? The latter is not advisable on a laptop that holds your credentials.
+3. **Presentation tickets (P01–P04)** stay with the human, not the overnight run: agreed?

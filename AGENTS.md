@@ -103,4 +103,41 @@ Be honest: the build log is part of the deliverable and is read by reviewers.
 - English, imperative subject line (≤ 72 chars), optional body explaining why.
 - Reference the ticket ID (`Refs T05`).
 - Never commit secrets, `.env` files, `.vercel/` or OS files (`.DS_Store`).
-- Do not push or open PRs unless the human asks for it.
+- Never push to `main` and never force-push. Pushing is allowed only to the
+  feature branch of the parallel build (below); the human merges into `main`.
+
+## Parallel build (two agents)
+
+The prototype is built by two agents in parallel. Rationale and the overnight
+procedure: `docs/two-agent-build.md`.
+
+- **Branch:** both agents push to `feature/hub-and-vs-code-extension`. Each
+  works in its own worktree on a local branch (`agent/hub`, `agent/local`) and
+  pushes with `git pull --rebase origin feature/hub-and-vs-code-extension &&
+  git push origin HEAD:feature/hub-and-vs-code-extension`.
+- **Who you are:** read `JIGWORKS_AGENT` (`hub` or `local`). If it is not set,
+  you are not part of the parallel build: do not push.
+- **Ownership:** write only your own paths and leave the other agent's files
+  alone.
+  - `hub`: `apps/hub-api/`, `apps/hub-web/`, `vercel.json`, `e2e/hub/`,
+    tickets T11–T13, `build-log/agent-hub.md`.
+  - `local`: `runner/`, `workflows/`, `sample-repo/`, `clients/vscode/`,
+    `e2e/local/`, `e2e/integration/`, tickets T03–T10 and T14–T17,
+    `build-log/agent-local.md`.
+  - Run `scripts/check-ownership.sh $JIGWORKS_AGENT` before every commit.
+- **Contracts are frozen** after T02. If you need a change in
+  `packages/contracts/`, do not make it: write the proposal in your build log,
+  mark the ticket `blocked`, move on. Exception: `hub` regenerates
+  `packages/contracts/openapi.json` from FastAPI.
+- **Lockfiles:** on a rebase conflict in `pnpm-lock.yaml` or `uv.lock`, take
+  the remote version, re-run `pnpm install` / `uv lock`, commit.
+- **Build log:** during the parallel build, write to your own
+  `build-log/agent-<name>.md`, not to `BUILD_LOG.md`; the human merges them.
+- **One ticket at a time.** Prove it with your verify command
+  (`pnpm verify:hub` or `pnpm verify:local`), paste the output into the
+  ticket's Evidence, tick the criteria, commit, push. After three failed
+  verification attempts mark the ticket `blocked` with the reason and take the
+  next independent ticket.
+- **Missing the other side:** test against fixtures in
+  `packages/contracts/fixtures/` or a mock generated from `openapi.json`;
+  never edit the other agent's code to unblock yourself.
