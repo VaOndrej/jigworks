@@ -1,6 +1,6 @@
 # Jigworks — joint brainstorming and architecture design
 
-- **Version:** 0.6 (narrowed MVP + prototype scope for the case study)
+- **Version:** 0.7 (prototype scope + human delta loop in the architecture)
 - **Last updated:** 19 Nov 2026
 - **Status:** working design, not a finished technical specification
 - **Context:** take-home case study "Design Your Software Factory" (AI Engineer, FTMO & OANDA); recommended time ~4 h, live demo + backup recording, repo incl. agent instructions, prompts, tests, evals and build log; public/synthetic data only.
@@ -18,8 +18,8 @@
 
 ### Three product parts
 
-1. **Web Hub** (React + TypeScript, Vite): workflows are written as **normal Python code** directly in the web; the graph is **only a read-only visualization** via LangGraph `get_graph()` → React Flow (with running nodes highlighted). Versioning, publishing, run overview, audit log and cost. A text tab "HR department".
-2. **VS Code extension** (TypeScript + React Webview): pick a published workflow, prompt, run, live step progress, Approve/Reject button (human-in-the-loop). Through a local Python runner it executes the LangGraph graph, which calls `claude -p` (other CLIs later).
+1. **Web Hub** (React + TypeScript, Vite): workflows are written as **normal Python code** directly in the web; the graph is **only a read-only visualization** via LangGraph `get_graph()` → React Flow (with running nodes highlighted). Versioning, publishing, and one "Runs & analytics" tab (runs, audit log, cost, version comparison). A text tab "Non-coding teams".
+2. **VS Code extension** (TypeScript + React Webview): pick a published workflow, prompt, run, live step progress, Approve/Reject button (human-in-the-loop); several sessions in parallel, each with its own workflow and worktree. Through a local Python runner it executes the LangGraph graph, which calls `claude -p` (other CLIs later).
 3. **Hub API** (Python + FastAPI + PostgreSQL) on Vercel: workflow drafts and releases, distribution to the extension, ingest of run events, usage/cost analytics.
 
 ### Prototype scope (case study, in build order)
@@ -31,7 +31,7 @@ Each step must be demo-able on its own; if we don't make it to 3, the demo stand
    - Sample repo: a small **synthetic order-handling service with invariants** guarded by property tests (the answer to the senior engineer: "agents silently break invariants").
    - Audit log: who started it, workflow version (digest), model, changed files, tokens, cost.
 2. **VS Code extension:** workflow picker, prompt, live steps, Approve/Reject.
-3. **Hub on Vercel (minimal):** Python editor + publish a version, `get_graph()` graph, list of runs with audit log and cost, HR text tab.
+3. **Hub on Vercel (minimal):** Python editor + publish a version, `get_graph()` graph, "Runs & analytics" tab with audit log and cost, "Non-coding teams" text tab.
 
 ### Explicitly out
 
@@ -79,7 +79,7 @@ Langflow / LangSmith Studio: inspiration only. LangSmith Studio already visualiz
 ```
                  WEB HUB (React, Vite)            ┐
         Python editor | get_graph() graph | runs  │ Vercel project "jigworks"
-        audit | cost | HR tab                     │ (Vercel Services)
+        runs & analytics | non-coding tab         │ (Vercel Services)
                         |                         │
                  HUB API (FastAPI)                │
         Postgres | releases | channels | events   ┘
@@ -103,6 +103,7 @@ Langflow / LangSmith Studio: inspiration only. LangSmith Studio already visualiz
 - The Hub owns published versions, assignments and the summary history. It needs no access to the code or to CLI credentials.
 - The runner owns execution; it streams events to the extension and to the hub. When the connection drops, it queues locally and syncs after recovery.
 - SSE on Vercel functions has a time limit → the client must handle reconnects (or polling).
+- **Human delta loop (architecture only, §8):** after a human approves, whatever they change before the code is merged flows back to the Hub as a diff. That closes the loop from a published workflow, through runs and human edits, back to an improved workflow.
 
 ## 5. Web Hub: workflow as Python
 
@@ -138,6 +139,9 @@ The code of published workflows is never executed in the Hub API process.
 
 ## 7. VS Code extension
 
+- Sidebar: **Workflows** (the selected one is active for a new session) and **Sessions** (every running or waiting session with its current node and progress).
+- A new session opens with the prompt in the middle of the editor area; each session is its own tab and runs in its own git worktree, so an engineer can start a customer bug fix while a feature run continues.
+- Run view: the read-only graph with the current node highlighted, and progress as **% of the plan** (weight of finished nodes / weight of the planned path; weights from past runs of the same release, fallback to `workflow.toml`). Not a time estimate; a fix loop never moves it backwards. The graph JSON comes from the local runner, which executes the workflow code anyway.
 - Pick the workspace, workflow (`feature-development@1.3.0`), agent/model.
 - Prompt + optional attachments from the workspace.
 - Start / stop / resume; live steps, tool calls, tokens, cost, links to the diff and Playwright artifacts.
@@ -175,6 +179,19 @@ The code of published workflows is never executed in the Hub API process.
 - For Pro accounts, label it "API equivalent". `total_cost_usd` from the CLI only as a cross-check.
 - The adapter normalizes into the same fields (Codex reports differently).
 
+### Human delta and supervised workflow learning (architecture only, not in the prototype)
+
+The runner records `ai_final_commit`: the tree the human approved at `approve_pr`. When the change is merged (primary: a PR-merge webhook to the Hub; fallback: the extension on local push), the Hub compares the merged tree with `ai_final_commit` on the paths the run touched and stores a **human delta**:
+
+- `runId, release, digest, outcome (merged_as_is | edited | rejected), files, lines_added, lines_removed, diff` (diff in Blob, after a secret scan).
+
+Uses:
+
+- **Analytics:** share of runs merged as the AI wrote them vs edited vs rejected, edit size, where humans edit most (files, node that produced the code), per release. This is the most direct quality signal beyond "it looks right" and feeds version comparison (§11.3).
+- **Supervised learning:** the Hub groups similar deltas per workflow; an agent proposes a change to prompts or steps as a **draft release diff**; the workflow owner reviews it, publishes to `beta`, and promotes it only if the metrics improve. Nothing is published automatically.
+
+Constraints: deltas contain company code, so they stay in the company Hub under the same access rules; collection is opt-in per team.
+
 ### Audit
 
 Every run: who started it, release + digest, model, steps, changed files (git snapshot per node), gate results, who approved and when, tokens and cost.
@@ -208,7 +225,8 @@ START → plan → [human approve plan] → write_tests (different agent, from t
 
 ## 10. Deferred
 
-- HR/legal/ops: only a text tab in the Hub (Ondřej describes the use cases, e.g. automatic CV screening). Future shape: a base workflow + a department variant with added check/approval nodes (subgraphs + `interrupt`) and running outside the IDE.
+- Non-coding teams (HR/legal/ops): only a "Non-coding teams" text tab in the Hub (Ondřej describes the use cases, e.g. automatic CV screening). Future shape: a base workflow + a department variant with added check/approval nodes (subgraphs + `interrupt`) and running outside the IDE.
+- Human delta capture and supervised workflow learning (designed in §8, not built).
 - Public API, JetBrains, cloud runners, scheduling, marketplace, advanced permissions, billing, server-side CI enforcement.
 
 ## 11. Open questions
@@ -218,6 +236,7 @@ START → plan → [human approve plan] → write_tests (different agent, from t
 3. Comparing workflow versions from analytics (cost, fixes, success rate).
 4. Granularity of `stream-json` telemetry — verify in spike B.
 5. Pro account billing for `claude -p` — verify the current terms.
+6. Human delta: capture point (PR-merge webhook vs local push), matching squashed or rebased merges to `ai_final_commit`, and retention of stored diffs.
 
 ## 12. Repo structure (plan)
 
@@ -244,6 +263,7 @@ Tooling: pnpm workspace (TS), uv workspace (Python).
 
 ## 13. Decision history
 
+- **v0.7 (19 Nov 2026):** human delta loop added to the architecture (§4, §8; not built). Hub tabs: "Runs & analytics" merged into one, the HR tab renamed "Non-coding teams". VS Code extension: parallel sessions, prompt in the middle, run view with graph position and % of plan (§7). Tickets live in `tickets/`.
 - **v0.6 (19 Nov 2026):** project named Jigworks, license FSL-1.1-ALv2. Web Hub = writing Python + read-only `get_graph()` graph (visual editing dropped). Distribution via Hub API + `.zip` import fallback. Own analytics (tokens × price list with validity). Hosting on Vercel Services + Neon. Target audience is developers, HR only as a text tab. Governance elements (audit, independent review, human approval) moved into the core because of the case study brief. Prototype scope: runner → extension → minimal Hub.
 - **v0.5:** strictly three-part MVP, no policy engine and no DSL, local execution of a Python LangGraph package.
 - **v0.4:** FastAPI REST/SSE hub, VS Code TS/React Webview, releases, live usage.
