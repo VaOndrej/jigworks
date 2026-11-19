@@ -92,7 +92,7 @@ Visual spec for both: [`docs/mockups/jigworks-ui.html`](mockups/jigworks-ui.html
 | Ticket | Result the night depends on |
 |---|---|
 | T00 | Facts about `claude -p` stream-json, recorded fixtures, the login check, how usage limits show up |
-| T01 | pnpm + uv workspaces, folder skeleton, `vercel.json`, `docker-compose.yml` (Postgres), hooks, `scripts/check-ownership.sh`, `scripts/overnight.sh`, `prompts/overnight-*.md`, and a **toolchain smoke test** (below) |
+| T01 | pnpm + uv workspaces, folder skeleton, `vercel.json`, `docker-compose.yml` (Postgres), hooks, `scripts/check-ownership.sh`, `.claude/settings.json` allowlist, and a **toolchain smoke test** (below) |
 | T02 | Frozen contracts: schemas, generated types, `openapi` shapes, and fixtures: recorded runs, a sample workflow bundle (`.zip` + digest) and its `get_graph()` JSON |
 
 ### HUB (Vercel)
