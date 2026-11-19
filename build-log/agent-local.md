@@ -89,3 +89,22 @@ Agent: Claude Code (Opus 5.5), worktree `~/Development/jigworks-local`, branch `
     include the location.
   - Privacy: the audit records the human's real git email. It stays in `.jigworks/`; the ticket
     evidence is redacted.
+
+### T08, T09, T16 · VS Code extension — T08/T09 done, T16 review
+
+- **Built:** runner bridge (one process per command, keyed by runId, JSONL → events, rebuild from
+  disk), login preflight, extension host (sidebar webview view, a panel per session, new-session
+  panel, status bar, interrupt notifications, commands), React webviews (sidebar, new session,
+  run view with graph + NOW, % of plan, agent output, decision card), a standalone harness that
+  replays the recorded runs, and `.vsix` packaging.
+- **Proof:** 4 `@vscode/test-electron` tests in real VS Code (two parallel sessions through the
+  real runner with the fake adapter, request changes, approve, reloads, preflight); 4 Playwright
+  tests with screenshots at 1440 px; `.vsix` built and installed with `code --install-extension`.
+- **Decisions:**
+  - No React Flow in the extension: the run view lays out the planned path itself, with fix
+    below, as in the mockup.
+  - A tiny test workflow keeps the extension test at 6 s instead of running the real gate.
+  - The runner got `inspect`, so the extension never parses TOML.
+  - Agent output is off by default (Activity tab first).
+- **Open:** T16's real VS Code screenshot (human, morning).
+- **Note:** `code --install-extension` installed the `.vsix` into the human's VS Code profile.

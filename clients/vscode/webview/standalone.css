@@ -1,0 +1,18 @@
+/* The VS Code chrome around the webviews in the standalone UI (only for screenshots; in VS Code the
+   editor provides it). Mirrors the frame in docs/mockups/jigworks-ui.html. */
+body { background: #1E1F23; }
+.vs { width: 1440px; height: 900px; display: flex; flex-direction: column; background: #1E1F23; overflow: hidden; }
+.vs-title { height: 36px; flex: none; display: flex; align-items: center; justify-content: center; background: #18191C; color: #A3A7B1; font-size: 12px; border-bottom: 1px solid #2C2E34; }
+.vs-main { flex: 1; display: flex; min-height: 0; }
+.vs-activity { width: 48px; flex: none; background: #18191C; display: flex; flex-direction: column; align-items: center; gap: 18px; padding-top: 14px; border-right: 1px solid #2C2E34; }
+.vs-active-icon { width: 48px; display: flex; justify-content: center; border-left: 2px solid #F59E5B; }
+.vs-side { width: 300px; flex: none; border-right: 1px solid #2C2E34; display: flex; flex-direction: column; min-height: 0; overflow: auto; }
+.vs-side .sidebar { min-height: 100%; }
+.vs-editor { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.vs-tabs { height: 36px; flex: none; display: flex; background: #1B1C20; border-bottom: 1px solid #2C2E34; font-size: 12px; }
+.vs-tab { padding: 0 16px; display: flex; align-items: center; gap: 8px; color: #8C909B; border-right: 1px solid #2C2E34; white-space: nowrap; }
+.vs-tab.on { background: #1E1F23; border-top: 2px solid #5B8DEF; color: #E6E7EB; }
+.vs-tab.on.new { border-top-color: #F59E5B; }
+.vs-content { flex: 1; overflow: auto; }
+.vs-content .run { min-height: 0; }
+.vs-status { height: 24px; flex: none; display: flex; align-items: center; gap: 18px; padding: 0 12px; background: #2B2D33; color: #C9CBD1; font-size: 11px; }

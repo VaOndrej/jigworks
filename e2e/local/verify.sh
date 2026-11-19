@@ -13,8 +13,12 @@ uv run pytest runner workflows sample-repo -q -o tmp_path_retention_policy=faile
 echo "== sample-repo: planted bugs must be caught by the property tests"
 bash sample-repo/scripts/break-invariant.sh all
 
-echo "== vscode: @vscode/test-electron"
+echo "== vscode: @vscode/test-electron (real extension, real runner, fake adapter)"
 pnpm --filter vscode test
+
+echo "== vscode: standalone webview + Playwright screenshots at 1440 px (e2e/local/screenshots/)"
+pnpm --filter vscode exec tsc -p tsconfig.webview.json
+pnpm --filter vscode test:ui
 
 if [[ "${JIGWORKS_LIVE:-}" == "1" ]]; then
   echo "== live: real claude -p calls"
