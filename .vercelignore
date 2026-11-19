@@ -1,0 +1,12 @@
+# Keep `vercel deploy` uploads small; Git-integration deploys only see committed files.
+**/node_modules
+**/.vscode-test
+**/out
+**/dist
+.venv
+**/__pycache__
+**/.pytest_cache
+e2e/screenshots
+**/test-results
+**/playwright-report
+.env*

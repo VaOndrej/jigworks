@@ -27,7 +27,7 @@ step "4/5 vercel deploy of the skeleton (preview)"
 if [[ "${1:-}" == "--skip-deploy" ]]; then
   echo "skipped (--skip-deploy)"
 else
-  url="$(vercel deploy --yes 2>/dev/null | grep -Eo 'https://[a-z0-9-]+\.vercel\.app' | tail -1)"
+  url="$(vercel deploy --yes 2>&1 | grep -Eo 'https://[a-z0-9-]+\.vercel\.app' | tail -1)"
   echo "preview: $url"
   printf 'GET /api/health -> '
   vercel curl /api/health --deployment "$url" -- -s 2>/dev/null | tail -1
@@ -41,7 +41,7 @@ step "5/5 claude login check + one tiny claude -p call"
 claude --version
 claude auth status | redact
 claude auth status | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d["loggedIn"], "claude is not logged in"; print("loggedIn:", d["loggedIn"], "| authMethod:", d.get("authMethod"), "| subscription:", d.get("subscriptionType"))'
-claude -p "Reply with exactly the word: ok" --model haiku --output-format json \
+claude -p "Reply with exactly the word: ok" --model haiku --output-format json < /dev/null \
   | python3 -c 'import json,sys; d=json.load(sys.stdin); print("result:", d["result"].strip(), "| is_error:", d["is_error"], "| cost_usd:", d.get("total_cost_usd"))'
 
 printf '\nSMOKE TEST PASSED\n'
