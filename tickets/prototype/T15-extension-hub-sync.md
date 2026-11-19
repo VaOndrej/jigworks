@@ -16,6 +16,7 @@ The extension resolves `stable`, downloads the bundle, verifies the digest and r
 
 ## Acceptance criteria
 
+- [ ] Settings: hub URL in VS Code settings; the hub password in VS Code SecretStorage (never in settings.json), sent as `X-Jigworks-Key`. A wrong password shows a clear error.
 - [ ] Test or recording: publish v1 → run → publish v2 → roll the channel back to v1 → the extension picks up v1.
 
 ## Evidence

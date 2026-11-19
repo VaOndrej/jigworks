@@ -21,15 +21,18 @@ The existing Vercel project `jigworks` (Hobby, linked to this repo) gets Postgre
 
 ## Steps
 
-| Step | Who |
-|---|---|
-| Enable Vercel Services (Beta) for the project, if it needs an opt-in | **Ondřej — dashboard** |
-| Marketplace → Neon Postgres → install and connect to `jigworks` (all environments) | **Ondřej — dashboard** (accepts Marketplace terms) |
-| Storage → Blob → create store, connect to `jigworks` | **Ondřej — dashboard** |
-| Enable Vercel Sandbox for the project (needed by T13) | **Ondřej — dashboard** |
-| `vercel link` in the repo | Ondřej once (login), then agent |
-| `vercel env pull .env.local`; verify the variables exist | agent |
-| Preview deploy of the T01 skeleton | agent |
+| Step | Who | State (19 Nov 2026) |
+|---|---|---|
+| `vercel login` + `vercel link` (repo-linked, project `jigworks`) | Ondřej | done |
+| Blob store `jigworks-bundles` (private, all environments) | Ondřej (CLI) | done |
+| Neon Postgres via Marketplace (Preview + Production) | Ondřej (dashboard) | done |
+| `HUB_PASSWORD` (secret in Production + Preview, plain in Development) | Ondřej (CLI) | done |
+| Protection Bypass for Automation secret in `.env.local` | Ondřej (dashboard) | optional; without it use `vercel curl` |
+| Vercel Services (Beta) and Sandbox: confirm no opt-in is needed | agent, in the T01 smoke test | todo |
+| `vercel env pull .env.local`; verify the variables | agent | todo |
+| Preview deploy of the skeleton | agent | todo |
+
+Local development uses Postgres in Docker; Neon is only in Preview and Production.
 
 Note: Hobby function duration limits SSE, so the client uses reconnect/polling (design.md §4).
 
