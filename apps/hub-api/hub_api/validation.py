@@ -21,7 +21,6 @@ from jigworks_contracts.graph import normalize_langgraph_json
 from .config import settings
 
 MARK = "JIGWORKS_RESULT "
-SANDBOX_ROOT = "/vercel/sandbox"
 
 # Runs inside the sandbox only. Imports the package, builds the graph, prints get_graph().
 CHECK_SCRIPT = r'''
@@ -154,20 +153,21 @@ def run_in_sandbox(files: dict[str, str], entrypoint: str, request_headers: dict
     checks: list[dict] = []
     # The default Sandbox image ships python3 and uv (checked 20 Nov 2026: Python 3.14, /usr/local/bin/uv).
     with create_sandbox(execution_time_limit=240, tags={"app": "jigworks-hub", "purpose": "validate"}) as sb:
+        root = str(sb.cwd)  # the image's working directory
         dirs = sorted({f"pkg/{p.rsplit('/', 1)[0]}" for p in files if "/" in p} | {"pkg"})
-        sb.run_command("mkdir", ["-p", *dirs], cwd=SANDBOX_ROOT, check=True)
+        sb.run_command("mkdir", ["-p", *dirs], cwd=root, check=True)
         for path, content in files.items():
-            sb.fs.write_bytes(f"pkg/{path}", content.encode(), cwd=SANDBOX_ROOT)
-        sb.fs.write_bytes("jigworks_check.py", CHECK_SCRIPT.encode(), cwd=SANDBOX_ROOT)
+            sb.fs.write_bytes(f"pkg/{path}", content.encode(), cwd=root)
+        sb.fs.write_bytes("jigworks_check.py", CHECK_SCRIPT.encode(), cwd=root)
         reqs = ["-r", "pkg/requirements.lock"] if "requirements.lock" in files else ["langgraph"]
-        venv = sb.run_command("uv", ["venv", "-q", ".venv"], cwd=SANDBOX_ROOT, capture_output=True)
+        venv = sb.run_command("uv", ["venv", "-q", ".venv"], cwd=root, capture_output=True)
         install = sb.run_command("uv", ["pip", "install", "-q", "--python", ".venv/bin/python", *reqs],
-                                 cwd=SANDBOX_ROOT, capture_output=True) if venv.returncode == 0 else venv
+                                 cwd=root, capture_output=True) if venv.returncode == 0 else venv
         if install.returncode != 0:
             tail = (install.stderr or b"").decode(errors="replace").strip().splitlines()[-3:]
             checks.append(_check("imports", False, "installing requirements.lock failed: " + " | ".join(tail), "requirements.lock"))
             return checks, None
-        run = sb.run_command(".venv/bin/python", ["jigworks_check.py", "pkg", entrypoint], cwd=SANDBOX_ROOT,
+        run = sb.run_command(".venv/bin/python", ["jigworks_check.py", "pkg", entrypoint], cwd=root,
                              capture_output=True)
     stdout = (run.stdout or b"").decode(errors="replace")
     line = next((ln for ln in stdout.splitlines() if ln.startswith(MARK)), None)
