@@ -16,9 +16,10 @@ A slides deck or document that answers all 9 questions from the brief and goes d
 ## Acceptance criteria
 
 - [ ] `docs/presentation.md` (or slides exported to `docs/`) covers all 9 questions.
-- [ ] Deep dives (confirmed; may change once the prototype exists): **Q3** walk one change from idea to PR and zoom into the gate (independent tests + invariant property tests); **Q6** quality, security and governance (audit trail, approver ≠ author, cost); **Q5** delegate / review / own. The other six questions get one or two sentences each; Q7 (non-engineers) points to the HR tab and the department-variant direction in design.md §10.
+- [ ] Deep dives (confirmed; may change once the prototype exists): **Q3** walk one change from idea to PR and zoom into the gate (independent tests + invariant property tests); **Q6** quality, security and governance (audit trail, approver ≠ author, cost); **Q5** delegate / review / own. The other six questions get one or two sentences each; Q7 (non-engineers) points to the "Non-coding teams" tab and the department-variant direction in design.md §10.
 - [ ] Fits a 35–40 min presentation + demo slot (the session is 1 h including discussion).
 - [ ] States the time spent and why (from BUILD_LOG.md), as the brief asks.
+- [ ] The human delta loop (design.md §8) closes the story end to end: shown as architecture, clearly marked as not built.
 - [ ] Each deep dive links to the code or eval that backs it.
 - [ ] A "what I cut" slide.
 
