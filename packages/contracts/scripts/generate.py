@@ -1,11 +1,13 @@
 """Regenerate the Python side of the contracts from schema/jigworks.schema.json.
 
-    uv run python packages/contracts/scripts/generate.py           # write files
-    uv run python packages/contracts/scripts/generate.py --check   # fail if out of date
+    uv run python packages/contracts/scripts/generate.py                  # write models.py
+    uv run python packages/contracts/scripts/generate.py --openapi-stub   # also write openapi.json from the stub
+    uv run python packages/contracts/scripts/generate.py --check          # fail if models.py is stale
 
-Writes jigworks_contracts/models.py (datamodel-codegen) and openapi.json (from a
-FastAPI stub that declares every hub endpoint with the generated models). After T02,
-HUB regenerates openapi.json from the real FastAPI app; it must stay compatible.
+models.py comes from datamodel-codegen. openapi.json was first written from a FastAPI stub
+(scripts/openapi_stub.py). After T02, HUB owns its regeneration from the real FastAPI app,
+so this script only rewrites it with --openapi-stub; the tests check that it stays
+compatible with the stub (same paths and methods, same component schemas, same auth).
 """
 
 from __future__ import annotations
@@ -62,19 +64,17 @@ def main() -> int:
         new_models_path = Path(tmp) / "models.py"
         generate_models(new_models_path)
         new_models = new_models_path.read_text()
-    if not check:
-        MODELS.write_text(new_models)
-    new_openapi = generate_openapi()  # imports the (possibly just written) models
     if check:
-        stale = [p.name for p, new in ((MODELS, new_models), (OPENAPI, new_openapi))
-                 if not p.exists() or p.read_text() != new]
-        if stale:
-            print(f"out of date: {', '.join(stale)}; run scripts/generate.py", file=sys.stderr)
+        if not MODELS.exists() or MODELS.read_text() != new_models:
+            print("out of date: models.py; run scripts/generate.py", file=sys.stderr)
             return 1
-        print("generated files are up to date")
+        print("models.py is up to date")
         return 0
-    OPENAPI.write_text(new_openapi)
-    print(f"wrote {MODELS.relative_to(ROOT)} and {OPENAPI.relative_to(ROOT)}")
+    MODELS.write_text(new_models)
+    print(f"wrote {MODELS.relative_to(ROOT)}")
+    if "--openapi-stub" in sys.argv:
+        OPENAPI.write_text(generate_openapi())
+        print(f"wrote {OPENAPI.relative_to(ROOT)} from scripts/openapi_stub.py")
     return 0
 
 

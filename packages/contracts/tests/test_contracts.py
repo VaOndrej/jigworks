@@ -189,9 +189,25 @@ def test_graph_fixture_is_normalized_from_real_get_graph():
 
 
 # --- API description ------------------------------------------------------------
-def test_openapi_is_generated_from_the_contracts():
+def test_models_are_generated_from_the_schema():
     out = subprocess.run([sys.executable, str(PKG / "scripts" / "generate.py"), "--check"], capture_output=True, text=True)
     assert out.returncode == 0, out.stderr
+
+
+def test_openapi_stays_compatible_with_the_contract_stub():
+    """HUB may regenerate openapi.json from the real app; it must keep every stub operation and schema."""
+    sys.path.insert(0, str(PKG / "scripts"))
+    from openapi_stub import build_app
+
+    stub = build_app().openapi()
+    spec = json.loads((PKG / "openapi.json").read_text())
+    ops = lambda s: {f"{m.upper()} {p}" for p, o in s["paths"].items() for m in o}  # noqa: E731
+    assert ops(stub) <= ops(spec), ops(stub) - ops(spec)
+    missing = set(stub["components"]["schemas"]) - set(spec["components"]["schemas"]) - {"HTTPValidationError", "ValidationError"}
+    assert not missing, missing
+    for name, schema in stub["components"]["schemas"].items():
+        if name in spec["components"]["schemas"] and name not in ("HTTPValidationError", "ValidationError"):
+            assert set(schema.get("properties", {})) <= set(spec["components"]["schemas"][name].get("properties", {})), name
 
 
 def test_openapi_states_the_auth_rule():

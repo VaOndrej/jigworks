@@ -32,7 +32,7 @@ One schema for run events (design.md §8) shared by the runner (Python) and the 
 
 ## Evidence
 
-Package: [`packages/contracts/`](../../packages/contracts/README.md). Source of truth: `schema/jigworks.schema.json`. Pydantic models, TS types and `openapi.json` are generated from it; a test fails if `models.py` or `openapi.json` is stale.
+Package: [`packages/contracts/`](../../packages/contracts/README.md). Source of truth: `schema/jigworks.schema.json`. Pydantic models, TS types and `openapi.json` are generated from it. A test fails if `models.py` is stale, or if `openapi.json` (which HUB may regenerate from the real app) loses any operation, schema or field of the stub.
 
 **How each criterion is met**
 
@@ -80,15 +80,16 @@ test_fix_loop_run_counts_follow_ups_and_first_result PASSED
 test_bundle_digests_and_tampering PASSED
 test_bundle_build_is_deterministic PASSED
 test_graph_fixture_is_normalized_from_real_get_graph PASSED
-test_openapi_is_generated_from_the_contracts PASSED
+test_models_are_generated_from_the_schema PASSED
+test_openapi_stays_compatible_with_the_contract_stub PASSED
 test_openapi_states_the_auth_rule PASSED
 test_openapi_covers_the_design_endpoints PASSED
-============================== 54 passed in 0.78s ==============================
+============================== 55 passed in 0.66s ==============================
 $ uv run python packages/contracts/scripts/generate.py --check
-generated files are up to date
+models.py is up to date
 ```
 
-**The tests can fail:** a progress regression in run 0002 and a stale `openapi.json`, both introduced on purpose: `2 failed, 52 passed`. After restoring the files: `54 passed`.
+**The tests can fail:** a progress regression in run 0002 and a stale `openapi.json`, both introduced on purpose, gave `2 failed, 52 passed`. Deleting `POST /api/runs/{runId}/events` from `openapi.json` gave `2 failed, 53 passed` (`test_openapi_stays_compatible_with_the_contract_stub`, `test_openapi_covers_the_design_endpoints`). After restoring the files: `55 passed`.
 
 **Fixture generator is deterministic:** two runs of `make_fixtures.py` give byte-identical fixtures (md5 of all files compared).
 
@@ -107,7 +108,7 @@ api examples: 12; prices: 8; human deltas: 4
 
 **hub-api consumes the contracts on Vercel:** `apps/hub-api` depends on the workspace package `jigworks-contracts`, and `/api/health` returns `HealthResponse`. The preview build log shows `Installing the dependencies of uv workspace member "jigworks-hub-api" only … from uv.lock`, and `vercel curl /api/health` returns `{"ok":true}` with HTTP 200.
 
-**Repo-wide:** `uv run pytest` reports 58 passed; `pnpm -r test` exits 0 (contracts 29/29, hub-web 1/1, vscode 1 passing).
+**Repo-wide:** `uv run pytest` reports 59 passed; `pnpm -r test` exits 0 (contracts 29/29, hub-web 1/1, vscode 1 passing).
 
 ## Notes
 

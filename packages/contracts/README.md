@@ -16,14 +16,14 @@ regenerates `openapi.json` from the real FastAPI app; it must stay compatible.
 | `jigworks_contracts/graph.py` | `normalize_langgraph_json()`: LangGraph `get_graph().to_json()` → `GraphJSON` |
 | `src/generated/types.ts` | TS types, generated. `import type { RunEvent } from "@jigworks/contracts"` |
 | `src/validate.ts` | `validate(def, value)`, `assertValid()` (ajv, same schema) |
-| `openapi.json` | Hub API: every endpoint, request/response shapes, auth. Generated from `scripts/openapi_stub.py`. |
+| `openapi.json` | Hub API: every endpoint, request/response shapes, auth. First generated from `scripts/openapi_stub.py`; HUB regenerates it from the real app, and a test checks it keeps every stub operation and schema. |
 | `fixtures/` | Runs, bundles, graph, API examples, prices, sample human deltas; see `fixtures/README.md` |
 
 Build and test:
 
 ```bash
 pnpm --filter contracts build      # generate TS, compile ESM + CJS into dist/, run the TS tests
-uv run pytest packages/contracts   # Python tests (also checks openapi.json and models.py are up to date)
+uv run pytest packages/contracts   # Python tests (models.py up to date, openapi.json compatible with the stub)
 ```
 
 `dist/` is not committed: run the build before using the package from hub-web or the extension
@@ -33,7 +33,7 @@ VS Code extension).
 Regenerate after a schema change (only with the human's approval once frozen):
 
 ```bash
-uv run python packages/contracts/scripts/generate.py       # models.py + openapi.json
+uv run python packages/contracts/scripts/generate.py       # models.py (add --openapi-stub to rewrite openapi.json)
 pnpm --filter contracts build                               # TS types
 uv run python packages/contracts/scripts/make_fixtures.py   # fixtures (deterministic)
 ```
