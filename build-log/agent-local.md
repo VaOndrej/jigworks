@@ -173,3 +173,66 @@ Agent: Claude Code (Opus 5.5), worktree `~/Development/jigworks-local`, branch `
 - **Result:** 3/5 scripted implementers broke an invariant; 5/5 runs ended with every invariant
   intact.
 - **Decision:** no live eval batch tonight (kickoff limits live usage); the command is in the ticket.
+
+## Summary (queue empty, 19 Nov 2026 23:36 CET)
+
+| Ticket | Status | Evidence (in the ticket) | Open / blocked |
+|---|---|---|---|
+| T03 sample-repo | done | 19 property + example tests; `break-invariant.sh all` 4/4 caught, example tests blind | — |
+| T04 Claude adapter | done | 25 tests on the T00 recordings; cost = CLI cost on all 6; live haiku smoke | usage-limit stream synthetic; auto-memory isolation unverified |
+| T05 workflow | done | 17 fake-adapter tests over every path with the real gate; `export_graph` | gitleaks/semgrep not installed → built-in secret rules + bandit; `gh pr create` path unexercised |
+| T06 runner CLI | done | 10 CLI tests (kill mid-node, crash after commit, parallel, progress replay); live run with a real review FAIL → fix and a request-changes loop, PR branch on a local bare remote, $4.90 | per-step model in the live audit was wrong (fixed after); venv per digest not built |
+| T08 bridge | done | 7 `@vscode/test-electron` tests; `.vsix` built + installed | runner packaging for other repos |
+| T09 UI | done | 4 Playwright tests, screenshots at 1440 px | real VS Code screenshots (human) |
+| T16 run view | review | standalone screenshots + extension test of the decision path | real VS Code screenshot with two sessions (human, §10.6) |
+| T10 .zip import | done | 6 runner tests (valid, tampered, wrong digest, `../`), extension test | — |
+| T14 runner → hub | done | 4 tests incl. a network cut mid-run (13 queued events delivered) | live preview check not run (secrets refused); `e2e/local/hub-live.sh` ready |
+| T15 extension ← hub | done | publish v1 → run → v2 → rollback → v1, wrong password | live preview not run; beta channel / upgrade prompt not built |
+| e2e | passes | `pnpm verify:e2e`: real hub_api app + private Postgres, 45/45 events, analytics | against the Vercel preview: needs the hub password |
+| T07 evals | done | 5 tasks, control column: 3/5 broke an invariant after `implement`, 5/5 intact at the end | no live eval batch (live-usage limit) |
+| T17 | deferred | — | as planned |
+
+Final `pnpm verify:local` (23:35 CET): 83 passed / 1 skipped (live), 4/4 bugs caught, 7 extension
+tests passing, 4 UI tests passed. Final `pnpm verify:e2e`: 45 events in the hub = 45 in the runner, OK.
+
+**Time:** human ≈ 2 min (kickoff message plus one mid-session question about the architecture);
+agent ≈ 1 h 30 min wall clock (22:05–23:36 CET), one session, no usage-limit pause.
+Live usage: one haiku smoke call plus one release-model run (≈ $4.90 API-equivalent on the Max
+subscription).
+
+### Self-audit: "Is there anything I hacked, cut short, worked around, or left unsaid?"
+
+Ordered by severity.
+
+1. **I broke HUB's preview deploys for ~10 minutes** (T08 dependencies with install scripts).
+   Fixed and verified (next preview Ready). My mistake: I pushed a new dependency without a
+   CI-style frozen install.
+2. **Nothing ran against the deployed hub.** T14, T15 and e2e are proven against the fake hub and
+   against HUB's real FastAPI app locally, but not on Vercel: loading `HUB_PASSWORD` from
+   `.env.local` was refused, and I did not work around it. Commands for the human are in T14.
+3. **The live T06 audit shows wrong models per step** (haiku instead of sonnet for plan, implement
+   and review). Fixed in code with a test; the live run was not repeated.
+4. **Evals are scripted.** They measure the workflow's guardrails, not the model. One real data
+   point (T06). A live batch costs ~$15–25 API-equivalent.
+5. **The ownership hook was inactive all session** (`JIGWORKS_AGENT` empty, D1). I ran
+   `check-ownership.sh local` before every commit (the pre-commit hook did too); every commit
+   passed it.
+6. **Workarounds that change behaviour:**
+   - The bare remote's base branch is `base` (the pre-push hook refuses `main` even locally).
+   - Live state lives in the ignored `.jigworks/` of the LOCAL worktree, including the T06 live
+     worktree and the human's real git email in its audit.
+   - The extension `.vsix` is installed in the human's VS Code profile.
+7. **Design points not built:**
+   - A uv venv per release digest: runs use the runner's venv.
+   - The beta channel and the "new version offered" prompt.
+   - The agent's auto-memory isolation (spike §7).
+   - The real usage-limit stream shape (synthetic in tests).
+8. **Smaller trade-offs:**
+   - Hypothesis is derandomized (reproducible, explores less).
+   - Request changes at the plan appends the comment instead of re-planning.
+   - The fix agent may edit tests (it fixed buggy ones in the live run).
+   - Hub workflows reappear only after a sync, not from the cache.
+9. **Environment:**
+   - The disk was full most of the night (153 MB–1 GB free). Docker is down because of it.
+   - The e2e uses a private Postgres from the Homebrew binaries on port 54339, created and
+     deleted per run.
