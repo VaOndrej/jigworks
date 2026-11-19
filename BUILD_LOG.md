@@ -9,8 +9,8 @@ Time is tracked in two columns: **human** (my own time: deciding, directing, rev
 | Brainstorming & design | 1 h 30 min | — |
 | English pass, agent instructions, ticket plan | 20 min | ~85 min |
 | UI review and design brainstorming (v0.7) | 30 min | ~30 min |
-| Foundation T00–T02 (+ T11 Vercel setup) | 30 min (20 min + 10 min Vercel setup) | ~35 min (+ ~8 min parallel subagent) |
-| **Total** | **2 h 50 min** | **~2 h 30 min** |
+| Foundation T00–T02 (+ T11 Vercel setup, overnight launch) | 40 min (20 min + 10 min Vercel setup + 10 min launch) | ~35 min (+ ~8 min parallel subagent) |
+| **Total** | **3 h 00 min** | **~2 h 30 min** |
 
 ## Entries
 
@@ -86,11 +86,12 @@ Time is tracked in two columns: **human** (my own time: deciding, directing, rev
 - Hub behind one shared password; identity from `git config user.email`; no demo in tonight's build.
 - Decided the build runs overnight: two agents push to `feature/hub-and-vs-code-extension`, each only its own files; I merge the PR in the morning. Rules in AGENTS.md, procedure in docs/two-agent-build.md.
 
-### 2026-11-19 — Foundation: T00, T01, T02 (human 30 min, agent ~35 min + ~8 min parallel)
+### 2026-11-19 — Foundation: T00, T01, T02 (human 40 min, agent ~35 min + ~8 min parallel)
 
 **What I did**
 - 20 min: wrote the session prompt (scope, branch rules, order, stop for review), stayed at the computer for the macOS dialogs during the T01 toolchain smoke test, and the review.
 - 10 min: Vercel setup for T11 (`vercel login` + `vercel link`, Blob store, Neon via the Marketplace, `HUB_PASSWORD`).
+- 10 min: overnight launch: bypass token, starting both sessions, fixing the HUB session that started outside its worktree.
 
 **What I delegated**
 - Everything that was built: branch `feature/hub-and-vs-code-extension`, T00 spike, T01 scaffolding and smoke test, T02 contracts, the agent rows of T11.
@@ -112,5 +113,6 @@ Time is tracked in two columns: **human** (my own time: deciding, directing, rev
 - The first `openapi.json` test required byte equality with the stub, which would have gone red as soon as HUB regenerated the file overnight. It now checks compatibility instead.
 - The fixture runs are synthetic (no runner exists yet); they are labelled so.
 - The ownership guard was proven inside a real `claude -p` session in the HUB worktree (write to `runner/` blocked, write to `apps/hub-web/` allowed), and the pre-commit hook rejected a commit of a LOCAL path.
+- The HUB session in the VS Code panel started in the main checkout, not in its worktree, so `JIGWORKS_AGENT` was empty. The guard and the git hooks now read the agent from the target worktree's `.claude/settings.local.json`, and the HUB kickoff pins all work to `~/Development/jigworks-hub`.
 - Worktrees `../jigworks-hub` and `../jigworks-local` created; kickoff prompts in `docs/kickoff-hub.md` and `docs/kickoff-local.md`.
 - The recorded T00 transcripts listed the recording user's claude.ai connectors; they are blanked in the fixtures and in the scrubber.
