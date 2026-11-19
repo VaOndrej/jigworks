@@ -8,12 +8,12 @@
 | | Agent **HUB** | Agent **LOCAL** |
 |---|---|---|
 | Directories (write) | `apps/hub-api/`, `apps/hub-web/`, `vercel.json` | `runner/`, `workflows/`, `sample-repo/`, `clients/vscode/` |
-| Tickets | T11 (agent part), T12, T13 | T03–T10, T16, T17, then T14, T15 |
+| Tickets | T11 (agent part), T12, T13, hub side of T14 | T03–T10, T16, T17, runner side of T14, T15 |
 | Branch / worktree | `agent/hub` in `../jigworks-hub` | `agent/local` in `../jigworks-local` |
 
 **Shared, built first by one agent before the split:** T00 spike, T01 scaffolding, T02 `packages/contracts`. After T02 merges, `packages/contracts/` is **frozen**: a change needs a separate commit that the human approves, and both agents rebase onto it.
 
-`e2e/` (cross-system tests) is written by LOCAL after both sides exist, because LOCAL owns the integration tickets T14 and T15.
+`e2e/` (cross-system tests) is written by LOCAL after both sides exist; HUB owns the hub side of T14 (ingest endpoint), LOCAL the runner side and T15.
 
 **Enforcement:** `scripts/check-ownership.sh <agent>` fails if the branch touches files outside that agent's directories (plus its ticket files and `BUILD_LOG.md`). Both agents run it before every commit.
 
@@ -55,11 +55,11 @@ The agents work unattended between these points; each costs a few minutes of rev
 3. Before each merge of `agent/hub` or `agent/local` into `main`. Agents commit; only the human merges and pushes.
 4. Before recording the demo.
 
-## 5. Decisions needed
+## 5. Decisions (answered 19 Nov 2026)
 
-1. **Contracts frozen after T02**, changes only with your approval: OK?
-2. **Integration (T14, T15, `e2e/`) owned by LOCAL**: OK, or should HUB own the hub side of T14?
-3. **Live `claude -p` runs during self-testing:** allowed with a cap (proposal: $5/day, only for the T06 live proof and the demo rehearsal)?
-4. **Local Postgres for HUB:** Docker, or a Neon dev branch?
-5. **Preview deploys:** may HUB deploy previews itself (`vercel deploy`) and get a deployment-protection bypass for Playwright?
-6. **Merging:** agents only commit on their branches and you merge and push: OK?
+1. **Contracts frozen after T02**; changes only with the human's approval. Agreed.
+2. **Integration split:** HUB owns the hub side of T14 (event ingest endpoint, offline replay acceptance); LOCAL owns the runner side, T15 and `e2e/`. The two agents do not need equal workloads.
+3. **Live `claude -p` runs:** the human has a Max subscription, so there is no per-dollar bill; the limit is the subscription's rolling usage window. Live runs stay opt-in (`JIGWORKS_LIVE=1`) and are used for the T06 live proof, the extension's login check and demo rehearsal. The extension must verify it is using the logged-in Claude Code (preflight in T08, check found in T00).
+4. **Local Postgres for HUB:** Docker.
+5. **Preview deploys:** the Vercel project is linked to the GitHub repo, so every pushed branch gets a preview deploy automatically. Because agents do not push (decision 6), HUB self-tests with `vercel deploy` (CLI preview) and `vercel curl` for protected URLs; the human's pushes produce the Git previews. **Open:** may HUB push its own `agent/hub` branch (never `main`) to get Git previews instead?
+6. **Merging:** agents only commit on their branches; the human merges and pushes. Agreed.
