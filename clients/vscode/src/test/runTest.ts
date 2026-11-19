@@ -1,3 +1,4 @@
+import * as os from "node:os";
 import * as path from "node:path";
 import { runTests } from "@vscode/test-electron";
 
@@ -8,7 +9,11 @@ async function main(): Promise<void> {
   delete process.env.ELECTRON_RUN_AS_NODE;
   const extensionDevelopmentPath = path.resolve(__dirname, "../../");
   const extensionTestsPath = path.resolve(__dirname, "./suite/index");
+  // One VS Code download (~375 MB) shared by all worktrees instead of one per checkout.
+  const cachePath =
+    process.env.JIGWORKS_VSCODE_TEST_CACHE ?? path.join(os.homedir(), ".cache", "jigworks-vscode-test");
   await runTests({
+    cachePath,
     extensionDevelopmentPath,
     extensionTestsPath,
     launchArgs: ["--disable-extensions"],
