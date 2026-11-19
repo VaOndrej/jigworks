@@ -17,6 +17,7 @@ Run a pinned workflow against a repo, isolated and auditable.
 
 - [ ] `uv run jigworks run --workflow workflows/feature-development --repo sample-repo --prompt "<task>"` runs in a fresh git worktree and emits JSONL events on stdout.
 - [ ] LangGraph checkpoint + git commit per node; the commit hash is stored in the graph state.
+- [ ] Resume after a restart (design.md §11.1): kill the runner mid-node, then `uv run jigworks resume <runId>` continues from the last checkpoint; a node whose git commit already exists is not executed twice. Test output pasted.
 - [ ] `uv run jigworks approve <runId>` / `reject <runId>` resumes the interrupt.
 - [ ] Audit log `.jigworks/runs/<runId>/audit.jsonl`: who started, workflow digest, model, steps, changed files, gate results, who approved and when, tokens, cost.
 - [ ] Live proof: one real run on `sample-repo` that goes through at least one fix loop (design.md §9 acceptance) and opens a PR in this repo; audit log excerpt and PR link pasted.

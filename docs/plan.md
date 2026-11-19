@@ -64,6 +64,8 @@ Critical-path human time: T00 5 + T01 5 + T02 5 + T03 10 + T04 5 + T05 15 + T06 
 
 - **Tickets live in the repo** (`tickets/prototype/`), not as GitHub issues, so the plan is reviewable with the code.
 - **`get_graph()` in the hub (T13):** computed only on Vercel, in Vercel Sandbox, behind a "Show graph" CTA in the editor that switches from the code to the visual graph. This settles the "Proposal" status of Vercel Sandbox in design.md §3 for the graph view.
+- **Security in the gate (T05):** secret scan and static security scan run in the gate, because the security lead asks how we know the agent did not add a vulnerability or leak a secret.
+- **Resume after restart (T06):** proven by a kill-and-resume test, covering the long-task engineer and design.md §11.1.
 - **Demo target (T05, P02):** the demo runs in this repo. The workflow changes only `sample-repo/`, pushes a `demo/<runId>` branch and opens the PR against this repo.
 
-- **The brief's 9 questions** are listed in P01, together with the proposed deep dives (Q3, Q6, Q5).
+- **The brief's 9 questions** are listed in P01, together with the deep dives (Q3, Q6, Q5; may change once the prototype exists).
