@@ -3,6 +3,7 @@
 | Field | Value |
 |---|---|
 | Status | todo |
+| Owner | local |
 | Label | `milestone-2` |
 | Size | S |
 | Demo critical path | no |

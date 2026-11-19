@@ -3,6 +3,7 @@
 | Field | Value |
 |---|---|
 | Status | todo |
+| Owner | foundation (before the split) |
 | Label | `milestone-0` |
 | Size | S |
 | Demo critical path | yes |

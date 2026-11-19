@@ -3,6 +3,7 @@
 | Field | Value |
 |---|---|
 | Status | todo |
+| Owner | human (dashboard) + hub |
 | Label | `milestone-3` |
 | Size | S |
 | Demo critical path | no (below the cut line) |

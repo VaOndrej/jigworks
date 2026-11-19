@@ -3,6 +3,7 @@
 | Field | Value |
 |---|---|
 | Status | todo |
+| Owner | human |
 | Label | `presentation` |
 | Size | M |
 | Demo critical path | yes |

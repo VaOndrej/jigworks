@@ -3,6 +3,7 @@
 | Field | Value |
 |---|---|
 | Status | todo |
+| Owner | local |
 | Label | `milestone-1` |
 | Size | M |
 | Demo critical path | no (required deliverable, not demo-blocking) |

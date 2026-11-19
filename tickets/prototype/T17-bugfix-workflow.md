@@ -3,6 +3,7 @@
 | Field | Value |
 |---|---|
 | Status | todo |
+| Owner | local |
 | Label | `milestone-1` |
 | Size | M |
 | Demo critical path | no (the parallel demo falls back to two `feature-development` sessions) |
