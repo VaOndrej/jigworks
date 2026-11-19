@@ -3,7 +3,10 @@ name = "jigworks-hub-api"
 version = "0.0.0"
 description = "Jigworks Hub API (FastAPI) served as a Vercel Service."
 requires-python = ">=3.12"
-dependencies = ["fastapi>=0.115"]
+dependencies = [
+    "fastapi>=0.115",
+    "jigworks-contracts",
+]
 
 [build-system]
 requires = ["hatchling"]
@@ -11,3 +14,6 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["hub_api"]
+
+[tool.uv.sources]
+jigworks-contracts = { workspace = true }

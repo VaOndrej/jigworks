@@ -4,5 +4,6 @@
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 echo "== verify:hub (foundation stub: unit tests only, no Postgres, no Playwright yet)"
+pnpm --filter contracts build   # consumers import dist/
 uv run pytest apps/hub-api
 pnpm --filter @jigworks/hub-web test

@@ -4,5 +4,6 @@
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 echo "== verify:local (foundation stub: unit tests + extension skeleton test)"
+pnpm --filter contracts build   # consumers import dist/
 uv run pytest runner workflows sample-repo
 pnpm --filter vscode test
