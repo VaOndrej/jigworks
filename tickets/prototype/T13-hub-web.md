@@ -11,7 +11,7 @@
 
 ## Goal
 
-Three tabs, as in the mockups: **Workflows** (overview with weekly numbers, workflow cards, live sessions, recent releases; Python editor + publish; read-only `get_graph()` graph), **Runs & analytics** (key numbers, cost per day by token type, version comparison, runs table, run detail with the audit trail) and **Non-coding teams** (text tab describing the direction).
+Three tabs, as in the mockups: **Workflows** (overview with weekly numbers, workflow cards, live sessions, recent releases; Python editor with a Code / Graph toggle (no separate graph button), new file and folder from templates, `[models]` in `workflow.toml`, a "Connect GitHub repo" source bar marked Planned, publish; read-only `get_graph()` graph), **Runs & analytics** (key numbers, cost per day by token type, version comparison, runs table, run detail with the audit trail) and **Non-coding teams** (text tab describing the direction).
 
 ## Acceptance criteria
 
