@@ -115,7 +115,9 @@ export function GraphView({ graph, plannedPath, states, selected, onSelect }: {
       fromSide: ["b", "rt"],
     } as const;
     const edges: Edge[] = placed.edges.map((e, i) => {
-      const [sourceHandle, targetHandle] = handles[e.route];
+      const [sourceHandle, defaultTarget] = handles[e.route];
+      // A human "request changes" edge enters fix from the right, so its label does not sit on the gate's FAIL.
+      const targetHandle = e.route === "toSide" && kindOf.get(e.source) === "interrupt" ? "rt" : defaultTarget;
       const color = colors[e.tone];
       return {
         id: `e${i}-${e.source}-${e.target}`,
@@ -138,7 +140,7 @@ export function GraphView({ graph, plannedPath, states, selected, onSelect }: {
               : e.tone === "fail"
                 ? "FAIL"
                 : e.label,
-        labelStyle: { fontSize: 11, fontWeight: 600, fill: e.tone === "fail" ? "#9B1C1C" : "#0F5F58" },
+        labelStyle: { fontSize: 11, fontWeight: 600, fill: e.tone === "fail" || e.target === END ? "#9B1C1C" : "#0F5F58" },
         labelBgStyle: { fill: "#FFFFFF" },
         style: { stroke: color, strokeWidth: 2, strokeDasharray: e.conditional ? "6 4" : undefined },
         markerEnd: { type: MarkerType.ArrowClosed, color, width: 14, height: 14 },

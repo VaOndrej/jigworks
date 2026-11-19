@@ -68,7 +68,7 @@ echo "  → $(wc -c <"$tmp/bundle.zip" | tr -d ' ') bytes, X-Jigworks-Digest=$he
 [[ "$actual" == "$digest" && "$header_digest" == "$digest" ]] || { echo "FAIL: digest mismatch" >&2; exit 1; }
 echo "  files: $(unzip -Z1 "$tmp/bundle.zip" | paste -sd' ' -)"
 
-echo; echo "# register a run → post events (twice) → read usage"
+echo; echo "# register a run → post events (twice) → read usage (the run ends cancelled, so it leaves no live session behind)"
 run_id="run_smoke_$(date +%s)"
 now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 create="$(jq -nc --arg r "$run_id" --arg wf "$wf" --arg rel "$wf@$version" --arg id "$release_id" --arg d "$digest" --arg t "$now" \
@@ -84,11 +84,12 @@ events="$(jq -nc --arg r "$run_id" --arg wf "$wf" --arg rel "$wf@$version" --arg
     {runId:$r, seq:1, kind:"node_status", at:$t, release:$rel, node:"plan", attempt:1, status:"running", model:"claude-sonnet-5", progress:0, step:0, stepsPlanned:3},
     {runId:$r, seq:2, kind:"usage", at:$t, release:$rel, node:"plan", attempt:1,
      usage:{runId:$r, node:"plan", attempt:1, model:"claude-sonnet-5", adapter:"fake", input:40, output:2100, cache_write:18400, cache_read:96000, at:$t}},
-    {runId:$r, seq:3, kind:"node_status", at:$t, release:$rel, node:"plan", attempt:1, status:"succeeded", progress:20, step:1, stepsPlanned:3}
+    {runId:$r, seq:3, kind:"node_status", at:$t, release:$rel, node:"plan", attempt:1, status:"succeeded", progress:20, step:1, stepsPlanned:3},
+    {runId:$r, seq:4, kind:"node_status", at:$t, release:$rel, node:"approve_plan", attempt:1, status:"cancelled", runStatus:"cancelled", progress:20, step:1, stepsPlanned:3}
   ]}')"
 req key POST "/api/runs/$run_id/events" "$events"; expect 200
 req key POST "/api/runs/$run_id/events" "$events"; expect 200
-[[ "$(j .duplicates)" == 4 ]] || { echo "FAIL: replay was not deduplicated" >&2; exit 1; }
+[[ "$(j .duplicates)" == 5 ]] || { echo "FAIL: replay was not deduplicated" >&2; exit 1; }
 req key GET "/api/runs/$run_id/events?after=1"; expect 200
 req key GET "/api/runs/$run_id"; expect 200
 echo "  status=$(j .summary.status) progress=$(j .summary.progress) currentNode=$(j '.summary.currentNode // "-"') costUsd=$(j .summary.costUsd)"
@@ -102,6 +103,6 @@ echo; echo "# SSE stream (ends after the function's stream window; clients recon
 curl -sS -N --max-time 40 "${bypass[@]}" "${key[@]}" "$base/api/runs/$run_id/events/stream?after=-1" >"$tmp/sse" || true
 echo "\$ curl -N /api/runs/$run_id/events/stream?after=-1  [X-Jigworks-Key]"
 echo "  → $(grep -c '^id: ' "$tmp/sse") messages: $(grep '^event: ' "$tmp/sse" | awk '{print $2}' | paste -sd, -)"
-[[ "$(grep -c '^id: ' "$tmp/sse")" == 4 ]] || { echo "FAIL: SSE did not replay the 4 events" >&2; exit 1; }
+[[ "$(grep -c '^id: ' "$tmp/sse")" == 5 ]] || { echo "FAIL: SSE did not replay the 5 events" >&2; exit 1; }
 
 echo; echo "preview-api: OK ($base)"
