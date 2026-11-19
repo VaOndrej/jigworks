@@ -3,7 +3,9 @@
 //   node build.mjs --production  the same, minified (for the .vsix)
 //   node build.mjs --standalone  the webview + a standalone page that replays the recorded runs
 //                                (out/standalone/index.html) for the Playwright screenshots
-import * as esbuild from "esbuild";
+// esbuild-wasm, not esbuild: no install script, so `pnpm install` on Vercel (pnpm 12 refuses
+// unapproved build scripts) keeps working for the whole workspace.
+import * as esbuild from "esbuild-wasm";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
