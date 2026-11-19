@@ -3,7 +3,8 @@ import * as path from "node:path";
 import Mocha from "mocha";
 
 export function run(): Promise<void> {
-  const mocha = new Mocha({ ui: "tdd", color: true, timeout: 120000 });
+  const grep = process.env.JIGWORKS_TEST_GREP;
+  const mocha = new Mocha({ ui: "tdd", color: true, timeout: 180000, ...(grep ? { grep } : {}) });
   for (const f of fs.readdirSync(__dirname).filter((f) => f.endsWith(".test.js")).sort()) {
     mocha.addFile(path.resolve(__dirname, f));
   }

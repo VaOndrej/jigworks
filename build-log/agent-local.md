@@ -152,3 +152,15 @@ Agent: Claude Code (Opus 5.5), worktree `~/Development/jigworks-local`, branch `
   - `GET /api/workflows` in the fake hub.
 - **Proof:** extension test publish v1 → run → v2 → rollback → v1, plus the wrong-password error.
 - **Not done:** live check against the preview (secrets), beta channel, upgrade prompt.
+
+### e2e · `pnpm verify:e2e` — passes (real hub app, local)
+
+- **Built:** `e2e/integration/verify.sh`: a private Postgres from the Homebrew binaries (Docker is
+  down: full disk) on port 54339, HUB's real `hub_api` under uvicorn (Sandbox fixture, bundles in
+  the database), publish via the real draft → publish endpoints, then the real extension in
+  VS Code (suite `e2e`) syncs `stable`, runs feature-development 1.4.0 with the fake adapter
+  through the real runner and gate (one review fix loop), approves twice; the run is read back
+  from `/api/runs/{id}`, `/api/runs` and `/api/analytics/usage`.
+- **Proof:** 45 events in the runner = 45 in the hub, status succeeded, fixLoops 1, cost
+  priced; the hub's bundle digest equals the runner's own (`sha256:06917e8e…`).
+- **Not done:** the same against the Vercel preview (needs the hub password; see T14).

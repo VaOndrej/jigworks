@@ -11,6 +11,11 @@ function makeWorkspace(repoRoot: string): string {
   const fixtures = path.join(repoRoot, "clients/vscode/test-fixtures");
   fs.cpSync(path.join(fixtures, "tiny-workflow"), path.join(ws, "workflows/tiny"), { recursive: true });
   fs.copyFileSync(path.join(fixtures, "fake-script.json"), path.join(ws, "fake-script.json"));
+  // sample-repo for the e2e suite (feature-development's gate runs its tests and property tests)
+  fs.cpSync(path.join(repoRoot, "sample-repo"), path.join(ws, "sample-repo"), {
+    recursive: true,
+    filter: (p) => !/(__pycache__|\.hypothesis|\.pytest_cache|[/\\]scripts)$/.test(p),
+  });
   fs.writeFileSync(path.join(ws, "README.md"), "test workspace\n");
   fs.writeFileSync(path.join(ws, ".gitignore"), ".jigworks/\n__pycache__/\n");
   fs.mkdirSync(path.join(ws, ".vscode"));
@@ -56,7 +61,15 @@ async function main(): Promise<void> {
       extensionDevelopmentPath,
       extensionTestsPath,
       launchArgs: [workspace, "--disable-extensions"],
-      extensionTestsEnv: { JIGWORKS_TEST_WORKSPACE: workspace, JIGWORKS_REPO_ROOT: repoRoot },
+      extensionTestsEnv: {
+        JIGWORKS_TEST_WORKSPACE: workspace,
+        JIGWORKS_REPO_ROOT: repoRoot,
+        // verify:e2e passes a hub and selects the e2e suite
+        JIGWORKS_E2E_HUB_URL: process.env.JIGWORKS_E2E_HUB_URL,
+        JIGWORKS_E2E_HUB_KEY: process.env.JIGWORKS_E2E_HUB_KEY,
+        JIGWORKS_E2E_OUT: process.env.JIGWORKS_E2E_OUT,
+        JIGWORKS_TEST_GREP: process.env.JIGWORKS_TEST_GREP,
+      },
     });
   } finally {
     fs.rmSync(workspace, { recursive: true, force: true });
