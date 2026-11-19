@@ -21,7 +21,7 @@ Three tabs, as in the mockups: **Workflows** (overview with weekly numbers, the 
 - [ ] The editor's Code / Graph toggle switches to the React Flow graph from `POST /api/workflows/{id}/validate` (Vercel Sandbox). The graph is only computed on Vercel, never in the API process and never on the client. No AI edit box.
 - [ ] A password screen guards the whole hub; a correct `HUB_PASSWORD` sets an HTTP-only cookie. Playwright reads the password from the environment.
 - [ ] Human-delta numbers and the human-delta box in run detail are shown with a "Planned" label and recorded sample data; they are not computed (design.md §8).
-- [ ] Playwright e2e on the preview URL; screenshots at **390 px and 1440 px** for Workflows, the editor, the graph and Runs & analytics.
+- [ ] Playwright e2e on the preview URL; screenshots at **1440 px** for Workflows, the editor, the graph and Runs & analytics.
 
 ## Evidence
 

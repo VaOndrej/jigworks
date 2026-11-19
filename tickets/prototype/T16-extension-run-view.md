@@ -23,7 +23,7 @@ While a session runs, the engineer sees where it is in the workflow graph and ho
 - [ ] Activity list of the latest events and a "Next for you" card; at an interrupt it becomes Approve / Request changes (comment box) / Reject, with links to the diff, the audit log and the test report, and resumes the run.
 - [ ] "Agent output" tab, off by default: live text and tool calls of the current node from `stream-json`, with "Follow live".
 - [ ] Tokens and cost of the session are shown and update live.
-- [ ] Screenshot or recording of the real extension in VS Code with two sessions: one running with the graph and %, one waiting for approval. Playwright screenshots of the standalone run view at **390 px and 1440 px**.
+- [ ] Screenshot or recording of the real extension in VS Code with two sessions: one running with the graph and %, one waiting for approval. Playwright screenshots of the standalone run view at **1440 px**.
 
 ## Evidence
 

@@ -66,9 +66,10 @@ Work is not reported as done without evidence attached to the summary.
   is not evidence. Invariants in `sample-repo/` are guarded by property tests;
   a change there must show them running.
 - **Visual change** (hub-web, the extension webview) → verify with Playwright at
-  **390 px** (mobile) and **1440 px** (desktop) and attach both screenshots.
-  Check for horizontal overflow at 390 px. Save screenshots under
-  `e2e/screenshots/` or attach them to the PR, not to the repo root.
+  **1440 px** (desktop) and attach the screenshot. Mobile layouts are out of
+  scope for the prototype (decided 19 Nov 2026); do not spend time on them.
+  Save screenshots under `e2e/screenshots/`, `e2e/hub/screenshots/` or
+  `e2e/local/screenshots/` (or attach them to the PR), not to the repo root.
 - **Data / infra change** → a dry-run output or three real records after the
   change.
 - If something could not be verified, say so explicitly. Never write "all

@@ -46,12 +46,12 @@ One entry point per side; its output is pasted into the ticket's Evidence.
 **LOCAL — `pnpm verify:local`**
 - `uv run pytest runner workflows sample-repo`: fake adapter, recorded fixtures. Includes the property tests, the planted-secret gate test and the kill-and-resume test.
 - `pnpm --filter vscode test`: `@vscode/test-electron` drives the real extension headless: two sessions in parallel, events, request changes, approve.
-- `pnpm --filter vscode test:ui`: the webview runs standalone with recorded runs; Playwright screenshots at 390 px and 1440 px → `e2e/local/screenshots/`.
+- `pnpm --filter vscode test:ui`: the webview runs standalone with recorded runs; Playwright screenshots at 1440 px → `e2e/local/screenshots/`.
 - `JIGWORKS_LIVE=1 uv run pytest -m live`: one real `claude -p` run on `sample-repo`, plus the extension's login preflight. Uses the Max subscription.
 
 **HUB — `pnpm verify:hub`**
 - `docker compose up -d db` and `uv run pytest apps/hub-api` against local Postgres.
-- `vercel dev` + Playwright on localhost: the three tabs at 390 px and 1440 px → `e2e/hub/screenshots/`.
+- `vercel dev` + Playwright on localhost: the three tabs at 1440 px → `e2e/hub/screenshots/`.
 - After a push: the same Playwright suite against the branch preview URL, through `vercel curl` or a protection-bypass header for the protected deploy.
 
 **Integration — `pnpm verify:e2e`** (LOCAL, last): publish in the hub preview → the extension syncs `stable` → fake-adapter run → events appear in Runs & analytics.
@@ -101,7 +101,7 @@ Visual spec for both: [`docs/mockups/jigworks-ui.html`](mockups/jigworks-ui.html
 |---|---|---|
 | T11 (agent part) | `vercel env pull`, health endpoint, first preview | preview `/api/health` returns `{"ok":true}` |
 | T12 | FastAPI behind the **hub password** (below): workflows, draft, validate (Sandbox), publish (bundle → Blob, digest), releases, channels, bundle download, runs + events ingest, usage analytics with a price table; seeded from contract fixtures | `pytest` green on Docker Postgres; curl transcript against the preview |
-| T13 | React: **Workflows** (overview, editor with Code/Graph, new file/folder, GitHub bar as Planned), **Runs & analytics** (numbers, cost chart, outcomes as Planned, version comparison, runs, run detail), **Non-coding teams** text tab | Playwright at 390 + 1440 px on localhost and on the preview, matching the mockups |
+| T13 | React: **Workflows** (overview, editor with Code/Graph, new file/folder, GitHub bar as Planned), **Runs & analytics** (numbers, cost chart, outcomes as Planned, version comparison, runs, run detail), **Non-coding teams** text tab | Playwright at 1440 px on localhost and on the preview, matching the mockups |
 
 ### LOCAL (runner + VS Code)
 
@@ -113,7 +113,7 @@ Visual spec for both: [`docs/mockups/jigworks-ui.html`](mockups/jigworks-ui.html
 | T06 | Runner CLI: worktrees, checkpoints, resume, parallel runs, progress %, `jigworks graph`, audit log | tests + one live run with a fix loop; its PR step targets a local bare remote |
 | T07 | Evals (3–5 tasks), last in the queue | results file committed |
 | T08 | Extension bridge: several runner processes, login preflight | `@vscode/test-electron` with two runs |
-| T09 | Sidebar (workflows, sessions, Review badge), new-session prompt, tabs | standalone webview screenshots 390 + 1440 px |
+| T09 | Sidebar (workflows, sessions, Review badge), new-session prompt, tabs | standalone webview screenshots at 1440 px |
 | T16 | Run view: graph with NOW marker, % of plan, activity / agent output, Approve / Request changes / Reject | same |
 | T10 | `.zip` import with digest check | valid + tampered zip tests |
 | T14, T15 | Runner → hub sync; extension syncs `stable` | against the OpenAPI mock, then the hub preview |
@@ -145,4 +145,6 @@ Things only you can do (logins, dashboards, macOS prompts), checked on 19 Nov 20
 1. **Identity:** no login for engineers. The runner sends `git config user.email` as "who started / who approved"; the hub trusts it. This is right for the product too: an engineer never needs access to the hub to run a workflow. Named as a known limit in the presentation.
 2. **Hub password:** the hub is a public URL, so the whole hub (web and API) sits behind one shared password, stored only in the Vercel env var `HUB_PASSWORD` and the local `.env.local`, never in the repo. The web shows a password screen and sets an HTTP-only cookie; the runner and the extension send the same secret in an `X-Jigworks-Key` header.
 3. **No demo tonight:** only the hub and the extension are built. T06's live proof opens its PR against a local bare remote; T17 (second workflow, for the demo story) is deferred; P01–P04 stay with the human.
-4. **Real VS Code screenshots:** the agent builds the extension UI from the mockups and proves it with standalone Playwright screenshots and `@vscode/test-electron`; the human takes real VS Code screenshots in the morning.
+4. **Desktop only (19 Nov 2026):** visual checks are Playwright at 1440 px; mobile (390 px) is out of scope for the prototype.
+5. **Permissions:** the agents run as interactive Claude Code sessions with the default permission settings (no extra allowlist). The kickoff prompts tell them to prefer the built-in Read/Edit/Write/Grep/Glob tools and allowlisted commands, so they do not stop on a prompt.
+6. **Real VS Code screenshots:** the agent builds the extension UI from the mockups and proves it with standalone Playwright screenshots and `@vscode/test-electron`; the human takes real VS Code screenshots in the morning.

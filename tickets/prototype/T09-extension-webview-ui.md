@@ -22,7 +22,7 @@ The engineer starts work from VS Code and runs several sessions in parallel, eac
 - [ ] "+ New session" opens an editor-area panel with the prompt in the middle: task text, attachments from the workspace, the active workflow (models come from the workflow, no model picker) and a preview of its steps, permissions and typical cost. "Start session" starts a run in its own worktree.
 - [ ] Each session is its own editor tab; clicking a session in the sidebar or a tab switches to it. At least two sessions run at the same time without blocking each other.
 - [ ] Status bar shows "N sessions running · M waiting for you"; a session that reaches an interrupt raises a VS Code notification.
-- [ ] The webview React app also runs standalone with recorded events; Playwright screenshots at **390 px and 1440 px** attached as evidence.
+- [ ] The webview React app also runs standalone with recorded events; Playwright screenshots at **1440 px** attached as evidence.
 
 ## Evidence
 
