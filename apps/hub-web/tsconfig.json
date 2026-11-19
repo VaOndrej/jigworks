@@ -8,7 +8,11 @@
     "strict": true,
     "noEmit": true,
     "skipLibCheck": true,
-    "types": ["vite/client"]
+    "verbatimModuleSyntax": true,
+    "types": ["vite/client"],
+    "paths": {
+      "@jigworks/contracts": ["../../packages/contracts/src/generated/types.ts"]
+    }
   },
   "include": ["src", "vite.config.ts"]
 }
