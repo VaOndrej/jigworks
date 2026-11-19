@@ -79,4 +79,6 @@ Time is tracked in two columns: **human** (my own time: deciding, directing, rev
 - Answers to the two-agent decisions: contracts frozen, Docker Postgres, agents commit and I merge and push.
 
 **What went wrong / changed course**
-- The first redesign of the hub overview was over-decorated (KPI tiles, sparklines, coloured step bars); I asked for it to be toned down.
+- The first redesign of the hub overview was over-decorated (KPI tiles, sparklines, coloured step bars); I asked for it to be toned down, then for a middle ground when the second version was too bare.
+- Dropped the "AI edit" box from the hub editor: workflows are edited as code.
+- Decided the build runs overnight: two agents push to `feature/hub-and-vs-code-extension`, each only its own files; I merge the PR in the morning. Rules in AGENTS.md, procedure in docs/two-agent-build.md.
