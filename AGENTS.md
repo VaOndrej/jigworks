@@ -5,7 +5,13 @@ it (Claude Code, Codex, subagents, workflow nodes run by the Jigworks runner).
 
 `docs/design.md` is the canonical design (v0.6). Read the relevant section before
 you change anything. Do not re-open decisions recorded there; if something is
-ambiguous, ask the human instead of guessing. `docs/plan.md` is the ticket plan.
+ambiguous, ask the human instead of guessing. `docs/plan.md` is the ticket plan;
+the tickets themselves are Markdown files in `tickets/` (conventions in
+`tickets/README.md`). Work on one ticket at a time and keep its Status and
+Evidence up to date.
+
+Everything lives in this one repo (hub, runner, VS Code extension, sample-repo,
+demo) so it can be shared as a single repo. Do not split anything out.
 
 ## Mandatory: English only
 
@@ -33,6 +39,7 @@ jigworks/
   demo/                # later
   e2e/                 # Playwright
   docs/                # design.md, plan.md
+  tickets/             # one Markdown file per ticket
 ```
 
 Folders that do not exist yet are planned, not missing. Create them only as part
@@ -94,6 +101,6 @@ Be honest: the build log is part of the deliverable and is read by reviewers.
 
 - Small, focused commits; one logical change per commit.
 - English, imperative subject line (≤ 72 chars), optional body explaining why.
-- Reference the GitHub issue when there is one (`Refs #12`, `Closes #12`).
+- Reference the ticket ID (`Refs T05`).
 - Never commit secrets, `.env` files, `.vercel/` or OS files (`.DS_Store`).
 - Do not push or open PRs unless the human asks for it.
