@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | review |
+| Status | done |
 | Owner | foundation (before the split) |
 | Label | `milestone-0` |
 | Size | S |
@@ -112,6 +112,6 @@ api examples: 12; prices: 8; human deltas: 4
 
 ## Notes
 
-- Status is `review`, not `done`: the human reviews the contracts before they are frozen (docs/two-agent-build.md §6.1).
+- Reviewed and approved by the human on 19 Nov 2026 (all nine decisions in docs/foundation-review.md §3). **Contracts are frozen from here on.**
 - Decisions made here that the design left open: cache writes are priced as 1-hour cache (`claude -p` writes only 1-hour cache, T00); `workflow.toml` gains `plannedPath` and `interruptNodes` because `get_graph()` cannot see `interrupt()`; the email pattern is loose (`x@y`); `seq` is optional in the schema (so the design example validates) but required at ingest.
 - The runs are synthetic (no runner before T06); see `fixtures/README.md`.
