@@ -35,6 +35,7 @@ from .adapters.claude import ClaudeAdapter, auth_status
 from .adapters.fake import FakeAdapter, load_script
 from .engine import Outcome, RunStateError, WorkflowRun, default_pr_opener
 from .events import EventSink
+from .hub import BackgroundSync, HubConfig, HubSync
 from .ledger import Ledger
 from .package import bundle_files, load_package
 from .pricing import PriceTable
@@ -109,6 +110,10 @@ def open_run(store: Store, run_id: str, echo: bool = True) -> Iterator[tuple[Run
                 sys.stdout.flush()
 
         sink.subscribe(persist)
+        hub_cfg = HubConfig.from_env(meta.get("hubUrl"))
+        background = BackgroundSync(HubSync(rd.path, run_id, hub_cfg)).start() if hub_cfg else None
+        if background:
+            sink.subscribe(background.notify)
         package = load_package(rd.package_dir, digest=meta["digest"])
         run = WorkflowRun(
             package,
@@ -131,6 +136,16 @@ def open_run(store: Store, run_id: str, echo: bool = True) -> Iterator[tuple[Run
             yield rd, run
         finally:
             rd.append_audit(run.audit())
+            if background:
+                report_hub(run_id, background.close())
+
+
+def report_hub(run_id: str, r: dict[str, Any]) -> None:
+    if r.get("error"):
+        eprint(f"{run_id}: hub sync failed, {r['pending']} events queued ({r['error']}). They are sent with the "
+               f"next command or `jigworks sync {run_id}`.")
+    elif r.get("sent") or r.get("duplicates"):
+        eprint(f"{run_id}: hub synced ({r['sent']} new, {r['duplicates']} already there)")
 
 
 def report(outcome: Outcome, run_id: str) -> int:
@@ -198,6 +213,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         "weights": weights,
         "weightsSource": source,
         "options": options,
+        "hubUrl": args.hub_url,  # the key is never stored; it comes from HUB_PASSWORD
         "prRemote": args.pr_remote,
         "prBase": args.pr_base,
         "runnerVersion": __version__,
@@ -291,6 +307,30 @@ def cmd_events(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_sync(args: argparse.Namespace) -> int:
+    """Send queued events of one run (or every run with --all) to the hub."""
+    store = Store(home_for(args))
+    runs = store.all() if args.all or not args.run_id else [store.get(args.run_id)]
+    failed = 0
+    for rd in runs:
+        meta = rd.meta()
+        cfg = HubConfig.from_env(args.hub_url or meta.get("hubUrl"))
+        if cfg is None:
+            eprint(f"{rd.run_id}: no hub configured (JIGWORKS_HUB_URL / --hub-url and HUB_PASSWORD)")
+            failed += 1
+            continue
+        if rd.is_busy():
+            eprint(f"{rd.run_id}: busy, its runner process syncs it")
+            continue
+        r = HubSync(rd.path, rd.run_id, cfg).sync()
+        if r.get("error"):
+            failed += 1
+        report_hub(rd.run_id, r)
+        if not r.get("error") and not r.get("sent") and not r.get("duplicates"):
+            eprint(f"{rd.run_id}: hub up to date")
+    return 1 if failed else 0
+
+
 def cmd_graph(args: argparse.Namespace) -> int:
     print(json.dumps(load_package(Path(args.workflow)).graph_json(), indent=2))
     return 0
@@ -374,6 +414,7 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("--pr-remote", default="origin", help="remote name or URL/path the PR branch is pushed to")
     r.add_argument("--pr-base", default="main")
     r.add_argument("--max-fix-loops", type=int)
+    r.add_argument("--hub-url", help="hub to sync events to (default: $JIGWORKS_HUB_URL); key from $HUB_PASSWORD")
     r.add_argument("--skip-preflight", action="store_true")
     r.set_defaults(fn=cmd_run)
 
@@ -399,6 +440,11 @@ def build_parser() -> argparse.ArgumentParser:
     ls = with_home(sub.add_parser("ls", help="list runs"))
     ls.add_argument("--json", action="store_true")
     ls.set_defaults(fn=cmd_ls)
+    sy = with_home(sub.add_parser("sync", help="send queued run events to the hub"))
+    sy.add_argument("run_id", nargs="?")
+    sy.add_argument("--all", action="store_true")
+    sy.add_argument("--hub-url")
+    sy.set_defaults(fn=cmd_sync)
     g = sub.add_parser("graph", help="print get_graph() as GraphJSON")
     g.add_argument("workflow")
     g.set_defaults(fn=cmd_graph)

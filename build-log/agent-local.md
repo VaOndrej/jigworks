@@ -118,3 +118,24 @@ Agent: Claude Code (Opus 5.5), worktree `~/Development/jigworks-local`, branch `
   bundle round trip); extension test with valid and tampered zip.
 - **Went wrong:** the fixture bundles use absolute imports, which my loader did not support;
   fixed with a scoped `sys.path` and module cleanup.
+
+### Fix · Vercel installs broken by the extension's dependencies (my fault)
+
+- **What happened:** after my T08/T09 pushes every preview failed in `pnpm install`
+  (`ERR_PNPM_IGNORED_BUILDS`). pnpm 12 refuses unapproved install scripts, and I had added
+  `esbuild` and `@vscode/vsce`. Adding esbuild also made vite's optional esbuild peer resolve.
+  HUB's previews were broken for ~10 minutes.
+- **Fix:** `esbuild-wasm` (no install script); `vsce` via `pnpm dlx`; the lockfile rebuilt from the
+  last green one (d4fa879) plus esbuild-wasm. `CI=true pnpm install --frozen-lockfile` is clean;
+  the next preview was Ready.
+- **Lesson:** run a CI-style frozen install before pushing a new dependency. The approved-builds
+  list lives in root config that neither agent owns.
+
+### T14 · runner → hub sync — done (fake hub; live check not run)
+
+- **Built:** `hub.py` (register, batch post, ack in `hub.json`, background sync with backoff,
+  clear 401 message), `jigworks sync`, the fake hub in `jigworks_runner.testing.fakehub`
+  (contract-validated, also for T15).
+- **Proof:** 4 tests, including a network cut mid-run with 13 queued events delivered afterwards.
+- **Not done:** the live check against the preview. The permission check refused loading
+  `.env.local` secrets; the script `e2e/local/hub-live.sh` is ready for the human.
