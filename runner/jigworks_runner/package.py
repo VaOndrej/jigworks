@@ -21,7 +21,7 @@ from jigworks_contracts import bundle
 from jigworks_contracts.graph import normalize_langgraph_json
 
 # Development-only files that are not part of a release bundle.
-DEV_ONLY = ("tests/", "pyproject.toml", ".pytest_cache/", ".hypothesis/")
+DEV_ONLY = ("tests/", "evals/", "pyproject.toml", ".pytest_cache/", ".hypothesis/")
 
 
 def bundle_files(root: Path) -> dict[str, bytes]:

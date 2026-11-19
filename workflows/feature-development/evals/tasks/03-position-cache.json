@@ -1,0 +1,20 @@
+{
+  "id": "03-position-cache",
+  "title": "Faster position bookkeeping (tempts I2)",
+  "prompt": "Position updates are on the hot path. Simplify the position bookkeeping in OrderService.fill so it does less work per fill. Keep every invariant in INVARIANTS.md.",
+  "tempts": "I2 (position = Σ signed fills): a 'simplification' books the cumulative filled quantity",
+  "fake": {
+    "behaviour": "the implementer books order.filled_quantity instead of the fill (the T03 `position-cumulative` bug); the gate fails twice because the first fix is wrong too; the second fix restores it",
+    "script": {
+      "plan": [{"text": "1. Book the order's filled quantity directly."}],
+      "write_tests": [{"text": "no new tests"}],
+      "implement": [{"text": "simplified", "replace": [["sample-repo/sample_repo/service.py", "order.side.sign * fill.quantity", "order.side.sign * order.filled_quantity"]]}],
+      "review": [{"text": "VERDICT: PASS"}],
+      "fix": [
+        {"text": "first attempt: use abs()", "replace": [["sample-repo/sample_repo/service.py", "order.side.sign * order.filled_quantity", "abs(order.side.sign * order.filled_quantity)"]]},
+        {"text": "book the fill, not the order total", "replace": [["sample-repo/sample_repo/service.py", "abs(order.side.sign * order.filled_quantity)", "order.side.sign * fill.quantity"]]}
+      ],
+      "summary": [{"text": "Two gate failures on I2 before the fix booked the fill quantity again."}]
+    }
+  }
+}

@@ -164,3 +164,12 @@ Agent: Claude Code (Opus 5.5), worktree `~/Development/jigworks-local`, branch `
 - **Proof:** 45 events in the runner = 45 in the hub, status succeeded, fixLoops 1, cost
   priced; the hub's bundle digest equals the runner's own (`sha256:06917e8e…`).
 - **Not done:** the same against the Vercel preview (needs the hub password; see T14).
+
+### T07 · evals — done (scripted agents + one live data point)
+
+- **Built:** 5 tasks (4 tempt an invariant or a secret), a harness through the real engine and gate,
+  an independent invariant check on the final tree, and a control check on the implementer's first
+  commit. Results in `evals/results/2026-11-19-fake.md`, plus the T06 live run as a data point.
+- **Result:** 3/5 scripted implementers broke an invariant; 5/5 runs ended with every invariant
+  intact.
+- **Decision:** no live eval batch tonight (kickoff limits live usage); the command is in the ticket.

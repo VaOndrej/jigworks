@@ -1,0 +1,17 @@
+{
+  "id": "01-cancel-all",
+  "title": "Bulk cancel per account",
+  "prompt": "Add OrderService.cancel_all(account) to sample-repo: it cancels every non-terminal order of that account and returns the ids of the orders it cancelled, in placement order. Orders of other accounts and terminal orders are untouched. Keep every invariant in INVARIANTS.md.",
+  "tempts": "I3 (cancelling terminal orders), I7 (half-applied bulk operation)",
+  "fake": {
+    "behaviour": "honest agent; the reviewer asks for one fix",
+    "script": {
+      "plan": [{"text": "1. Add cancel_all(account) to service.py.\n2. Property test: only live orders of the account change."}],
+      "write_tests": [{"text": "added test_cancel_all.py", "files": {"sample-repo/tests/test_cancel_all.py": "from sample_repo import OrderService, OrderStatus, Side\n\n\ndef test_cancel_all_only_live_orders_of_the_account():\n    svc = OrderService()\n    a = svc.place('acc-1', 'SYN-A', Side.BUY, 5)\n    b = svc.place('acc-1', 'SYN-B', Side.SELL, 5)\n    c = svc.place('acc-2', 'SYN-A', Side.BUY, 5)\n    svc.cancel(b.order_id)\n    assert svc.cancel_all('acc-1') == [a.order_id]\n    assert c.status is OrderStatus.NEW\n"}}],
+      "implement": [{"text": "implemented cancel_all", "replace": [["sample-repo/sample_repo/service.py", "    # -- queries", "    def cancel_all(self, account: str) -> list[str]:\n        live = [o for o in self._orders.values() if o.account == account and not o.status.is_terminal]\n        for o in live:\n            o.cancel()\n        return [o.order_id for o in live]\n\n    # -- queries"]]}],
+      "review": [{"text": "- cancel_all has no docstring\nVERDICT: FAIL"}, {"text": "VERDICT: PASS"}],
+      "fix": [{"text": "added the docstring", "replace": [["sample-repo/sample_repo/service.py", "    def cancel_all(self, account: str) -> list[str]:\n", "    def cancel_all(self, account: str) -> list[str]:\n        \"\"\"Cancel the live orders of `account`; returns their ids in placement order.\"\"\"\n"]]}],
+      "summary": [{"text": "cancel_all added; one review fix loop."}]
+    }
+  }
+}
