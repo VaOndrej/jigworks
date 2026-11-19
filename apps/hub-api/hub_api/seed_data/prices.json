@@ -1,0 +1,50 @@
+[
+  {
+    "model": "claude-sonnet-5",
+    "tokenType": "input",
+    "pricePerMtok": 3.0,
+    "validFrom": "2026-01-01T00:00:00Z"
+  },
+  {
+    "model": "claude-sonnet-5",
+    "tokenType": "output",
+    "pricePerMtok": 15.0,
+    "validFrom": "2026-01-01T00:00:00Z"
+  },
+  {
+    "model": "claude-sonnet-5",
+    "tokenType": "cache_write",
+    "pricePerMtok": 6.0,
+    "validFrom": "2026-01-01T00:00:00Z"
+  },
+  {
+    "model": "claude-sonnet-5",
+    "tokenType": "cache_read",
+    "pricePerMtok": 0.3,
+    "validFrom": "2026-01-01T00:00:00Z"
+  },
+  {
+    "model": "claude-haiku-4-5-20251001",
+    "tokenType": "input",
+    "pricePerMtok": 1.0,
+    "validFrom": "2026-01-01T00:00:00Z"
+  },
+  {
+    "model": "claude-haiku-4-5-20251001",
+    "tokenType": "output",
+    "pricePerMtok": 5.0,
+    "validFrom": "2026-01-01T00:00:00Z"
+  },
+  {
+    "model": "claude-haiku-4-5-20251001",
+    "tokenType": "cache_write",
+    "pricePerMtok": 2.0,
+    "validFrom": "2026-01-01T00:00:00Z"
+  },
+  {
+    "model": "claude-haiku-4-5-20251001",
+    "tokenType": "cache_read",
+    "pricePerMtok": 0.1,
+    "validFrom": "2026-01-01T00:00:00Z"
+  }
+]

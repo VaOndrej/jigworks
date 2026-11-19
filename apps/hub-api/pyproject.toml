@@ -6,6 +6,10 @@ requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115",
     "jigworks-contracts",
+    "psycopg[binary]>=3.2",
+    "vercel-blob>=0.6.1",
+    "vercel-headers>=0.8.0",
+    "vercel-sandbox>=1.0.1",
 ]
 
 [build-system]

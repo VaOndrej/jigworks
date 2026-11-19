@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Jigworks Hub API",
-    "description": "Contract for the Jigworks hub (frozen after T02). Every endpoint except `GET /api/health` and `POST /api/session` requires the session cookie `jigworks_session` (set by `POST /api/session`) or the `X-Jigworks-Key` header carrying the hub password (HUB_PASSWORD). Engineers never log in: the runner reports `git config user.email` as author/approver. Costs are API equivalent.",
+    "description": "Jigworks hub. Every endpoint except `GET /api/health` and `POST /api/session` requires the session cookie `jigworks_session` (set by `POST /api/session`) or the `X-Jigworks-Key` header carrying the hub password (HUB_PASSWORD). Engineers never log in: the runner reports `git config user.email` as author/approver. Costs are API equivalent.",
     "version": "0.1.0"
   },
   "paths": {
@@ -186,6 +186,7 @@
           "workflows"
         ],
         "summary": "Put Draft",
+        "description": "Full replacement of the draft's files (create, rename and delete files and folders). An unknown workflow id creates the workflow; an empty file list fills it from the template.",
         "operationId": "put_draft_api_workflows__workflowId__draft_put",
         "parameters": [
           {
@@ -833,8 +834,10 @@
                   "type": "null"
                 }
               ],
+              "description": "One status or a comma-separated list; `live` = running, waiting_human, paused_usage_limit.",
               "title": "Status"
-            }
+            },
+            "description": "One status or a comma-separated list; `live` = running, waiting_human, paused_usage_limit."
           },
           {
             "name": "limit",
@@ -1165,6 +1168,22 @@
               "default": -1,
               "title": "After"
             }
+          },
+          {
+            "name": "Last-Event-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Last-Event-Id"
+            }
           }
         ],
         "responses": {
@@ -1262,7 +1281,8 @@
             "schema": {
               "anyOf": [
                 {
-                  "type": "string"
+                  "type": "string",
+                  "format": "date-time"
                 },
                 {
                   "type": "null"
@@ -1278,7 +1298,8 @@
             "schema": {
               "anyOf": [
                 {
-                  "type": "string"
+                  "type": "string",
+                  "format": "date-time"
                 },
                 {
                   "type": "null"
@@ -1434,6 +1455,100 @@
           }
         }
       }
+    },
+    "/api/analytics/overview": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Overview",
+        "description": "Hub-only (not in the frozen contract): key numbers for the Workflows and Runs & analytics tabs. Default period: the last 7 days.",
+        "operationId": "overview_api_analytics_overview_get",
+        "parameters": [
+          {
+            "name": "workflowId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Workflowid"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Overview"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong session cookie / X-Jigworks-Key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1533,7 +1648,7 @@
           "block"
         ],
         "title": "AgentOutputPayload",
-        "description": "Pass-through of stream-json content for the optional live agent output (design.md §7). One event per content block. thinking blocks are normally skipped."
+        "description": "Pass-through of stream-json content for the optional live agent output (design.md \u00a77). One event per content block. thinking blocks are normally skipped."
       },
       "Artifact": {
         "properties": {
@@ -1822,7 +1937,7 @@
           "usage"
         ],
         "title": "AuditRecord",
-        "description": "Audit trail of one run (design.md §8 Audit): who started it, release + digest, models, steps with git snapshots, gate results, who approved and when, tokens. Written by the runner to its local audit log; the hub can rebuild it from the events."
+        "description": "Audit trail of one run (design.md \u00a78 Audit): who started it, release + digest, models, steps with git snapshots, gate results, who approved and when, tokens. Written by the runner to its local audit log; the hub can rebuild it from the events."
       },
       "AuditStep": {
         "properties": {
@@ -2018,7 +2133,41 @@
         "additionalProperties": false,
         "type": "object",
         "title": "Channels",
-        "description": "Channel → version currently pointed to."
+        "description": "Channel \u2192 version currently pointed to."
+      },
+      "DayCost": {
+        "properties": {
+          "day": {
+            "type": "string",
+            "title": "Day"
+          },
+          "input": {
+            "type": "number",
+            "title": "Input"
+          },
+          "output": {
+            "type": "number",
+            "title": "Output"
+          },
+          "cache_write": {
+            "type": "number",
+            "title": "Cache Write"
+          },
+          "cache_read": {
+            "type": "number",
+            "title": "Cache Read"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "day",
+          "input",
+          "output",
+          "cache_write",
+          "cache_read"
+        ],
+        "title": "DayCost"
       },
       "DiffStat": {
         "properties": {
@@ -2646,7 +2795,7 @@
           "linesRemoved"
         ],
         "title": "HumanDelta",
-        "description": "PLANNED, not built (design.md §8 Human delta). What the human changed after the first result of a session. The hub shows sample data (sample=true) in the Planned outcomes panel."
+        "description": "PLANNED, not built (design.md \u00a78 Human delta). What the human changed after the first result of a session. The hub shows sample data (sample=true) in the Planned outcomes panel."
       },
       "Inputs": {
         "properties": {
@@ -2772,7 +2921,7 @@
           "stage"
         ],
         "title": "InterruptPayload",
-        "description": "LangGraph interrupt waiting for the human (design.md §7)."
+        "description": "LangGraph interrupt waiting for the human (design.md \u00a77)."
       },
       "ModelAssignment": {
         "properties": {
@@ -2856,6 +3005,147 @@
         "title": "OutcomeReport",
         "description": "PLANNED human-delta outcomes. The hub returns sample data (sample=true) and the UI labels the panel Planned."
       },
+      "Overview": {
+        "properties": {
+          "runs": {
+            "type": "integer",
+            "title": "Runs"
+          },
+          "costUsd": {
+            "type": "number",
+            "title": "Costusd"
+          },
+          "costPerRunUsd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Costperrunusd"
+          },
+          "gateRuns": {
+            "type": "integer",
+            "title": "Gateruns"
+          },
+          "gatePassFirstTry": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gatepassfirsttry"
+          },
+          "medianTimeToPrSec": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mediantimetoprsec"
+          },
+          "medianHumanWaitSec": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Medianhumanwaitsec"
+          },
+          "from": {
+            "type": "string",
+            "format": "date-time",
+            "title": "From"
+          },
+          "to": {
+            "type": "string",
+            "format": "date-time",
+            "title": "To"
+          },
+          "costLabel": {
+            "type": "string",
+            "title": "Costlabel"
+          },
+          "previousRuns": {
+            "type": "integer",
+            "title": "Previousruns"
+          },
+          "running": {
+            "type": "integer",
+            "title": "Running"
+          },
+          "waitingHuman": {
+            "type": "integer",
+            "title": "Waitinghuman"
+          },
+          "pausedUsageLimit": {
+            "type": "integer",
+            "title": "Pausedusagelimit"
+          },
+          "oldestWaitingSince": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oldestwaitingsince"
+          },
+          "costByDay": {
+            "items": {
+              "$ref": "#/components/schemas/DayCost"
+            },
+            "type": "array",
+            "title": "Costbyday"
+          },
+          "workflows": {
+            "items": {
+              "$ref": "#/components/schemas/WorkflowStats"
+            },
+            "type": "array",
+            "title": "Workflows"
+          },
+          "releases": {
+            "items": {
+              "$ref": "#/components/schemas/ReleaseStats"
+            },
+            "type": "array",
+            "title": "Releases"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "runs",
+          "costUsd",
+          "gateRuns",
+          "from",
+          "to",
+          "costLabel",
+          "previousRuns",
+          "running",
+          "waitingHuman",
+          "pausedUsageLimit",
+          "costByDay",
+          "workflows",
+          "releases"
+        ],
+        "title": "Overview"
+      },
       "Permissions": {
         "properties": {
           "allowedTools": {
@@ -2887,7 +3177,7 @@
         "additionalProperties": false,
         "type": "object",
         "title": "Permissions",
-        "description": "Proposal (design.md §11.2): agent permissions declared per release."
+        "description": "Proposal (design.md \u00a711.2): agent permissions declared per release."
       },
       "PriceEntry": {
         "properties": {
@@ -2925,7 +3215,7 @@
           "validFrom"
         ],
         "title": "PriceEntry",
-        "description": "Price list with validity (design.md §8). Cost = Σ tokens × price of the entry valid at the call time."
+        "description": "Price list with validity (design.md \u00a78). Cost = \u03a3 tokens \u00d7 price of the entry valid at the call time."
       },
       "PublishRequest": {
         "properties": {
@@ -3079,7 +3369,7 @@
           "publishedAt"
         ],
         "title": "Release",
-        "description": "Immutable published release (design.md §6)."
+        "description": "Immutable published release (design.md \u00a76)."
       },
       "ReleaseComparison": {
         "properties": {
@@ -3103,7 +3393,7 @@
           "rows"
         ],
         "title": "ReleaseComparison",
-        "description": "Version comparison (design.md §11.3)."
+        "description": "Version comparison (design.md \u00a711.3)."
       },
       "ReleaseComparisonRow": {
         "properties": {
@@ -3214,6 +3504,79 @@
           "releases"
         ],
         "title": "ReleaseList"
+      },
+      "ReleaseStats": {
+        "properties": {
+          "runs": {
+            "type": "integer",
+            "title": "Runs"
+          },
+          "costUsd": {
+            "type": "number",
+            "title": "Costusd"
+          },
+          "costPerRunUsd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Costperrunusd"
+          },
+          "gateRuns": {
+            "type": "integer",
+            "title": "Gateruns"
+          },
+          "gatePassFirstTry": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gatepassfirsttry"
+          },
+          "medianTimeToPrSec": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mediantimetoprsec"
+          },
+          "medianHumanWaitSec": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Medianhumanwaitsec"
+          },
+          "release": {
+            "type": "string",
+            "title": "Release"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "runs",
+          "costUsd",
+          "gateRuns",
+          "release"
+        ],
+        "title": "ReleaseStats"
       },
       "ReviewDecisionPayload": {
         "properties": {
@@ -3737,7 +4100,7 @@
           "at"
         ],
         "title": "RunEvent",
-        "description": "One event of a run (design.md §8). `kind` defaults to node_status, so the design example validates as-is. The payload object matching `kind` is required (see allOf). The runner sends seq (monotonic per run, from 0) on every event; the hub deduplicates on (runId, seq)."
+        "description": "One event of a run (design.md \u00a78). `kind` defaults to node_status, so the design example validates as-is. The payload object matching `kind` is required (see allOf). The runner sends seq (monotonic per run, from 0) on every event; the hub deduplicates on (runId, seq)."
       },
       "RunList": {
         "properties": {
@@ -4228,7 +4591,7 @@
           "commit"
         ],
         "title": "Snapshot",
-        "description": "Git snapshot taken after a node (design.md §9: a git commit per node)."
+        "description": "Git snapshot taken after a node (design.md \u00a79: a git commit per node)."
       },
       "ToolCall": {
         "properties": {
@@ -4313,7 +4676,7 @@
           "status"
         ],
         "title": "UsageLimitPayload",
-        "description": "From the stream-json `rate_limit_event` (docs/spikes/claude-stream-json.md §5). Emitted when status is not `allowed`."
+        "description": "From the stream-json `rate_limit_event` (docs/spikes/claude-stream-json.md \u00a75). Emitted when status is not `allowed`."
       },
       "UsageRecord": {
         "properties": {
@@ -4417,7 +4780,7 @@
           "cache_read"
         ],
         "title": "UsageRecord",
-        "description": "Raw tokens of one agent call for one model (design.md §8). Claude adapter: one record per key of result.modelUsage of the final stream-json `result` event (docs/spikes/claude-stream-json.md §8). Cost is computed at read time from PriceEntry; cliCostUsd is a cross-check only."
+        "description": "Raw tokens of one agent call for one model (design.md \u00a78). Claude adapter: one record per key of result.modelUsage of the final stream-json `result` event (docs/spikes/claude-stream-json.md \u00a78). Cost is computed at read time from PriceEntry; cliCostUsd is a cross-check only."
       },
       "UsageReport": {
         "properties": {
@@ -4500,7 +4863,7 @@
           "prices"
         ],
         "title": "UsageReport",
-        "description": "Cost is labelled API equivalent: on a subscription nobody pays per token (design.md §8)."
+        "description": "Cost is labelled API equivalent: on a subscription nobody pays per token (design.md \u00a78)."
       },
       "UsageReportRow": {
         "properties": {
@@ -4886,7 +5249,85 @@
           "models"
         ],
         "title": "WorkflowManifest",
-        "description": "workflow.toml of a workflow package, parsed (design.md §5)."
+        "description": "workflow.toml of a workflow package, parsed (design.md \u00a75)."
+      },
+      "WorkflowStats": {
+        "properties": {
+          "runs": {
+            "type": "integer",
+            "title": "Runs"
+          },
+          "costUsd": {
+            "type": "number",
+            "title": "Costusd"
+          },
+          "costPerRunUsd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Costperrunusd"
+          },
+          "gateRuns": {
+            "type": "integer",
+            "title": "Gateruns"
+          },
+          "gatePassFirstTry": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gatepassfirsttry"
+          },
+          "medianTimeToPrSec": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mediantimetoprsec"
+          },
+          "medianHumanWaitSec": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Medianhumanwaitsec"
+          },
+          "workflowId": {
+            "type": "string",
+            "title": "Workflowid"
+          },
+          "running": {
+            "type": "integer",
+            "title": "Running"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "runs",
+          "costUsd",
+          "gateRuns",
+          "workflowId",
+          "running"
+        ],
+        "title": "WorkflowStats"
       },
       "WorkflowSummary": {
         "properties": {
