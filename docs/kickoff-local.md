@@ -13,6 +13,11 @@ Worktree: `~/Development/jigworks-local`, local branch `agent/local`, `JIGWORKS_
 5. `docs/design.md` §5–§9 and `docs/mockups/jigworks-ui.html` (the visual spec for the extension).
 6. Your tickets in `tickets/prototype/`: T03–T10 and T14–T16. T17 is deferred.
 
+## Before the first ticket
+
+1. Start `caffeinate -dimsu` as a **background** command (run_in_background) and leave it running for the whole session, so the Mac stays awake all night.
+2. Confirm `echo $JIGWORKS_AGENT` prints `local` and `git rev-parse --abbrev-ref HEAD` prints `agent/local`. Both must hold before you write anything.
+
 ## Your queue
 
 Work through the tickets in order. For each ticket, the loop is:

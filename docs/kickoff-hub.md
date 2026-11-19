@@ -12,6 +12,12 @@ Worktree: `~/Development/jigworks-hub`, local branch `agent/hub`, `JIGWORKS_AGEN
 4. `docs/design.md` §4–§8 and `docs/mockups/jigworks-ui.html` (the visual spec for the hub).
 5. Your tickets: `tickets/prototype/T12-hub-api.md`, `T13-hub-web.md`. T11 is already done; read its Evidence for the preview and Sandbox facts.
 
+## Before the first ticket
+
+1. Start `caffeinate -dimsu` as a **background** command (run_in_background) and leave it running for the whole session, so the Mac stays awake all night.
+2. Make sure Docker runs: `docker info`. If it fails, `open -a Docker`, then wait until `docker info` succeeds.
+3. Confirm `echo $JIGWORKS_AGENT` prints `hub` and `git rev-parse --abbrev-ref HEAD` prints `agent/hub`. Both must hold before you write anything.
+
 ## Your queue
 
 Work through the tickets in order. For each ticket, the loop is:
