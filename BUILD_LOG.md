@@ -97,7 +97,10 @@ Time is tracked in two columns: **human** (my own time: deciding, directing, rev
 - The agent forked T00 (real `claude -p` runs) into a parallel subagent while it scaffolded T01. That subagent made ~22 small paid calls (~$2 API equivalent, mostly the plan-mode experiments), more than the ~15 planned.
 
 **What I reviewed / decided myself**
-- Pending: the foundation review ([`docs/foundation-review.md`](docs/foundation-review.md)) before the contracts are frozen and the overnight agents start.
+- Reviewed [`docs/foundation-review.md`](docs/foundation-review.md) and approved all nine contract decisions; contracts frozen.
+- Visual checks are Playwright at 1440 px only; mobile is out of scope (AGENTS.md updated).
+- The overnight sessions run with Claude Code's default permissions; the kickoff prompts steer the agents to tools that need no approval.
+- I create the Protection Bypass for Automation token myself, so HUB can run Playwright against the preview.
 
 **What I wrote by hand**
 - The session prompt only.
@@ -108,4 +111,6 @@ Time is tracked in two columns: **human** (my own time: deciding, directing, rev
 - The extension package is named `vscode` so the documented `pnpm --filter vscode` works.
 - The first `openapi.json` test required byte equality with the stub, which would have gone red as soon as HUB regenerated the file overnight. It now checks compatibility instead.
 - The fixture runs are synthetic (no runner exists yet); they are labelled so.
+- The ownership guard was proven inside a real `claude -p` session in the HUB worktree (write to `runner/` blocked, write to `apps/hub-web/` allowed), and the pre-commit hook rejected a commit of a LOCAL path.
+- Worktrees `../jigworks-hub` and `../jigworks-local` created; kickoff prompts in `docs/kickoff-hub.md` and `docs/kickoff-local.md`.
 - The recorded T00 transcripts listed the recording user's claude.ai connectors; they are blanked in the fixtures and in the scrubber.
