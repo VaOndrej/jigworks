@@ -16,7 +16,8 @@ T00 spike ─► T01 scaffold ─► T02 contracts ─┬─► T03 sample-repo 
                                                                                           │
                                                              T08 extension bridge ◄───────┘
                                                                     │
-                                                             T09 webview UI ─► T10 .zip import
+                                                             T09 sessions + prompt ─► T16 run view ─► T10 .zip import
+                                            (T17 bugfix workflow, parallel to M2)
 ──────────────────────────────── CUT LINE ────────────────────────────────
 T11 Vercel setup ─► T12 hub-api ─► T13 hub-web ─► T14 runner→hub sync ─► T15 extension sync
 Presentation: P01 answers · P02 demo script · P03 backup recording · P04 build log/README
@@ -37,7 +38,9 @@ T00 comes first because the adapter, the contracts and the cost analytics all de
 | T06 | [Runner CLI, checkpoints, audit log](../tickets/prototype/T06-runner-cli.md) | milestone-1 | L | yes | T05 |
 | T07 | [Evals](../tickets/prototype/T07-evals.md) | milestone-1 | M | no* | T06 |
 | T08 | [Extension: runner bridge](../tickets/prototype/T08-extension-runner-bridge.md) | milestone-2 | M | yes | T02, T06 |
-| T09 | [Webview UI](../tickets/prototype/T09-extension-webview-ui.md) | milestone-2 | L | yes | T08 |
+| T09 | [Extension UI: workflows, sessions, prompt](../tickets/prototype/T09-extension-webview-ui.md) | milestone-2 | L | yes | T08 |
+| T16 | [Extension run view: graph + % of plan](../tickets/prototype/T16-extension-run-view.md) | milestone-2 | M | yes | T06, T09 |
+| T17 | [Second workflow `bugfix-with-repro`](../tickets/prototype/T17-bugfix-workflow.md) | milestone-1 | M | no | T05 |
 | T10 | [.zip import fallback](../tickets/prototype/T10-extension-zip-import.md) | milestone-2 | S | no | T09 |
 | | **— CUT LINE —** | | | | |
 | T11 | [Vercel setup (dashboard steps)](../tickets/prototype/T11-vercel-setup.md) | milestone-3 | S | no | T01 |
@@ -58,7 +61,7 @@ Everything above the line plus the presentation tickets is the demo. If time run
 
 ## Human time check
 
-Critical-path human time: T00 5 + T01 5 + T02 5 + T03 10 + T04 5 + T05 15 + T06 15 + T08 5 + T09 10 + P01 30 + P02 10 + P03 20 + P04 5 = **~2 h 20 min**, which is the whole remaining budget. Milestone 3 only happens if the agent-only work goes well; the T11 dashboard steps cost ~10 min.
+Critical-path human time: T00 5 + T01 5 + T02 5 + T03 10 + T04 5 + T05 15 + T06 15 + T08 5 + T09 10 + T16 10 + P01 30 + P02 10 + P03 20 + P04 5 = **~2 h 30 min**, about 10 min over the remaining budget; T16 is the first thing to simplify if time runs short. Milestone 3 only happens if the agent-only work goes well; the T11 dashboard steps cost ~10 min.
 
 ## Decisions taken during planning
 
@@ -66,6 +69,7 @@ Critical-path human time: T00 5 + T01 5 + T02 5 + T03 10 + T04 5 + T05 15 + T06 
 - **`get_graph()` in the hub (T13):** computed only on Vercel, in Vercel Sandbox, behind a "Show graph" CTA in the editor that switches from the code to the visual graph. This settles the "Proposal" status of Vercel Sandbox in design.md §3 for the graph view.
 - **Security in the gate (T05):** secret scan and static security scan run in the gate, because the security lead asks how we know the agent did not add a vulnerability or leak a secret.
 - **Resume after restart (T06):** proven by a kill-and-resume test, covering the long-task engineer and design.md §11.1.
+- **VS Code extension shape (T09, T16):** sidebar with workflows and parallel sessions, the prompt in the middle, each session in its own tab and worktree. The run view shows the graph position and progress as % of the plan, not remaining time. Progress weights come from local audit logs of the same release, falling back to `workflow.toml` weights. The extension gets the graph from the local runner (`jigworks graph`); only the hub uses Vercel Sandbox.
 - **Demo target (T05, P02):** the demo runs in this repo. The workflow changes only `sample-repo/`, pushes a `demo/<runId>` branch and opens the PR against this repo.
 
 - **The brief's 9 questions** are listed in P01, together with the deep dives (Q3, Q6, Q5; may change once the prototype exists).

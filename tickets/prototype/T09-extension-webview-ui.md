@@ -1,4 +1,4 @@
-# T09 · Webview UI: picker, prompt, live steps, Approve/Reject
+# T09 · Extension UI: workflows, sessions, new-session prompt
 
 | Field | Value |
 |---|---|
@@ -11,13 +11,15 @@
 
 ## Goal
 
-design.md §7 without hub sync.
+The engineer starts work from VS Code and runs several sessions in parallel, each with its own workflow (design.md §7, mockup "VS Code — new session"). Example: a feature is being implemented, a customer bug comes in, the engineer starts a second session for the bug and switches between them.
 
 ## Acceptance criteria
 
-- [ ] Workflow picker (local workflows), prompt box, live step list with status, tokens and cost, Approve/Reject buttons that resume the interrupt.
+- [ ] Sidebar view with two sections: **Workflows** (local and imported workflows; the selected one is the active workflow for a new session) and **Sessions** (every running or waiting session with title, workflow, current node and progress %; waiting-for-you is visually distinct).
+- [ ] "+ New session" opens an editor-area panel with the prompt in the middle: task text, attachments from the workspace, model picker, the active workflow and a preview of its steps, permissions and typical cost. "Start session" starts a run in its own worktree.
+- [ ] Each session is its own editor tab; clicking a session in the sidebar or a tab switches to it. At least two sessions run at the same time without blocking each other.
+- [ ] Status bar shows "N sessions running · M waiting for you"; a session that reaches an interrupt raises a VS Code notification.
 - [ ] The webview React app also runs standalone with recorded events; Playwright screenshots at **390 px and 1440 px** attached as evidence.
-- [ ] Screenshot or recording of the real extension in VS Code driving one run to the approval step.
 
 ## Evidence
 

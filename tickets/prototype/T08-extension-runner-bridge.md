@@ -16,7 +16,8 @@ The extension spawns the local runner and consumes its JSONL events.
 ## Acceptance criteria
 
 - [ ] `clients/vscode` builds; `pnpm --filter vscode package` produces a `.vsix` installable via `code --install-extension`.
-- [ ] Integration test (`@vscode/test-electron`) starts a run with a fake-adapter workflow and receives events; `pnpm --filter vscode test` output pasted.
+- [ ] The bridge manages several runner processes at once, keyed by `runId`, and survives a webview reload without losing a running session.
+- [ ] Integration test (`@vscode/test-electron`) starts two runs with a fake-adapter workflow and receives events; `pnpm --filter vscode test` output pasted.
 
 ## Evidence
 
