@@ -110,6 +110,9 @@ Langflow / LangSmith Studio: inspiration only. LangSmith Studio already visualiz
 - A workflow is written as standard Python LangGraph (`StateGraph`, `add_node`, `add_edge`, `add_conditional_edges`, `interrupt`).
 - The graph is displayed **read-only**: the code is compiled in an isolated environment, `get_graph()` → JSON → React Flow. No roundtrip, no silent rewriting of the code.
 - AI edits: the proposed change is shown as a diff; before saving, syntax/import/compile checks run in isolation.
+- The editor has a Code / Graph toggle; switching to Graph compiles the draft in Vercel Sandbox and renders `get_graph()`.
+- Files and folders of the package can be created from templates (node function, prompt).
+- **GitHub source (shown, not built in the MVP):** a workflow can be connected to a GitHub repo; the editor then works as a richer view on that repo: a push to the repo updates the draft, a save in the editor commits to the repo. In the MVP the package is stored in the Hub.
 
 ### Workflow package
 
@@ -142,10 +145,12 @@ The code of published workflows is never executed in the Hub API process.
 - Sidebar: **Workflows** (the selected one is active for a new session) and **Sessions** (every running or waiting session with its current node and progress).
 - A new session opens with the prompt in the middle of the editor area; each session is its own tab and runs in its own git worktree, so an engineer can start a customer bug fix while a feature run continues.
 - Run view: the read-only graph with the current node highlighted, and progress as **% of the plan** (weight of finished nodes / weight of the planned path; weights from past runs of the same release, fallback to `workflow.toml`). Not a time estimate; a fix loop never moves it backwards. The graph JSON comes from the local runner, which executes the workflow code anyway.
-- Pick the workspace, workflow (`feature-development@1.3.0`), agent/model.
+- Pick the workspace and the workflow (`feature-development@1.3.0`). **Models are not picked in VS Code:** the workflow release sets them (`[models]` in `workflow.toml`, optionally per node), so every run of a release uses the same models.
+- Session states are colour-coded: done and approved steps green, the current step blue with a "NOW" marker, steps that need the human amber. A session waiting for review shows a "Review" badge instead of its %.
+- Optional live **agent output**: the raw `stream-json` text and tool calls of the current node, for people who like to watch.
 - Prompt + optional attachments from the workspace.
 - Start / stop / resume; live steps, tool calls, tokens, cost, links to the diff and Playwright artifacts.
-- **Human-in-the-loop:** LangGraph `interrupt` → Approve/Reject in the extension (plan approval, approval before the PR).
+- **Human-in-the-loop:** LangGraph `interrupt` → Approve / Request changes / Reject in the extension (plan approval, review before the PR). Request changes sends the human's comment back to the agent as a follow-up prompt (fix → gate → review again), like a PR review.
 - Parallel runs in separate git worktrees.
 - Remote SSH / Dev Containers: the runner and the CLI must run next to the workspace.
 
@@ -181,13 +186,16 @@ The code of published workflows is never executed in the Hub API process.
 
 ### Human delta and supervised workflow learning (architecture only, not in the prototype)
 
-The runner records `ai_final_commit`: the tree the human approved at `approve_pr`. When the change is merged (primary: a PR-merge webhook to the Hub; fallback: the extension on local push), the Hub compares the merged tree with `ai_final_commit` on the paths the run touched and stores a **human delta**:
+The baseline is the **first result of a session**: the runner records `first_result_commit`, the tree presented at the first review (`approve_pr`). Every later correction is measured against it:
 
-- `runId, release, digest, outcome (merged_as_is | edited | rejected), files, lines_added, lines_removed, diff` (diff in Blob, after a secret scan).
+- a **follow-up prompt** (Request changes) in the same session, and
+- a **hand edit** before merge (primary capture: a PR-merge webhook to the Hub; fallback: the extension on local push).
+
+The Hub stores a **human delta** per session: `runId, release, digest, outcome (worked_first_time | corrected_by_prompt | edited_by_hand | rejected), follow_up_prompts, files, lines_added, lines_removed, diff` (diff in Blob, after a secret scan). A session with no follow-up prompt and no hand edit counts as the workflow working first time.
 
 Uses:
 
-- **Analytics:** share of runs merged as the AI wrote them vs edited vs rejected, edit size, where humans edit most (files, node that produced the code), per release. This is the most direct quality signal beyond "it looks right" and feeds version comparison (§11.3).
+- **Analytics:** share of sessions that worked first time vs corrected by prompt vs edited by hand vs rejected, edit size, where humans edit most (files, node that produced the code), per release. This is the most direct quality signal beyond "it looks right" and feeds version comparison (§11.3).
 - **Supervised learning:** the Hub groups similar deltas per workflow; an agent proposes a change to prompts or steps as a **draft release diff**; the workflow owner reviews it, publishes to `beta`, and promotes it only if the metrics improve. Nothing is published automatically.
 
 Constraints: deltas contain company code, so they stay in the company Hub under the same access rules; collection is opt-in per team.
@@ -217,7 +225,8 @@ START → plan → [human approve plan] → write_tests (different agent, from t
             review FAIL → fix → review          (iteration limit)
             review PASS → gate (tests + invariant property tests)
             gate FAIL → fix → gate
-            gate PASS → [human approve] → open PR → summary → END
+            gate PASS → [human review] → open PR → summary → END
+            review: request changes → fix → gate → [human review]   (follow-up prompt, counted in the human delta)
 ```
 
 - Steps are ordinary Python functions via `add_node`; loops via `add_conditional_edges`; LangGraph checkpoints + a git commit per node (hash in the graph state).
@@ -263,7 +272,7 @@ Tooling: pnpm workspace (TS), uv workspace (Python).
 
 ## 13. Decision history
 
-- **v0.7 (19 Nov 2026):** human delta loop added to the architecture (§4, §8; not built). Hub tabs: "Runs & analytics" merged into one, the HR tab renamed "Non-coding teams". VS Code extension: parallel sessions, prompt in the middle, run view with graph position and % of plan (§7). Tickets live in `tickets/`.
+- **v0.7 (19 Nov 2026):** human delta loop added to the architecture (§4, §8; not built); its baseline is the first result of a session, and follow-up prompts count as corrections like hand edits. Request changes added to the human review. Models are set by the workflow release, not in VS Code. Editor: Code/Graph toggle, new file/folder, GitHub source shown as planned. Hub tabs: "Runs & analytics" merged into one, the HR tab renamed "Non-coding teams". VS Code extension: parallel sessions, prompt in the middle, run view with graph position and % of plan (§7). Tickets live in `tickets/`.
 - **v0.6 (19 Nov 2026):** project named Jigworks, license FSL-1.1-ALv2. Web Hub = writing Python + read-only `get_graph()` graph (visual editing dropped). Distribution via Hub API + `.zip` import fallback. Own analytics (tokens × price list with validity). Hosting on Vercel Services + Neon. Target audience is developers, HR only as a text tab. Governance elements (audit, independent review, human approval) moved into the core because of the case study brief. Prototype scope: runner → extension → minimal Hub.
 - **v0.5:** strictly three-part MVP, no policy engine and no DSL, local execution of a Python LangGraph package.
 - **v0.4:** FastAPI REST/SSE hub, VS Code TS/React Webview, releases, live usage.
