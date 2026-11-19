@@ -109,7 +109,7 @@ Langflow / LangSmith Studio: inspiration only. LangSmith Studio already visualiz
 
 - A workflow is written as standard Python LangGraph (`StateGraph`, `add_node`, `add_edge`, `add_conditional_edges`, `interrupt`).
 - The graph is displayed **read-only**: the code is compiled in an isolated environment, `get_graph()` → JSON → React Flow. No roundtrip, no silent rewriting of the code.
-- AI edits: the proposed change is shown as a diff; before saving, syntax/import/compile checks run in isolation.
+- Before saving, syntax/import/compile checks run in isolation. There is no AI edit box in the hub editor; workflows are edited as code (or in the connected repo).
 - The editor has a Code / Graph toggle; switching to Graph compiles the draft in Vercel Sandbox and renders `get_graph()`.
 - Files and folders of the package can be created from templates (node function, prompt).
 - **GitHub source (shown, not built in the MVP):** a workflow can be connected to a GitHub repo; the editor then works as a richer view on that repo: a push to the repo updates the draft, a save in the editor commits to the repo. In the MVP the package is stored in the Hub.
@@ -272,7 +272,7 @@ Tooling: pnpm workspace (TS), uv workspace (Python).
 
 ## 13. Decision history
 
-- **v0.7 (19 Nov 2026):** human delta loop added to the architecture (§4, §8; not built); its baseline is the first result of a session, and follow-up prompts count as corrections like hand edits. Request changes added to the human review. Models are set by the workflow release, not in VS Code. Editor: Code/Graph toggle, new file/folder, GitHub source shown as planned. Hub tabs: "Runs & analytics" merged into one, the HR tab renamed "Non-coding teams". VS Code extension: parallel sessions, prompt in the middle, run view with graph position and % of plan (§7). Tickets live in `tickets/`.
+- **v0.7 (19 Nov 2026):** human delta loop added to the architecture (§4, §8; not built); its baseline is the first result of a session, and follow-up prompts count as corrections like hand edits. Request changes added to the human review. Models are set by the workflow release, not in VS Code. Editor: Code/Graph toggle, new file/folder, GitHub source shown as planned, no AI edit box. Hub tabs: "Runs & analytics" merged into one, the HR tab renamed "Non-coding teams". VS Code extension: parallel sessions, prompt in the middle, run view with graph position and % of plan (§7). Tickets live in `tickets/`.
 - **v0.6 (19 Nov 2026):** project named Jigworks, license FSL-1.1-ALv2. Web Hub = writing Python + read-only `get_graph()` graph (visual editing dropped). Distribution via Hub API + `.zip` import fallback. Own analytics (tokens × price list with validity). Hosting on Vercel Services + Neon. Target audience is developers, HR only as a text tab. Governance elements (audit, independent review, human approval) moved into the core because of the case study brief. Prototype scope: runner → extension → minimal Hub.
 - **v0.5:** strictly three-part MVP, no policy engine and no DSL, local execution of a Python LangGraph package.
 - **v0.4:** FastAPI REST/SSE hub, VS Code TS/React Webview, releases, live usage.
