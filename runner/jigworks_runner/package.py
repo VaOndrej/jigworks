@@ -7,6 +7,7 @@ releases (or two packages that both have `graph.py` and `steps/`) never collide 
 
 from __future__ import annotations
 
+import hashlib
 import importlib
 import sys
 import tomllib
@@ -94,7 +95,10 @@ def load_package(root: str | Path, digest: str | None = None) -> WorkflowPackage
     manifest = read_manifest(root)
     if digest is None:
         _, digest = build_package_bundle(root)
-    module_name = "jigworks_pkg_" + digest.split(":", 1)[-1][:16]
+    # Digest and location both name the module: the same release unpacked in two places must not
+    # share a cached module (its files, e.g. prompts/, are read relative to the module).
+    where = hashlib.sha1(str(root).encode()).hexdigest()[:8]
+    module_name = f"jigworks_pkg_{digest.split(':', 1)[-1][:16]}_{where}"
     if module_name not in sys.modules:
         pkg = types.ModuleType(module_name)
         pkg.__path__ = [str(root)]  # type: ignore[attr-defined]

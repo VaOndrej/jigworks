@@ -341,7 +341,8 @@ def test_usage_limit_pauses_and_resumes(repo):
     out = approve_all(run, out)
     assert out.status == "succeeded"
     implement = [e for e in events(run) if e["kind"] == "node_status" and e["node"] == "implement"]
-    assert [(e["status"], e["attempt"]) for e in implement] == [("running", 1), ("running", 2), ("succeeded", 2)]
+    # the paused attempt is closed as cancelled, then the node runs again as attempt 2
+    assert [(e["status"], e["attempt"]) for e in implement] == [("running", 1), ("cancelled", 1), ("running", 2), ("succeeded", 2)]
     check_stream(run)
 
 

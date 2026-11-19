@@ -66,3 +66,26 @@ Agent: Claude Code (Opus 5.5), worktree `~/Development/jigworks-local`, branch `
 - **Environment:** the disk filled up (153 MB free; Docker 22 GB, caches 22 GB, not mine). I
   deleted only my own pytest temp dirs and set `tmp_path_retention_policy=failed` in verify.
   **Human:** please free disk space; the VS Code tests and screenshots need room.
+
+### T06 · runner CLI — done
+
+- **Built:** `jigworks` CLI (run, approve, request-changes, reject, resume, ls, show, audit, events,
+  graph, inspect, preflight), on-disk run store with a node journal, SQLite checkpoints, history
+  weights, per-run lock, deny rules for the agent (no push/commit/gh/curl/web).
+- **Proof:** 10 CLI tests with real processes (kill mid-node, crash after commit, parallel runs,
+  busy lock, progress replay of a recorded run); one live run on sample-repo: a genuine review
+  FAIL → fix → PASS, then request changes → fix → gate → approve, PR branch on a local bare remote.
+  $4.90 API-equivalent.
+- **Decisions:**
+  - Each command is a short-lived process that stops at the next interrupt; all state is on disk.
+    The extension simply runs the next command.
+  - The runner never runs plan mode and denies push/commit to the agent.
+  - The bare remote lives in the ignored `.jigworks/`: the worktree guard refuses git outside the
+    worktree, and the pre-push hook refuses any ref named `main`.
+- **Went wrong:**
+  - The live run exposed two bugs: a relative `--pr-remote` resolved against the worktree, and
+    wrong per-step model attribution. Both fixed with regression tests.
+  - A test-isolation bug: a cached package module pointed to a deleted temp dir. Module names now
+    include the location.
+  - Privacy: the audit records the human's real git email. It stays in `.jigworks/`; the ticket
+    evidence is redacted.

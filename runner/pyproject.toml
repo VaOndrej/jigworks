@@ -19,3 +19,6 @@ packages = ["jigworks_runner"]
 
 [tool.uv.sources]
 jigworks-contracts = { workspace = true }
+
+[project.scripts]
+jigworks = "jigworks_runner.cli:main"

@@ -26,7 +26,9 @@ class Runtime(Protocol):
     options: dict[str, Any]  # runner-side overrides, e.g. {"gate": {...}, "max_fix_loops": 3}
 
     def enter(self, node: str) -> None: ...
-    def exit(self, node: str, status: str, *, gate: dict | None = None) -> None: ...
+    def exit(self, node: str, status: str, *, gate: dict | None = None, update: dict | None = None) -> str:
+        """Take the node's git snapshot, report it, journal the update; returns the commit."""
+        ...
     def agent(self, node: str, prompt: str, *, tools: Sequence[str], resume: str | None = None) -> AgentReply: ...
     def ask_human(self, node: str, stage: str, message: str, **payload: Any) -> dict[str, Any]: ...
     def open_pr(self, title: str, body: str) -> str: ...
@@ -58,7 +60,8 @@ def step(name: str) -> Callable:
             update = dict(fn(state, rt) or {})
             status = update.pop(STATUS_KEY, "succeeded")
             gate = update.pop(GATE_KEY, None)
-            rt.exit(name, status, gate=gate)
+            # The node's commit hash is kept in the graph state (merged by the `commits` reducer).
+            update["commits"] = {name: rt.exit(name, status, gate=gate, update=update)}
             return update
 
         wrapper.__name__ = wrapper.__qualname__ = fn.__name__

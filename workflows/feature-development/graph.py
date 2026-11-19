@@ -17,14 +17,19 @@ package never imports the runner, so it runs from a release bundle as-is.
 
 from __future__ import annotations
 
-from typing import Literal, TypedDict
+from typing import Annotated, Literal, TypedDict
 
 from langgraph.graph import END, START, StateGraph
 
 from .steps import nodes
 
 
+def merge(left: dict | None, right: dict | None) -> dict:
+    return {**(left or {}), **(right or {})}
+
+
 class State(TypedDict, total=False):
+    commits: Annotated[dict[str, str], merge]  # node → git commit of its last snapshot
     prompt: str
     plan: str
     tests_summary: str

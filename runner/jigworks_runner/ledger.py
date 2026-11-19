@@ -123,6 +123,8 @@ class Ledger:
         step = self.open_steps.pop(key, {"node": node, "attempt": attempt, "startedAt": e["at"]})
         step["status"] = status
         step["finishedAt"] = e["at"]
+        if e.get("model"):
+            step["model"] = e["model"]  # the release's model, set by the runner (beats usage order)
         snap = e.get("snapshot")
         if snap:
             step["commit"] = snap["commit"]

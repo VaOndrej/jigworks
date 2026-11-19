@@ -10,6 +10,7 @@ Everything the run knows is in its event log (`EventSink`) and its LangGraph che
 
 from __future__ import annotations
 
+import os
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -27,6 +28,13 @@ from .ledger import Ledger
 from .package import WorkflowPackage
 
 PrOpener = Callable[["WorkflowRun", str, str], str]
+
+# Deny rules beat allow rules, including allow rules in the target repo's own project settings
+# (`--setting-sources project` loads them). The runner owns git history, pushes and the PR.
+DENIED_TOOLS = (
+    "Bash(git push:*)", "Bash(git commit:*)", "Bash(git reset:*)", "Bash(git checkout:*)",
+    "Bash(gh:*)", "Bash(vercel:*)", "Bash(curl:*)", "WebFetch", "WebSearch",
+)
 
 
 class UsageLimitPaused(Exception):
@@ -54,7 +62,8 @@ def default_pr_opener(remote: str = "origin", base: str = "main", gh: bool = Tru
     def open_pr(run: WorkflowRun, title: str, body: str) -> str:
         branch = f"demo/{run.run_id}"
         git.git(run.cwd, "push", "-q", remote, f"HEAD:refs/heads/{branch}")
-        url = git.git(run.cwd, "remote", "get-url", remote).strip()
+        named = remote in git.git(run.cwd, "remote").split()
+        url = git.git(run.cwd, "remote", "get-url", remote).strip() if named else remote
         if gh and "github.com" in url:
             import subprocess
 
@@ -77,6 +86,9 @@ class RunRuntime:
         self.base_commit = run.base_commit
         self.options = run.options
         self.resuming_node: str | None = None
+        # The release's model per (node, attempt) that called an agent; reported on the node's
+        # finish event. modelUsage may list background models first, so usage is not the source.
+        self.node_models: dict[tuple[str, int], str] = {}
 
     # -- node lifecycle ---------------------------------------------------------------------
 
@@ -90,7 +102,7 @@ class RunRuntime:
     def _attempt(self, node: str) -> int:
         return self.run.ledger.attempts.get(node, 1)
 
-    def exit(self, node: str, status: str, *, gate: dict | None = None) -> None:
+    def exit(self, node: str, status: str, *, gate: dict | None = None, update: dict | None = None) -> str:
         attempt = self._attempt(node)
         if self.resuming_node == node:
             self.resuming_node = None
@@ -100,7 +112,15 @@ class RunRuntime:
         snapshot: dict[str, Any] = {"commit": sha}
         if files:
             snapshot["changedFiles"] = files
-        self.run.emit_node(node, attempt, status, snapshot=snapshot)
+        # Journal first, then the event: if the process dies after this point, resume applies the
+        # journaled update instead of running the node again (design.md §11.1).
+        self.run.record_node_result(
+            {"node": node, "attempt": attempt, "commit": sha, "update": {**(update or {}), "commits": {node: sha}}}
+        )
+        self.run.emit_node(node, attempt, status, snapshot=snapshot, model=self.node_models.get((node, attempt)))
+        if os.environ.get("JIGWORKS_TEST_CRASH_AFTER_COMMIT") == node:
+            os._exit(137)  # test hook: die after the commit, before LangGraph writes its checkpoint
+        return sha
 
     # -- services ---------------------------------------------------------------------------
 
@@ -112,10 +132,12 @@ class RunRuntime:
         options = AgentOptions(
             model=self.run.package.model_for(node),
             allowed_tools=tuple(allowed),
+            disallowed_tools=tuple(self.options.get("disallowed_tools", DENIED_TOOLS)),
             resume_session_id=resume,
             max_turns=int(self.options.get("max_turns", 40)),
         )
         ctx = NodeContext(self.run.sink, node, self._attempt(node))
+        self.node_models[(node, ctx.attempt)] = options.model
         result = self.run.agent.run(prompt, self.cwd, options, ctx)
         if result.status == "usage_limit":
             raise UsageLimitPaused(result)
@@ -158,7 +180,12 @@ class WorkflowRun:
         pr_opener: PrOpener | None = None,
         branch: str | None = None,
         repo: str | None = None,
+        node_results: list[dict[str, Any]] | None = None,
+        on_node_result: Callable[[dict[str, Any]], None] | None = None,
+        weights: dict[str, float] | None = None,
     ) -> None:
+        self.node_results = list(node_results or [])
+        self.on_node_result = on_node_result
         self.package = package
         self.run_id = run_id
         self.cwd = Path(cwd)
@@ -171,7 +198,8 @@ class WorkflowRun:
         self.sink = sink or EventSink(run_id=run_id)
         self.sink.release = package.release
         self.sink.digest = package.digest
-        self.ledger = Ledger.replay(self.sink.events, package.weights)
+        self.weights = weights or package.weights
+        self.ledger = Ledger.replay(self.sink.events, self.weights)
         self.sink.next_seq = max(self.sink.next_seq, self.ledger.last_seq + 1)
         self.sink.subscribe(self.ledger.apply)
         self.base_commit = base_commit or git.head(self.cwd)
@@ -181,8 +209,16 @@ class WorkflowRun:
 
     # -- events -----------------------------------------------------------------------------
 
+    def record_node_result(self, entry: dict[str, Any]) -> None:
+        self.node_results.append(entry)
+        if self.on_node_result:
+            self.on_node_result(entry)
+
     def emit_node(self, node: str, attempt: int, status: str, **fields: Any) -> None:
         extra = node if status == "succeeded" else None
+        if status == "running" and getattr(self, "_retrying", False):
+            fields.setdefault("runStatus", "running")  # a retried failed run is running again
+            self._retrying = False
         self.sink.emit(
             "node_status",
             node=node,
@@ -245,16 +281,49 @@ class WorkflowRun:
         return self._drive(Command(resume={"decision": decision, "comment": comment or ""}))
 
     def resume(self) -> Outcome:
-        """Continue after a usage-limit pause or a crash: re-run from the last checkpoint."""
+        """Continue after a usage-limit pause or a crash, from the last LangGraph checkpoint.
+
+        - A node that already committed and journaled its result (the process died after its
+          git snapshot but before the checkpoint) is not run again: its journaled update is
+          applied with `update_state(..., as_node=node)`.
+        - A node that was cut off mid-way is reported `cancelled`, the worktree is reset to the
+          last snapshot, and the node runs again as a new attempt.
+        """
         if self.ledger.pending is not None:
             self.runtime.resuming_node = None
             return Outcome("waiting_human", self.ledger.pending)
-        if self.ledger.status in ("succeeded", "failed", "rejected", "cancelled"):
-            raise RunStateError(f"run {self.run_id} already {self.ledger.status}")
         state = self.graph.get_state(self.config)
-        if not state.next:
+        # A run that failed because a node crashed (e.g. the PR push failed) still has a next node
+        # in its checkpoint and can be retried; a run that ended (graph at END) cannot.
+        retry = self.ledger.status == "failed" and bool(state.next)
+        if self.ledger.status in ("succeeded", "failed", "rejected", "cancelled") and not retry:
+            raise RunStateError(f"run {self.run_id} already {self.ledger.status}")
+        self._retrying = retry
+        if not state.next and state.values:
             return self._finish(state.values)
+        if state.next:
+            node = state.next[0]
+            done = self._journaled(node)
+            if done is not None:
+                self.graph.update_state(self.config, done["update"], as_node=node)
+            elif self.ledger.current is not None:
+                cut_node, cut_attempt = self.ledger.current
+                self.emit_node(cut_node, cut_attempt, "cancelled", runStatus="running")
+                git.git(self.cwd, "reset", "-q", "--hard", self.ledger.last_commit or self.base_commit)
+                git.git(self.cwd, "clean", "-q", "-fd")
+        elif self.ledger.started is not None and not state.values:
+            raise RunStateError(f"run {self.run_id} has no checkpoint to resume from")
         return self._drive(None)
+
+    def _journaled(self, node: str) -> dict[str, Any] | None:
+        """The journal entry of `node`'s latest attempt if that attempt finished and committed."""
+        attempt = self.ledger.attempts.get(node)
+        for entry in reversed(self.node_results):
+            if entry["node"] == node and entry["attempt"] == attempt:
+                finished = any(s["node"] == node and s["attempt"] == attempt for s in self.ledger.steps)
+                head = git.head(self.cwd)
+                return entry if finished and head == entry["commit"] else None
+        return None
 
     def _drive(self, inp: Any) -> Outcome:
         try:

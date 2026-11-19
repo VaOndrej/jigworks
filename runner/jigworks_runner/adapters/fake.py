@@ -7,6 +7,7 @@ gate, git snapshots and review loop run against real changes.
 
 from __future__ import annotations
 
+import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -22,6 +23,26 @@ class FakeStep:
     files: dict[str, str | None] = field(default_factory=dict)  # path → content, None = delete
     status: str = "succeeded"  # succeeded | failed | usage_limit
     edit: Callable[[Path], None] | None = None  # arbitrary change to the worktree
+    replace: list[tuple[str, str, str]] = field(default_factory=list)  # (path, old, new) text edits
+    sleep: float = 0.0  # seconds, to let tests kill the runner mid-node
+
+    @classmethod
+    def from_json(cls, data: dict[str, Any]) -> FakeStep:
+        return cls(
+            text=data.get("text", "ok"),
+            files=data.get("files", {}),
+            status=data.get("status", "succeeded"),
+            replace=[tuple(r) for r in data.get("replace", [])],
+            sleep=float(data.get("sleep", 0)),
+        )
+
+
+def load_script(path: str | Path) -> dict[str, list[FakeStep]]:
+    """A fake script as JSON: {"node": [{"text": …, "files": {…}, "replace": [[p, old, new]], "sleep": s}, …]}."""
+    import json
+
+    raw = json.loads(Path(path).read_text())
+    return {node: [FakeStep.from_json(s) for s in steps] for node, steps in raw.items()}
 
 
 StepLike = Union[FakeStep, Callable[[str, Path], FakeStep]]
@@ -44,15 +65,17 @@ class FakeAdapter:
         self.calls: list[FakeCall] = []
         self._count: dict[str, int] = {}
 
-    def _next(self, node: str, prompt: str, cwd: Path) -> FakeStep:
+    def _next(self, node: str, attempt: int, prompt: str, cwd: Path) -> FakeStep:
+        # Indexed by the node's attempt number (from the event log), not by an in-process counter,
+        # so a resumed run in a new process continues the script where it was.
         steps = self.script.get(node) or [FakeStep()]
-        i = self._count.get(node, 0)
-        self._count[node] = i + 1
-        step = steps[min(i, len(steps) - 1)]
+        step = steps[min(max(attempt, 1) - 1, len(steps) - 1)]
         return step(prompt, cwd) if callable(step) and not isinstance(step, FakeStep) else step
 
     def run(self, prompt: str, cwd: Path, options: AgentOptions, ctx: NodeContext) -> AgentResult:
-        step = self._next(ctx.node, prompt, cwd)
+        step = self._next(ctx.node, ctx.attempt, prompt, cwd)
+        if step.sleep:
+            time.sleep(step.sleep)
         session = options.resume_session_id or f"fake-{ctx.sink.run_id}-{ctx.node}-{len(self.calls)}"
         self.calls.append(FakeCall(ctx.node, ctx.attempt, prompt, options, session))
 
@@ -70,6 +93,9 @@ class FakeAdapter:
             else:
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text(content)
+        for rel, old, new in step.replace:
+            path = cwd / rel
+            path.write_text(path.read_text().replace(old, new))
         if step.edit:
             step.edit(cwd)
 
