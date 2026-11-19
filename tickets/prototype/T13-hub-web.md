@@ -19,6 +19,7 @@ Three tabs, as in the mockups: **Workflows** (overview with weekly numbers, work
 ## Acceptance criteria
 
 - [ ] The editor has a "Show graph" CTA that compiles the current code in Vercel Sandbox, calls `get_graph()` and switches the view to the React Flow graph. The graph is only computed on Vercel, never in the API process and never on the client.
+- [ ] A password screen guards the whole hub; a correct `HUB_PASSWORD` sets an HTTP-only cookie. Playwright reads the password from the environment.
 - [ ] Human-delta numbers and the human-delta box in run detail are shown with a "Planned" label and recorded sample data; they are not computed (design.md §8).
 - [ ] Playwright e2e on the preview URL; screenshots at **390 px and 1440 px** for Workflows, the editor, the graph and Runs & analytics.
 

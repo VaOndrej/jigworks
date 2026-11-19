@@ -16,6 +16,7 @@ The subset of design.md §8 that the minimal hub needs: workflows, draft, publis
 
 ## Acceptance criteria
 
+- [ ] Every endpoint except `/api/health` requires the hub password: a valid session cookie from the web login or the `X-Jigworks-Key` header equal to `HUB_PASSWORD` (env only, never in the repo). Tests cover 401 without it.
 - [ ] `uv run pytest apps/hub-api` passes against a local Postgres.
 - [ ] A curl transcript against the preview deploy covers publish → resolve `stable` → download bundle → post run events → read usage.
 - [ ] Workflow code is never executed in the API process.

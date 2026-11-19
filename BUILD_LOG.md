@@ -81,4 +81,6 @@ Time is tracked in two columns: **human** (my own time: deciding, directing, rev
 **What went wrong / changed course**
 - The first redesign of the hub overview was over-decorated (KPI tiles, sparklines, coloured step bars); I asked for it to be toned down, then for a middle ground when the second version was too bare.
 - Dropped the "AI edit" box from the hub editor: workflows are edited as code.
+- Agent installed pnpm and the Vercel CLI and started Docker; logins stay with me.
+- Hub behind one shared password; identity from `git config user.email`; no demo in tonight's build.
 - Decided the build runs overnight: two agents push to `feature/hub-and-vs-code-extension`, each only its own files; I merge the PR in the morning. Rules in AGENTS.md, procedure in docs/two-agent-build.md.

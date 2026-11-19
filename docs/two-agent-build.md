@@ -1,7 +1,8 @@
 # Two-agent overnight build
 
 - **Status:** agreed rules are mirrored in `AGENTS.md` ("Parallel build"); this file keeps the rationale, the overnight procedure and the open points.
-- **Goal:** two AI agents build the prototype end to end overnight, unattended, one for the Vercel hub (**HUB**) and one for the local side (**LOCAL**: runner, workflows, sample-repo, VS Code extension). Each proves its own work. In the morning the human reviews one PR into `main` and merges it.
+- **Goal:** two AI agents build the **hub and the VS Code extension** end to end overnight, one for the Vercel hub (**HUB**) and one for the local side (**LOCAL**: runner, workflows, sample-repo, VS Code extension). Each proves its own work. In the morning the human reviews one PR into `main` and merges it.
+- **Not built tonight:** the demo (script, recording, demo PR) and the presentation. The demo is designed once the hub and the extension exist.
 
 ## 1. Branch and push model
 
@@ -18,7 +19,7 @@
 | | **HUB** | **LOCAL** |
 |---|---|---|
 | Writes | `apps/hub-api/`, `apps/hub-web/`, `vercel.json`, `e2e/hub/` | `runner/`, `workflows/`, `sample-repo/`, `clients/vscode/`, `e2e/local/`, `e2e/integration/` |
-| Tickets | T12, T13, agent part of T11 | T03–T10, T14, T15, T16, T17 |
+| Tickets | T12, T13, agent part of T11 | T03–T10, T14, T15, T16 (T17 deferred) |
 | Log | `build-log/agent-hub.md` | `build-log/agent-local.md` |
 
 - **Foundation (T00–T02) is built before the split** and reviewed by the human; after that, `packages/contracts/` is frozen. If an agent needs a change overnight, it writes the proposal in its log and marks the ticket `blocked`; neither agent edits contracts. Exception: HUB regenerates `packages/contracts/openapi.json` from FastAPI.
@@ -55,16 +56,14 @@ One entry point per side; its output is pasted into the ticket's Evidence.
 
 **Integration — `pnpm verify:e2e`** (LOCAL, last): publish in the hub preview → the extension syncs `stable` → fake-adapter run → events appear in Runs & analytics.
 
-## 5. Overnight loop
+## 5. How the agents run
 
-`scripts/overnight.sh <hub|local>` keeps an agent working until its tickets are done or blocked:
-
-1. `git pull --rebase` the shared branch.
-2. Start a **fresh** `claude -p` session with `prompts/overnight-<agent>.md`: pick the next ticket owned by this agent with status `todo` whose dependencies are `done`; implement it; run the verify command; tick the criteria; paste the evidence; commit; push.
-3. One ticket per session, so the context stays small and the state lives in the ticket files and git, not in the agent's memory.
-4. A ticket that fails verification three times becomes `blocked` with the reason, and the loop moves to the next independent ticket.
-5. If the subscription's usage limit is reached, the loop waits and retries instead of exiting.
-6. When nothing is left, the agent writes its summary to its log. The last agent to finish opens a **draft PR** `feature/hub-and-vs-code-extension → main` with a per-ticket table: status, evidence and blocked reasons.
+- Two **interactive Claude Code sessions with Opus**, one per agent, each started in its own worktree with `JIGWORKS_AGENT` set and one kickoff prompt (written once everything here is agreed).
+- The kickoff prompt tells the agent to work through its tickets in dependency order without stopping: implement, run the verify command, tick the criteria, paste the evidence, commit, push, next ticket.
+- A ticket that fails verification three times becomes `blocked` with the reason, and the agent takes the next independent ticket.
+- If the subscription's usage limit is reached, the session pauses; the human (or the morning) resumes it with "continue".
+- When nothing is left, the agent writes its summary to its log. The last agent to finish opens a **draft PR** `feature/hub-and-vs-code-extension → main` with a per-ticket table: status, evidence and blocked reasons.
+- **Permissions:** the sessions run with file edits auto-accepted and an allowlist of commands in `.claude/settings.json` (pnpm, uv, git, docker, vercel, npx playwright, claude, code); the ownership hook and the pre-push hook stay on. No `bypassPermissions`.
 
 ## 6. Before the human goes to sleep
 
@@ -101,7 +100,7 @@ Visual spec for both: [`docs/mockups/jigworks-ui.html`](mockups/jigworks-ui.html
 | Ticket | Builds | Done when |
 |---|---|---|
 | T11 (agent part) | `vercel env pull`, health endpoint, first preview | preview `/api/health` returns `{"ok":true}` |
-| T12 | FastAPI: workflows, draft, validate (Sandbox), publish (bundle → Blob, digest), releases, channels, bundle download, runs + events ingest, usage analytics with a price table; seeded from contract fixtures | `pytest` green on Docker Postgres; curl transcript against the preview |
+| T12 | FastAPI behind the **hub password** (below): workflows, draft, validate (Sandbox), publish (bundle → Blob, digest), releases, channels, bundle download, runs + events ingest, usage analytics with a price table; seeded from contract fixtures | `pytest` green on Docker Postgres; curl transcript against the preview |
 | T13 | React: **Workflows** (overview, editor with Code/Graph, new file/folder, GitHub bar as Planned), **Runs & analytics** (numbers, cost chart, outcomes as Planned, version comparison, runs, run detail), **Non-coding teams** text tab | Playwright at 390 + 1440 px on localhost and on the preview, matching the mockups |
 
 ### LOCAL (runner + VS Code)
@@ -111,9 +110,8 @@ Visual spec for both: [`docs/mockups/jigworks-ui.html`](mockups/jigworks-ui.html
 | T03 | `sample-repo`: order handling with invariants + property tests | tests green; `break-invariant.sh` makes them fail |
 | T04 | Claude adapter (stream-json, resume, allowedTools, models from the workflow, usage limit handling) | tests on T00 fixtures |
 | T05 | `feature-development` workflow incl. request changes, security scan in the gate, `first_result_commit` | fake-adapter tests for every path |
-| T06 | Runner CLI: worktrees, checkpoints, resume, parallel runs, progress %, `jigworks graph`, audit log | tests + one live run with a fix loop |
-| T07 | Evals (3–5 tasks) | results file committed |
-| T17 | `bugfix-with-repro` workflow + synthetic P&L bug | fake-adapter tests |
+| T06 | Runner CLI: worktrees, checkpoints, resume, parallel runs, progress %, `jigworks graph`, audit log | tests + one live run with a fix loop; its PR step targets a local bare remote |
+| T07 | Evals (3–5 tasks), last in the queue | results file committed |
 | T08 | Extension bridge: several runner processes, login preflight | `@vscode/test-electron` with two runs |
 | T09 | Sidebar (workflows, sessions, Review badge), new-session prompt, tabs | standalone webview screenshots 390 + 1440 px |
 | T16 | Run view: graph with NOW marker, % of plan, activity / agent output, Approve / Request changes / Reject | same |
@@ -131,19 +129,20 @@ Things only you can do (logins, dashboards, macOS prompts), checked on 19 Nov 20
 
 | Item | State now | What to do |
 |---|---|---|
-| pnpm | missing | `npm install -g pnpm` (Node 26 no longer ships corepack) |
-| Vercel CLI | missing | `npm install -g vercel && vercel login`, then `vercel link` in the repo (project `jigworks`) |
-| Docker | installed, **not running** | start Docker Desktop; enable "start at login" |
-| Vercel dashboard | — | Neon via Marketplace, Blob store, Sandbox; Deployment Protection → "Protection Bypass for Automation" token |
+| pnpm | installed by the agent (12.21) | nothing |
+| Vercel CLI | installed by the agent (66.4), **logged out** | `vercel login`, then `vercel link` in the repo (project `jigworks`) |
+| Docker | started by the agent | keep Docker Desktop running overnight |
+| Vercel dashboard | — | Neon via Marketplace, Blob store, Sandbox; Deployment Protection → "Protection Bypass for Automation" token; env var `HUB_PASSWORD` (Production + Preview) |
 | Claude Code | installed | `claude -p "say ok"` returns ok on your Max account |
 | GitHub | logged in | nothing |
 | Playwright Chromium | cached | nothing; the smoke test confirms it |
-| Sleep | prevented only while something holds `caffeinate` | `scripts/overnight.sh` wraps itself in `caffeinate -dimsu`; keep the laptop on power |
+| Sleep | prevented only while something holds `caffeinate` | run `caffeinate -dimsu` in a terminal overnight; keep the laptop on power |
 
 **Toolchain smoke test (part of T01, run with you watching):** one Playwright headless screenshot, one `@vscode/test-electron` run of a hello-world extension (it downloads its own VS Code; macOS may ask once to allow it), `docker compose up db` + a query, `vercel deploy` of the skeleton, and `claude -p` with the login check. Any macOS permission dialog appears then, while you are there, not at 3 a.m.
 
-## 10. Open points
+## 10. Decisions on the open points (19 Nov 2026)
 
-1. **Identity in the hub:** the MVP has no login. Proposal: the runner sends `git config user.email` as "who started / who approved"; the hub trusts it, and the presentation names this as a known limit.
-2. **Live proof overnight (T06):** opening a real PR from the night would push `demo/*` branches to this repo, against the push rule. Proposal: overnight the PR step targets a local bare remote; the real PR happens in the demo rehearsal with you.
-3. **Screenshots of the real VS Code window (T09, T16):** taking them unattended needs macOS Screen Recording permission for the terminal. Proposal: the agents prove the UI with standalone Playwright screenshots and `@vscode/test-electron`; you take the real VS Code screenshot in the morning (5 min).
+1. **Identity:** no login for engineers. The runner sends `git config user.email` as "who started / who approved"; the hub trusts it. This is right for the product too: an engineer never needs access to the hub to run a workflow. Named as a known limit in the presentation.
+2. **Hub password:** the hub is a public URL, so the whole hub (web and API) sits behind one shared password, stored only in the Vercel env var `HUB_PASSWORD` and the local `.env.local`, never in the repo. The web shows a password screen and sets an HTTP-only cookie; the runner and the extension send the same secret in an `X-Jigworks-Key` header.
+3. **No demo tonight:** only the hub and the extension are built. T06's live proof opens its PR against a local bare remote; T17 (second workflow, for the demo story) is deferred; P01–P04 stay with the human.
+4. **Real VS Code screenshots:** the agent builds the extension UI from the mockups and proves it with standalone Playwright screenshots and `@vscode/test-electron`; the human takes real VS Code screenshots in the morning.

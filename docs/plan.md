@@ -70,6 +70,8 @@ Critical-path human time: T00 5 + T01 5 + T02 5 + T03 10 + T04 5 + T05 15 + T06 
 - **Security in the gate (T05):** secret scan and static security scan run in the gate, because the security lead asks how we know the agent did not add a vulnerability or leak a secret.
 - **Resume after restart (T06):** proven by a kill-and-resume test, covering the long-task engineer and design.md §11.1.
 - **VS Code extension shape (T09, T16):** sidebar with workflows and parallel sessions, the prompt in the middle, each session in its own tab and worktree. The run view shows the graph position and progress as % of the plan, not remaining time. Progress weights come from local audit logs of the same release, falling back to `workflow.toml` weights. The extension gets the graph from the local runner (`jigworks graph`); only the hub uses Vercel Sandbox.
+- **Hub access:** one shared password (`HUB_PASSWORD` env var) in front of web and API; identity from `git config user.email`.
+- **Tonight's build:** hub + VS Code extension only; no demo, T17 deferred.
 - **Hub tabs (T13):** Workflows, Runs & analytics (one tab), Non-coding teams (renamed from "HR department").
 - **Human delta loop:** in the architecture only (design.md §8, v0.7); the hub shows it as "Planned" with sample data. Not built.
 - **Demo target (T05, P02):** the demo runs in this repo. The workflow changes only `sample-repo/`, pushes a `demo/<runId>` branch and opens the PR against this repo.

@@ -16,7 +16,7 @@ The runner posts events to `POST /api/runs/{id}/events`, queues locally when off
 
 ## Notes
 
-Only the runner side. The hub's ingest endpoint is part of T12.
+Only the runner side. Requests carry `X-Jigworks-Key`. The hub's ingest endpoint is part of T12.
 
 ## Acceptance criteria
 

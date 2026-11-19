@@ -200,6 +200,10 @@ Uses:
 
 Constraints: deltas contain company code, so they stay in the company Hub under the same access rules; collection is opt-in per team.
 
+### Access
+
+The Hub is a public URL in the prototype, so web and API sit behind one shared password (`HUB_PASSWORD`, env only). Engineers never log in: the runner reports `git config user.email` as the author and approver. Real SSO is out of scope.
+
 ### Audit
 
 Every run: who started it, release + digest, model, steps, changed files (git snapshot per node), gate results, who approved and when, tokens and cost.

@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | todo |
+| Status | deferred (after the overnight build; demo story) |
 | Owner | local |
 | Label | `milestone-1` |
 | Size | M |
