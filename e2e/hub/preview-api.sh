@@ -40,8 +40,18 @@ req none POST /api/session "$(jq -nc --arg p "$HUB_PASSWORD" '{password:$p}')"; 
 grep -i '^set-cookie' "$tmp/headers" | sed -E 's/(jigworks_session=)[^;]+/\1<redacted>/' | sed 's/^/  /'
 req key GET /api/workflows; expect 200
 
-echo; echo "# publish a smoke workflow (validated in Vercel Sandbox)"
 wf="smoke-check"
+# Older transcripts (before they ended their run) left live smoke runs behind: cancel them.
+curl -sS "${bypass[@]}" "${key[@]}" "$base/api/runs?workflowId=$wf&status=live" | jq -r '.runs[] | "\(.runId) \(.release)"' |
+while read -r stale rel; do
+  last="$(curl -sS "${bypass[@]}" "${key[@]}" "$base/api/runs/$stale/events?after=-1&limit=1000" | jq '.lastSeq // -1')"
+  body="$(jq -nc --arg r "$stale" --arg rel "$rel" --argjson s "$((last + 1))" --arg t "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    '{events: [{runId:$r, seq:$s, kind:"node_status", at:$t, release:$rel, node:"plan", attempt:1, status:"cancelled", runStatus:"cancelled"}]}')"
+  curl -sS -o /dev/null "${bypass[@]}" "${key[@]}" -H 'content-type: application/json' --data-binary "$body" "$base/api/runs/$stale/events"
+  echo "  cancelled leftover smoke run $stale"
+done
+
+echo; echo "# publish a smoke workflow (validated in Vercel Sandbox)"
 version="0.1.$(date +%s)"
 req key GET "/api/workflows/$wf/draft"
 if [[ "$(cat "$tmp/code")" == 404 ]]; then req key PUT "/api/workflows/$wf/draft" '{"files":[]}'; expect 200; fi
