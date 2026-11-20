@@ -74,8 +74,9 @@ account reset (written from a background thread).
   `Broadcaster.publish` is synchronous and never awaits. `book`, `reference` and `candle` messages
   coalesce to the newest, `trade` keeps the newest 100, `fill` and `state` are never dropped (more
   than 1,000 waiting closes the socket with 1013). Messages are JSON-encoded once, not per client,
-  and a client writer batches for 0.1 s (a few clients) up to 0.4 s (1,000 clients); under that
-  load only the newest trade of a batch is sent.
+  and a client writer batches for 0.1 s (a few clients) up to 0.4 s (1,000 clients). Every queued
+  trade is delivered, except that with more than 250 connected sockets only the newest trade of a
+  batch is sent (delivering all of them to 1,000 clients measured 1.1 s of loop lag).
 * **Shutdown.** Producers stop, the queue is drained and the last batch committed, then the rest is
   cancelled and the store closed. A failed commit stops the process with exit code 1.
 * **Loop lag** is measured by a 50 ms heartbeat and shown in `/healthz` (`loop_lag_ms.max` / `p99`).
@@ -120,7 +121,7 @@ reported only; there is no threshold.
 
 | clients | bots | seconds | orders | 503 overloaded | p95 order->ack ms | p95 tick->push ms | loop lag max ms | loop lag p99 ms |
 |---|---|---|---|---|---|---|---|---|
-| 1000 | 1000 | 60 | 11977 | 0 | 75.4 | 428.8 | 116.17 | 77.67 |
+| 1000 | 1000 | 60 | 11993 | 0 | 53.4 | 421.4 | 77.68 | 40.15 |
 
 The same run asserted no 5xx, every client's WebSocket fills equal to its `/api/state` fills, and
 `/api/internal/totals` equal to 0 for both USD and BTC. Re-run it on your machine; the numbers

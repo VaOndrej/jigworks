@@ -170,11 +170,20 @@ class ExchangeTask:
                     break
             outcomes: list[tuple[Command, Result | None, Exception | None]] = []
             for cmd in batch:
+                if cmd.future.done():
+                    # The caller gave up (ack timeout -> 503 overloaded): it must not execute.
+                    continue
                 try:
                     outcomes.append((cmd, self._apply(cmd), None))
-                except Exception as exc:  # an engine bug must not take the exchange down
-                    log.exception("command %s failed", cmd.kind)
-                    outcomes.append((cmd, None, exc))
+                except Exception as exc:
+                    # The engine may be half-changed and nothing can roll it back: never commit
+                    # it. Fail the waiting callers and stop the service (exit code 1).
+                    log.exception("command %s failed inside the engine", cmd.kind)
+                    for c in batch:
+                        if not c.future.done():
+                            c.future.set_exception(exc)
+                    self._done(len(batch))
+                    raise
             journal = self.engine.drain_journal()
             if not journal.empty() or journal.meta != self._last_meta:
                 try:

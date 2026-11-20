@@ -287,8 +287,11 @@ def _writer_period(clients: int) -> float:
     return min(0.5, max(0.1, 0.0004 * clients))
 
 
+OVERLOAD_CLIENTS = 250  # above this many sockets, per-trade frames cost more than one process can send
+
+
 def _thin_trades(msgs: list[dict]) -> list[dict]:
-    """Under load a client only needs the newest trade (the last price), not every trade."""
+    """Real overload only: keep the newest trade (the last price) of a batch, drop older ones."""
     last = max((i for i, m in enumerate(msgs) if m.get("type") == "trade"), default=-1)
     return [m for i, m in enumerate(msgs) if m.get("type") != "trade" or i == last]
 
@@ -307,7 +310,10 @@ async def _ws_writer(ws: WebSocket, q: ClientQueue, broadcaster: Broadcaster) ->
                 await asyncio.sleep(_writer_period(broadcaster.client_count))
                 if q.closed:
                     break
-            for m in _thin_trades(q.drain()):
+            batch = q.drain()
+            if broadcaster.client_count > OVERLOAD_CLIENTS:
+                batch = _thin_trades(batch)
+            for m in batch:
                 async with asyncio.timeout(WS_SEND_TIMEOUT_S):
                     await ws.send_text(_encode(m))
         with contextlib.suppress(Exception):

@@ -47,7 +47,7 @@ async def test_partial_entry_then_sl_trigger_cancels_tp_and_sells_the_position(a
     assert kids["tp"]["status"] == "cancelled" and kids["tp"]["reason"] == "sl_triggered"
     assert kids["sl"]["status"] == "filled"
     parent = next(o for o in s["history"] if o["order_id"] == entry_id)
-    assert parent["status"] == "filled" or (parent["status"] == "cancelled" and parent["reason"] == "sl_triggered")
+    assert parent["status"] == "filled"  # the trigger trade fills the entry first (human ruling, option b)
     assert D(s["account"]["btc"]) == 0
     assert D(s["account"]["btc_reserved"]) == 0
     assert s["open_orders"] == []
