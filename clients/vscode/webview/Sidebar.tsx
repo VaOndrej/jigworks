@@ -26,7 +26,7 @@ export function Sidebar({ state, sessions, activeRun }: { state: HostState; sess
         {state.workflows.length === 0 && <div className="muted small pad">No workflows yet. Connect a hub and sync, or import a .zip.</div>}
         {state.workflows.map((w) => {
           const selected = w.key === state.selectedWorkflow;
-          const tag = [w.version, w.channel && w.channel !== "stable" ? w.channel : "", w.source === "workspace" ? "local" : "", selected ? "selected" : ""]
+          const tag = [w.version, w.channel && w.channel !== "stable" ? w.channel : "", w.source === "workspace" ? (w.changed ? "local (changed)" : "local") : "", selected ? "selected" : ""]
             .filter(Boolean)
             .join(" · ");
           return (

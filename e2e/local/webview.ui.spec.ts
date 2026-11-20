@@ -79,3 +79,10 @@ test("hub status in the sidebar: connect when not set up, a clear error when the
   await expect(p.locator(".hub-line")).toContainText("Hub jigworks.vercel.app · connected");
   await p.screenshot({ path: path.join(shots, "vscode-hub-connected-1440.png") });
 });
+
+test("a workspace workflow that differs from the hub's release is tagged local (changed)", async ({ page: p }) => {
+  await open(p, "screen=new&local=changed");
+  await expect(p.locator(".wf")).toHaveCount(3);
+  await expect(p.locator(".wf").nth(2)).toContainText("1.3.0 · local (changed)");
+  await p.screenshot({ path: path.join(shots, "vscode-local-changed-1440.png") });
+});
