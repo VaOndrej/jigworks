@@ -42,7 +42,14 @@ test("Workflows: weekly numbers, workflow table with step shape, live sessions, 
   await expect(table.getByText("stable 1.3.0")).toBeVisible();
   await expect(table.getByRole("img", { name: /Agent steps, 2 human reviews, 1 gate/ })).toBeVisible();
   await expect(page.getByRole("region", { name: "Live now" }).getByText("Review required")).toBeVisible();
-  await expect(page.getByRole("region", { name: "Recent releases" }).getByText("feature-development 1.3.0")).toBeVisible();
+  const releases = page.getByRole("region", { name: "Recent releases" });
+  if (target === "local") {
+    await expect(releases.getByText("feature-development 1.3.0")).toBeVisible();
+  } else {
+    // The shared Preview database also holds the transcript's smoke-check releases
+    // (preview-api.sh publishes one per run), which push older releases out of this list.
+    await expect(releases.getByText(/\d+\.\d+\.\d+/).first()).toBeVisible();
+  }
   await expect(page.getByRole("region", { name: "This week" }).getByText("PLANNED", { exact: true })).toBeVisible();
   await shot(page, "workflows");
 });
@@ -107,7 +114,8 @@ test("Runs & analytics: key numbers, cost per day, planned outcomes, versions, r
   const keys = page.getByRole("region", { name: "Key numbers" });
   await expect(keys.getByText("Gate pass, first try")).toBeVisible();
   await expect(keys.getByText("API equivalent", { exact: false })).toBeVisible();
-  await expect(page.getByRole("region", { name: "Cost per day" }).locator(".bar").last()).toBeVisible();
+  // Any day with cost: the last bar is today, which has $0 (zero height) once the seed is a day old.
+  await expect(page.getByRole("region", { name: "Cost per day" }).locator(".bar:visible").first()).toBeVisible();
   const outcomes = page.getByRole("region", { name: "Outcomes" });
   await expect(outcomes.getByText("PLANNED", { exact: true })).toBeVisible();
   await expect(outcomes).toContainText("Sample data");
