@@ -50,6 +50,19 @@
         "title": "Jigworks: Sync workflows from the hub"
       },
       {
+        "command": "jigworks.connectHub",
+        "title": "Jigworks: Connect to hub"
+      },
+      {
+        "command": "jigworks.hubSettings",
+        "title": "Jigworks: Hub settings",
+        "icon": "$(gear)"
+      },
+      {
+        "command": "jigworks.setHubBypass",
+        "title": "Jigworks: Set Vercel protection bypass secret"
+      },
+      {
         "command": "jigworks.setHubPassword",
         "title": "Jigworks: Set hub password"
       },
@@ -137,9 +150,18 @@
         "jigworks.hubUrl": {
           "type": "string",
           "default": "",
-          "description": "Jigworks hub URL. The hub password is kept in VS Code's secret storage (command “Jigworks: Set hub password”), never in settings."
+          "description": "Jigworks hub URL. Set it with the gear in the Jigworks view (“Jigworks: Connect to hub”). The hub password and the optional Vercel protection bypass secret are kept in VS Code's secret storage, never in settings."
         }
       }
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "jigworks.hubSettings",
+          "when": "view == jigworks.sidebar",
+          "group": "navigation"
+        }
+      ]
     }
   },
   "scripts": {

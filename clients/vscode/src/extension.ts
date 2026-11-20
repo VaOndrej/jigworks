@@ -40,6 +40,8 @@ class Host {
   private status: vscode.StatusBarItem;
   selected?: string;
   preflightResult?: Preflight;
+  hubState: { state: "unknown" | "connected" | "error"; message?: string } = { state: "unknown" };
+  hubHasPassword = false;
   /** Runs driven from this window; replayed history (load) never raises notifications. */
   readonly live = new Set<string>();
   readonly notified: string[] = [];
@@ -125,6 +127,7 @@ class Host {
       running: this.bridge.running(),
       preflight: this.preflightResult,
       repoLabel: config().get<string>("repoPath", "sample-repo"),
+      hub: this.hubStatus(),
     };
   }
 
@@ -225,6 +228,9 @@ class Host {
       case "sync":
         await vscode.commands.executeCommand("jigworks.syncWorkflows");
         break;
+      case "hubSettings":
+        await vscode.commands.executeCommand("jigworks.hubSettings");
+        break;
     }
   }
 
@@ -300,33 +306,117 @@ class Host {
   }
 
   private static SECRET = "jigworks.hubPassword";
+  private static BYPASS = "jigworks.hubBypass";
 
-  async hubClient(): Promise<HubClient | undefined> {
-    const url = config().get<string>("hubUrl", "").trim();
-    if (!url) return undefined;
-    const key = await this.ctx.secrets.get(Host.SECRET);
-    if (!key) throw new HubError("No hub password yet. Run “Jigworks: Set hub password”.");
-    // Runs started from here sync their events to the same hub (T14), with the same key.
-    this.bridge.setEnv({ JIGWORKS_HUB_URL: url, HUB_PASSWORD: key });
-    return new HubClient(url, key);
+  private hubUrl(): string {
+    return config().get<string>("hubUrl", "").trim();
   }
 
-  async setHubPassword(password?: string): Promise<void> {
+  private hubStatus(): HostState["hub"] {
+    const url = this.hubUrl();
+    if (!url) return { url: "", hasPassword: this.hubHasPassword, state: "not_configured" };
+    return { url, hasPassword: this.hubHasPassword, ...this.hubState };
+  }
+
+  async hubClient(): Promise<HubClient | undefined> {
+    const url = this.hubUrl();
+    if (!url) return undefined;
+    const key = await this.ctx.secrets.get(Host.SECRET);
+    this.hubHasPassword = !!key;
+    if (!key) throw new HubError("No hub password yet. Use the gear in the Jigworks view → “Connect to hub”.");
+    const bypass = (await this.ctx.secrets.get(Host.BYPASS)) || undefined;
+    // Runs started from here sync their events to the same hub (T14), with the same key.
+    this.bridge.setEnv({ JIGWORKS_HUB_URL: url, HUB_PASSWORD: key });
+    return new HubClient(url, key, bypass);
+  }
+
+  async setHubPassword(password?: string): Promise<boolean> {
     const value =
       password ?? (await vscode.window.showInputBox({ prompt: "Jigworks hub password", password: true, ignoreFocusOut: true }));
-    if (value === undefined) return;
+    if (value === undefined) return false;
     await this.ctx.secrets.store(Host.SECRET, value);
+    this.hubHasPassword = true;
+    this.hubState = { state: "unknown" };
+    this.broadcast();
+    return true;
+  }
+
+  /** Optional: only for a hub on a Vercel preview behind Deployment Protection. Empty clears it. */
+  async setHubBypass(secret?: string): Promise<boolean> {
+    const value =
+      secret ??
+      (await vscode.window.showInputBox({
+        title: "Vercel protection bypass secret (optional)",
+        prompt: "Only for a hub on a protected Vercel preview (VERCEL_AUTOMATION_BYPASS_SECRET). Leave empty to clear it.",
+        password: true,
+        ignoreFocusOut: true,
+      }));
+    if (value === undefined) return false;
+    if (value.trim()) await this.ctx.secrets.store(Host.BYPASS, value.trim());
+    else await this.ctx.secrets.delete(Host.BYPASS);
+    this.hubState = { state: "unknown" };
+    this.broadcast();
+    return true;
+  }
+
+  /** Guided setup: hub URL → password → optional bypass secret → sync. */
+  async connectHub(): Promise<WorkflowInfo[]> {
+    const url = await vscode.window.showInputBox({
+      title: "Connect to the Jigworks hub (1/3)",
+      prompt: "Hub URL, e.g. https://jigworks.example.com or http://localhost:8000",
+      value: this.hubUrl(),
+      ignoreFocusOut: true,
+      validateInput: (v) => (/^https?:\/\/\S+$/.test(v.trim()) ? undefined : "Expected an http(s):// URL"),
+    });
+    if (url === undefined) return [];
+    await config().update("hubUrl", url.trim().replace(/\/+$/, ""), vscode.ConfigurationTarget.Global);
+    const pw = await vscode.window.showInputBox({
+      title: "Connect to the Jigworks hub (2/3)",
+      prompt: this.hubHasPassword ? "Hub password (leave empty to keep the stored one)" : "Hub password (HUB_PASSWORD)",
+      password: true,
+      ignoreFocusOut: true,
+    });
+    if (pw === undefined) return [];
+    if (pw) await this.setHubPassword(pw);
+    if (!(await this.setHubBypass())) return [];
+    return this.syncWorkflows();
+  }
+
+  async hubSettings(): Promise<void> {
+    const url = this.hubUrl();
+    type Item = vscode.QuickPickItem & { run: () => Thenable<unknown> };
+    const items: Item[] = [
+      { label: "$(plug) Connect to hub…", description: url || "not configured", run: () => this.connectHub() },
+      { label: "$(sync) Sync workflows now", run: () => this.syncWorkflows() },
+      { label: "$(key) Change hub password…", run: () => this.setHubPassword() },
+      { label: "$(shield) Set Vercel protection bypass secret…", run: () => this.setHubBypass() },
+      {
+        label: "$(debug-disconnect) Forget hub password and bypass secret",
+        run: async () => {
+          await this.ctx.secrets.delete(Host.SECRET);
+          await this.ctx.secrets.delete(Host.BYPASS);
+          this.hubHasPassword = false;
+          this.hubState = { state: "unknown" };
+          this.broadcast();
+        },
+      },
+      { label: "$(settings-gear) Open Jigworks settings", run: () => vscode.commands.executeCommand("workbench.action.openSettings", "jigworks") },
+    ];
+    const pick = await vscode.window.showQuickPick(items, { title: "Jigworks hub", placeHolder: url ? `Hub: ${url}` : "No hub configured yet" });
+    if (pick) await pick.run();
   }
 
   /** Resolve `stable` of every hub workflow, download what changed, verify, install (T15). */
   async syncWorkflows(opts: { quiet?: boolean } = {}): Promise<WorkflowInfo[]> {
-    const hub = await this.hubClient();
-    if (!hub) {
-      if (!opts.quiet) void vscode.window.showWarningMessage("Jigworks: set `jigworks.hubUrl` to sync workflows from the hub.");
+    this.hubHasPassword = !!(await this.ctx.secrets.get(Host.SECRET));
+    if (!this.hubUrl() || !this.hubHasPassword) {
+      // Not set up yet: a click on Sync starts the guided setup instead of a toast that is easy to miss.
+      if (!opts.quiet) return this.connectHub();
       return [];
     }
     const synced: WorkflowInfo[] = [];
     try {
+      const hub = (await this.hubClient())!;
       const { workflows } = await hub.workflows();
       for (const w of workflows.filter((x) => x.channels.stable)) {
         const res = await hub.channel(w.id, "stable");
@@ -352,10 +442,19 @@ class Host {
         if (!this.selected || this.registry.get(this.selected) === undefined) this.selected = wf.key;
         synced.push(wf);
       }
+      // A workflow the hub no longer offers on stable (deleted, or the hub was emptied) leaves the list.
+      const kept = new Set(synced.map((w) => w.key));
+      this.registry.remove((x) => x.source === "hub" && !kept.has(x.key));
+      if (this.selected && this.registry.get(this.selected) === undefined) this.selected = this.registry.list()[0]?.key;
+      this.hubState = {
+        state: "connected",
+        message: workflows.length === 0 ? "the hub has no workflows yet" : synced.length === 0 ? "no workflow has a stable release yet" : undefined,
+      };
       if (!opts.quiet) void vscode.window.showInformationMessage(`Jigworks: ${synced.map((s) => s.release).join(", ") || "no workflows"} on stable.`);
       return synced;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
+      this.hubState = { state: "error", message: msg };
       if (!opts.quiet) void vscode.window.showErrorMessage(`Jigworks: sync failed. ${msg}`);
       throw err;
     } finally {
@@ -425,6 +524,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<Jigwor
     vscode.commands.registerCommand("jigworks.importWorkflow", (zipPath?: string, digest?: string) => host.importZip(zipPath, digest)),
     vscode.commands.registerCommand("jigworks.syncWorkflows", () => host.syncWorkflows()),
     vscode.commands.registerCommand("jigworks.setHubPassword", (password?: string) => host.setHubPassword(password)),
+    vscode.commands.registerCommand("jigworks.setHubBypass", (secret?: string) => host.setHubBypass(secret)),
+    vscode.commands.registerCommand("jigworks.connectHub", () => host.connectHub()),
+    vscode.commands.registerCommand("jigworks.hubSettings", () => host.hubSettings()),
+    vscode.workspace.onDidChangeConfiguration((e) => {
+      if (e.affectsConfiguration("jigworks.hubUrl")) {
+        host.hubState = { state: "unknown" };
+        host.broadcast();
+      }
+    }),
     vscode.commands.registerCommand("jigworks.preflight", () => host.preflight()),
     vscode.commands.registerCommand("jigworks.openWorktree", async (runId: string) => {
       const rows = await host.bridge.list();

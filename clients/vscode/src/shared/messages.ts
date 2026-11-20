@@ -27,6 +27,14 @@ export interface Preflight {
   message?: string;
 }
 
+export interface HubStatus {
+  /** Hub URL from settings; empty when no hub is configured. */
+  url: string;
+  hasPassword: boolean;
+  state: "not_configured" | "unknown" | "connected" | "error";
+  message?: string;
+}
+
 export interface HostState {
   workflows: WorkflowInfo[];
   selectedWorkflow?: string;
@@ -35,6 +43,7 @@ export interface HostState {
   preflight?: Preflight;
   activeRun?: string;
   repoLabel?: string;
+  hub?: HubStatus;
 }
 
 export type ToHost =
@@ -50,7 +59,8 @@ export type ToHost =
   | { type: "stop"; runId: string }
   | { type: "openDiff"; runId: string }
   | { type: "importWorkflow" }
-  | { type: "sync" };
+  | { type: "sync" }
+  | { type: "hubSettings" };
 
 export type ToWebview =
   | { type: "state"; state: HostState }

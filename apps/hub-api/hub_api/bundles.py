@@ -31,6 +31,13 @@ def put(conn: psycopg.Connection, release_id: str, pathname: str, data: bytes) -
     return None
 
 
+def delete_blobs(urls: list[str]) -> None:
+    if urls:
+        from vercel.blob.sync import delete_blob  # noqa: PLC0415
+
+        delete_blob(urls)
+
+
 def get(conn: psycopg.Connection, release: dict) -> bytes:
     if release["bundle_url"]:
         from vercel.blob.sync import get_blob  # noqa: PLC0415

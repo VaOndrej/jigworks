@@ -58,6 +58,12 @@ const state: HostState = {
   running: ["run_fd_0007"],
   preflight: { ok: true, authMethod: "claude.ai", subscriptionType: "max" },
   activeRun: screen === "session" ? runParam : undefined,
+  hub: (
+    {
+      none: { url: "", hasPassword: false, state: "not_configured" },
+      error: { url: "https://jigworks-abc123-team.vercel.app", hasPassword: true, state: "error", message: "The hub at https://jigworks-abc123-team.vercel.app is behind Vercel Deployment Protection. Set the protection bypass secret (gear in the Jigworks view → “Set Vercel protection bypass secret”) or use the production hub URL." },
+    } as Record<string, HostState["hub"]>
+  )[params.get("hub") ?? ""] ?? { url: "https://jigworks.vercel.app", hasPassword: true, state: "connected" },
 };
 if (screen === "session" && RUNS[runParam]) state.sessions[runParam] = RUNS[runParam];
 

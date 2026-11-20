@@ -58,14 +58,27 @@ check before every session as well, and refuses to start one if you are logged o
 Without the hub, the extension runs workflows from the workspace, and runs stay local. With
 the hub, runs show up in **Runs & analytics**, and workflows can come from the `stable` channel.
 
-1. In Settings, set `jigworks.hubUrl` to `https://jigworks.vercel.app`.
-2. Run **Jigworks: Set hub password** and enter the hub password. It is stored in VS Code's
-   secret storage, never in settings.
-3. Run **Jigworks: Sync workflows from the hub**.
+1. Click the gear in the title bar of the Jigworks view (or **Sync** / **Connect** in the
+   sidebar, or the command **Jigworks: Connect to hub**).
+2. Enter the hub URL `https://jigworks.vercel.app`, then the hub password. Leave the third
+   prompt (Vercel protection bypass secret) empty; it is only needed for a protected preview
+   URL. The URL goes to the user setting `jigworks.hubUrl`; the password and the bypass secret
+   go to VS Code's secret storage, never to settings.
+3. The extension syncs right away. The line under **WORKFLOWS** shows the hub and its state
+   (`connected`, `sync failed` with the reason, or `Not connected to a hub`).
 
-What the hub offers right now: its `stable` channel holds the sample release
-`feature-development 1.3.0` from the contract fixtures. Its steps **do not call an agent**; it
-exists to seed the hub's screens. To run the real workflow from the hub, publish the package in
+A new hub seeds itself once with sample data from the contract fixtures: the release
+`feature-development 1.3.0` on `stable` and seven runs by `alice/bob/carol@example.com`. The
+sample release's steps **do not call an agent**; it exists to fill the hub's screens. To remove
+the sample data, call the hub with its URL and password. Only the
+seeded releases and runs go; real releases and runs stay, and the hub does not seed itself again:
+
+```bash
+set -a; source .env.local; set +a
+curl -sS -X POST -H "X-Jigworks-Key: $HUB_PASSWORD" https://jigworks.vercel.app/api/admin/remove-sample-data
+# → {"runs":7,"releases":2,"workflows":1,"blobBundles":2}; a second call returns zeros
+```
+ To run the real workflow from the hub, publish the package in
 this repo (`feature-development 1.4.0`) first. Publishing creates an immutable release and moves
 `stable` to it:
 
@@ -145,7 +158,8 @@ tampered zip is refused and nothing is written.
 
 | Symptom | Cause and fix |
 |---|---|
-| "wrong hub password" (401) | Run **Jigworks: Set hub password** again. |
+| "wrong hub password" (401) | Gear in the Jigworks view → **Change hub password…**. |
+| "behind Vercel Deployment Protection" | The URL is a protected preview. Use `https://jigworks.vercel.app`, or set the bypass secret (gear → **Set Vercel protection bypass secret…**). |
 | "too many wrong hub passwords" (429) | 10 wrong passwords from your IP within 15 min. Wait for the time in the message, then fix the password. |
 | Session refused: not logged in | `claude auth login`, then **Jigworks: Check Claude Code login**. |
 | Session paused: usage limit | Your subscription's usage window is full. Run **Jigworks: Resume session** after the reset time shown. |

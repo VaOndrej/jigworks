@@ -3,11 +3,13 @@
 import * as assert from "node:assert/strict";
 import { execFileSync, spawn, type ChildProcess } from "node:child_process";
 import * as fs from "node:fs";
+import * as http from "node:http";
 import * as os from "node:os";
 import * as path from "node:path";
 import * as vscode from "vscode";
 import type { RunEvent } from "@jigworks/contracts";
 import type { JigworksApi } from "../../extension";
+import { HubClient } from "../../hub";
 import { foldEvents } from "../../shared/session";
 
 const repoRoot = process.env.JIGWORKS_REPO_ROOT!;
@@ -86,6 +88,22 @@ suite("Jigworks hub sync (T15)", () => {
       () => Promise.resolve(vscode.commands.executeCommand("jigworks.syncWorkflows")),
       /hub refused the password.*Set hub password/,
     );
+    const status = (await api()).state().hub!;
+    assert.equal(status.state, "error", "the sidebar shows the failed sync");
+    assert.match(status.message ?? "", /refused the password/);
+  });
+
+  test("a hub behind Vercel Deployment Protection is named as such, not a JSON parse error", async () => {
+    const sso = http.createServer((_req, res) => {
+      res.writeHead(302, { location: "https://vercel.com/sso-api?url=x" }).end();
+    });
+    await new Promise<void>((r) => sso.listen(0, "127.0.0.1", r));
+    const url = `http://127.0.0.1:${(sso.address() as { port: number }).port}`;
+    try {
+      await assert.rejects(() => new HubClient(url, KEY).workflows(), /behind Vercel Deployment Protection/);
+    } finally {
+      sso.close();
+    }
   });
 
   test("publish v1 → run → publish v2 → roll stable back to v1 → the extension picks up v1", async () => {
@@ -99,6 +117,10 @@ suite("Jigworks hub sync (T15)", () => {
     const v1Id = await publish(hub.url, "0.1.0", v1.zip);
     await vscode.commands.executeCommand("jigworks.syncWorkflows");
     assert.deepEqual(hubTiny(a).map((w) => [w.version, w.digest, w.channel]), [["0.1.0", v1.digest, "stable"]]);
+    assert.deepEqual(
+      (({ url, hasPassword, state }) => ({ url, hasPassword, state }))(a.state().hub!),
+      { url: hub.url, hasPassword: true, state: "connected" },
+    );
     const runId = (await a.startSession("Task on the pinned release", hubTiny(a)[0].key))!;
     const events = await waitFor(a, runId, (e) => foldEvents(runId, e).status === "waiting_human" && !a.bridge.isRunning(runId));
     const started = events[0].runStarted!;
@@ -126,5 +148,11 @@ suite("Jigworks hub sync (T15)", () => {
     // the running session never changed version (design.md §6: a running task stays pinned)
     assert.equal(foldEvents(runId, a.bridge.events(runId)).release, "tiny@0.1.0");
     await vscode.commands.executeCommand("jigworks.reject", runId);
+
+    // the hub is emptied (sample data removed) → the next sync drops the hub workflow from the sidebar
+    await fetch(`${hub.url}/_test/reset`, { method: "POST" });
+    await vscode.commands.executeCommand("jigworks.syncWorkflows");
+    assert.deepEqual(hubTiny(a), [], "a workflow the hub no longer offers on stable is not left behind");
+    assert.ok(a.state().workflows.every((w) => w.source !== "hub"));
   });
 });

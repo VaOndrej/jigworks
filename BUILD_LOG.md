@@ -14,7 +14,9 @@ Time is tracked in two columns: **human** (my own time: deciding, directing, rev
 | Overnight two-agent build (HUB + LOCAL, in parallel) | ~2 min | ~2 h 55 min (HUB ~1 h 25 min + LOCAL ~1 h 30 min; ~1 h 30 min wall clock) |
 | Morning review and merge | 10 min | ~1 h 20 min |
 | Login rate limit, invariant guard, extension guide | 2 min | ~45 min |
-| **Total** | **3 h 16 min** | **~7 h 35 min** |
+| Extension hub connection (gear, connect flow, status line) | 2 min | ~25 min |
+| Hub sample-data reset, worktree cleanup | 2 min | ~20 min |
+| **Total** | **3 h 20 min** | **~8 h 20 min** |
 
 ## Entries
 
@@ -197,4 +199,48 @@ Two Claude Code sessions (Opus 5.5) in their own worktrees, pushing to `feature/
 - The hub's production `stable` channel is the contract's sample release 1.3.0, which does not
   call agents. The real 1.4.0 has to be published first; the command is in the guide, and
   nothing was published to production.
+
+### 2026-11-20 — Extension hub connection (human 2 min, agent ~25 min)
+
+**What I delegated**
+- The human clicked **Sync** in a fresh VS Code and saw nothing: without `jigworks.hubUrl` the
+  extension only showed a warning toast, and the settings had no visible entry point.
+- A gear in the Jigworks view title (`jigworks.hubSettings`) with connect, sync, change
+  password, bypass secret, forget, open settings. **Sync** without a URL or password now starts
+  the guided setup (`jigworks.connectHub`: URL → password → optional bypass secret → sync).
+- A hub status line under **WORKFLOWS** (`connected`, `sync failed` + reason, not connected).
+- The extension now sends the Vercel protection bypass secret when one is stored (`HubClient`
+  supported it, nobody passed it) and names a 302 to Vercel SSO as Deployment Protection
+  instead of failing on the HTML login page. Red first: the new test failed on the old
+  `hub.ts`, passes on the new one.
+
+**What I reviewed / decided myself**
+- The bug report and the screenshot.
+
+**What went wrong / changed course**
+- No unit test covers the input-box flow of `connectHub` itself (VS Code input boxes cannot be
+  driven from the test host without a stub); it is covered by the screenshots and by hand only.
+
+### 2026-11-20 — Hub sample-data reset, worktree cleanup (human 2 min, agent ~20 min)
+
+**What I delegated**
+- An inventory of the production hub through the API: only the fixture seed (1 workflow,
+  releases 1.2.0 and 1.3.0 by `carol@example.com`, 7 runs by `alice/bob/carol@example.com`).
+- `POST /api/admin/remove-sample-data` (hub-only, like `/api/analytics/overview`): deletes
+  only the rows whose ids come from the seed files (releases 1.2.0/1.3.0 with their Blob
+  bundles, runs `run_fd_0001`–`0007`), keeps real releases and runs under the same workflow,
+  and keeps the `seeded` flag so the hub does not seed again. Idempotent. Tests written red first.
+- The extension's sync now drops hub workflows the hub no longer offers on `stable`; before,
+  the emptied hub's 1.3.0 would have stayed in the sidebar from the cache. Red first, via a new
+  `/_test/reset` control in the fake hub.
+- Removed the `jigworks-hub` and `jigworks-local` worktrees of the parallel build (nothing
+  unpushed, both branches merged into `main`) and deleted `agent/hub` and `agent/local`.
+
+**What I reviewed / decided myself**
+- That the test data goes and the worktrees go.
+
+**What went wrong / changed course**
+- First version was a script on the raw `DATABASE_URL`. The human rejected it: they have the
+  hub URL and password, a database URL should not be needed. Replaced by the endpoint, which
+  works with the hub password only; the script was deleted before it was committed.
 
