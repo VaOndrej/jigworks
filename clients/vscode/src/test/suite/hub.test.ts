@@ -50,6 +50,18 @@ async function publish(hubUrl: string, version: string, zip: string): Promise<st
   return ((await res.json()) as { releaseId: string }).releaseId;
 }
 
+function localTiny(a: JigworksApi) {
+  return a.state().workflows.filter((w) => w.source === "workspace" && w.name === "tiny");
+}
+
+async function until(pred: () => boolean, ms = 10000): Promise<void> {
+  const end = Date.now() + ms;
+  while (!pred()) {
+    if (Date.now() > end) throw new Error("timeout");
+    await new Promise((r) => setTimeout(r, 100));
+  }
+}
+
 function hubTiny(a: JigworksApi) {
   return a.state().workflows.filter((w) => w.source === "hub" && w.name === "tiny");
 }
@@ -121,6 +133,8 @@ suite("Jigworks hub sync (T15)", () => {
       (({ url, hasPassword, state }) => ({ url, hasPassword, state }))(a.state().hub!),
       { url: hub.url, hasPassword: true, state: "connected" },
     );
+    // the workspace copy is the same package as the hub's release → listed once
+    assert.deepEqual(localTiny(a), [], "workspace tiny with the hub's digest is hidden");
     const runId = (await a.startSession("Task on the pinned release", hubTiny(a)[0].key))!;
     const events = await waitFor(a, runId, (e) => foldEvents(runId, e).status === "waiting_human" && !a.bridge.isRunning(runId));
     const started = events[0].runStarted!;
@@ -134,6 +148,7 @@ suite("Jigworks hub sync (T15)", () => {
     await publish(hub.url, "0.2.0", v2.zip);
     await vscode.commands.executeCommand("jigworks.syncWorkflows");
     assert.deepEqual(hubTiny(a).map((w) => [w.version, w.digest]), [["0.2.0", v2.digest]]);
+    assert.deepEqual(localTiny(a).map((w) => [w.version, w.changed]), [["0.1.0", true]], "differs from the hub → local (changed)");
 
     // roll the channel back to v1 (hub API, with the key) → sync picks v1 again
     const put = await fetch(`${hub.url}/api/workflows/tiny/channels/stable`, {
@@ -144,6 +159,19 @@ suite("Jigworks hub sync (T15)", () => {
     assert.equal(put.status, 200);
     await vscode.commands.executeCommand("jigworks.syncWorkflows");
     assert.deepEqual(hubTiny(a).map((w) => [w.version, w.digest]), [["0.1.0", v1.digest]]);
+
+    assert.deepEqual(localTiny(a), []);
+
+    // editing the workspace package shows it again as changed, without a reload; undoing hides it
+    const graphPy = path.join(workspace, "workflows/tiny/graph.py");
+    const original = fs.readFileSync(graphPy, "utf8");
+    fs.writeFileSync(graphPy, original + "\n# local edit\n");
+    try {
+      await until(() => localTiny(a)[0]?.changed === true);
+    } finally {
+      fs.writeFileSync(graphPy, original);
+    }
+    await until(() => localTiny(a).length === 0);
 
     // the running session never changed version (design.md §6: a running task stays pinned)
     assert.equal(foldEvents(runId, a.bridge.events(runId)).release, "tiny@0.1.0");
