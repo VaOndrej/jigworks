@@ -22,7 +22,8 @@ Time is tracked in two columns: **human** (my own time: deciding, directing, rev
 | Project-agnostic workflow, Opus 5.5 / Sonnet 5.5 (T19) | 5 min | ~1 h 15 min |
 | Prompting and brainstorming the workflow improvements (T18, T19, A/B idea) | 1 h | — |
 | Release skills as a Claude Code plugin, PR conflicts (T19) | 2 min | ~30 min |
-| **Total** | **4 h 32 min** | **~11 h 10 min** |
+| Brainstorming route, structured context (T20, feature-development 1.6.0) | 3 min | ~1 h |
+| **Total** | **4 h 35 min** | **~12 h 10 min** |
 
 ## Entries
 
@@ -368,3 +369,27 @@ Two Claude Code sessions (Opus 5.5) in their own worktrees, pushing to `feature/
 - The first idea, copying skills into the worktree's `.claude/skills/`, would have shown up in
   the diff and the gate's scope check; `--plugin-dir` loads them for the session only.
 
+
+### 2026-11-20 — Brainstorming route, structured context, feature-development 1.6.0 (human 3 min, agent ~1 h)
+
+**What I delegated**
+- `triage` at START (keyword "brainstorm…" or a low-effort Sonnet call), a
+  `brainstorm ⇄ approve_brainstorm` loop in one resumed Opus session with no cap on questions
+  per round, the approved design fed to `plan` (`plan_from_design.md`), and a new skill
+  `brainstorm-before-planning`.
+- One prompt structure for every agent and a context builder (`spec()`, `earlier()`) that hands
+  the implementer the test list and the reviewer the test list plus the implementer's report.
+- A checkpoint test: a brainstorming run continued from SQLite in a new `WorkflowRun`.
+- `jigworks run --max-turns`, an extension label for brainstorming and a taller plan box,
+  `demo/` as the target folder for demo projects.
+
+**What I reviewed / decided myself**
+- That larger changes are brainstormed in as many rounds as the design needs, inside 1.6.0,
+  and that every agent must get the right context in a well-structured prompt.
+
+**What went wrong / changed course**
+- First idea was to reuse `approve_plan` for brainstorming rounds; dropped because `plan` is on
+  the planned path and the brainstorming route would never earn its % weight. Brainstorming is
+  now off the planned path (like `fix`) and ends in the normal plan.
+- Found that a larger build would hit the runner's fixed 40-turn limit per agent call, and that
+  the gate only detects a test setup in the scope root; added `--max-turns` and told the agents.
