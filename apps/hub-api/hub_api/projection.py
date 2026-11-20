@@ -54,6 +54,8 @@ def project(created: dict[str, Any], events: list[dict[str, Any]]) -> tuple[dict
                 s[key] = e[key]
         if e.get("runStatus"):
             s["status"] = e["runStatus"]
+            if e["runStatus"] not in TERMINAL:
+                final = None  # resumed after run_finished (`jigworks resume`): that summary is stale
 
         if kind == "run_started":
             rs = e["runStarted"]
