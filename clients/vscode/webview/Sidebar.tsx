@@ -21,8 +21,9 @@ export function Sidebar({ state, sessions, activeRun }: { state: HostState; sess
           <button type="button" className="link" onClick={() => host().postMessage({ type: "importWorkflow" })}>Import</button>
         </span>
       </div>
+      <HubLine hub={state.hub} />
       <div className="wf-list">
-        {state.workflows.length === 0 && <div className="muted small pad">No workflows yet. Sync from the hub or import a .zip.</div>}
+        {state.workflows.length === 0 && <div className="muted small pad">No workflows yet. Connect a hub and sync, or import a .zip.</div>}
         {state.workflows.map((w) => {
           const selected = w.key === state.selectedWorkflow;
           const tag = [w.version, w.channel && w.channel !== "stable" ? w.channel : "", w.source === "workspace" ? "local" : "", selected ? "selected" : ""]
@@ -75,4 +76,36 @@ export function Sidebar({ state, sessions, activeRun }: { state: HostState; sess
       </div>
     </aside>
   );
+}
+
+function HubLine({ hub }: { hub: HostState["hub"] }) {
+  const settings = () => host().postMessage({ type: "hubSettings" });
+  if (!hub || hub.state === "not_configured" || !hub.hasPassword) {
+    return (
+      <div className="hub-line">
+        <span className="hub-dot off" />
+        <span className="muted">{hub?.url ? `Hub ${hostOf(hub.url)}: no password yet.` : "Not connected to a hub."}</span>
+        <button type="button" className="link accent" onClick={settings}>Connect</button>
+      </div>
+    );
+  }
+  const label = hub.state === "connected" ? "connected" : hub.state === "error" ? "sync failed" : "not synced yet";
+  return (
+    <div className={`hub-line${hub.state === "error" ? " error" : ""}`} title={hub.url}>
+      <span className={`hub-dot ${hub.state}`} />
+      <span className="hub-text">
+        Hub {hostOf(hub.url)} · {label}
+        {hub.message && <span className="hub-msg">{hub.message}</span>}
+      </span>
+      <button type="button" className="link" onClick={settings} aria-label="Hub settings">Settings</button>
+    </div>
+  );
+}
+
+function hostOf(url: string): string {
+  try {
+    return new URL(url).host;
+  } catch {
+    return url;
+  }
 }

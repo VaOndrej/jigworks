@@ -62,3 +62,20 @@ test("finished run with fix loops: fix node done, progress at 100 %", async ({ p
   await expect(p.locator(".log")).toContainText("requested changes");
   await p.screenshot({ path: path.join(shots, "vscode-fix-loops-activity-1440.png") });
 });
+
+test("hub status in the sidebar: connect when not set up, a clear error when the sync fails", async ({ page: p }) => {
+  await open(p, "screen=new&hub=none");
+  await expect(p.locator(".hub-line")).toContainText("Not connected to a hub.");
+  await p.locator(".hub-line").getByRole("button", { name: "Connect" }).click();
+  expect(await p.evaluate(() => (window as unknown as { __messages: string[] }).__messages)).toContain("hubSettings");
+  await p.screenshot({ path: path.join(shots, "vscode-hub-not-connected-1440.png") });
+
+  await open(p, "screen=new&hub=error");
+  await expect(p.locator(".hub-line.error")).toContainText("sync failed");
+  await expect(p.locator(".hub-line.error")).toContainText("Deployment Protection");
+  await p.screenshot({ path: path.join(shots, "vscode-hub-error-1440.png") });
+
+  await open(p, "screen=new");
+  await expect(p.locator(".hub-line")).toContainText("Hub jigworks.vercel.app · connected");
+  await p.screenshot({ path: path.join(shots, "vscode-hub-connected-1440.png") });
+});

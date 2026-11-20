@@ -13,7 +13,7 @@ packages/contracts/openapi.json, and validates every request body against the fr
 
 Test controls (not part of the hub API): POST /_test/release (body: zip bytes, query workflowId,
 version, releaseId, channel?) publishes a release; POST /_test/down?on=1|0 switches the hub off
-(503) and on; POST /_test/down_after?node=…&status=… goes down once such an event was ingested.
+(503) and on; POST /_test/reset empties releases and channels (an emptied hub); POST /_test/down_after?node=…&status=… goes down once such an event was ingested.
 
     python -m jigworks_runner.testing.fakehub --key test-key      # prints {"url": …} and serves
 """
@@ -216,6 +216,11 @@ class FakeHub:
             return send(200, {"downAfter": list(self.down_after)})
         if path == "/_test/release":
             return send(200, self.publish(q["workflowId"], q["version"], raw, q.get("releaseId"), q.get("channel")))
+        if path == "/_test/reset":
+            with self.lock:
+                self.releases.clear()
+                self.channels.clear()
+            return send(200, {"reset": True})
         if path == "/_test/events":
             return send(200, {rid: self.seqs(rid) for rid in self.events})
         return send(404, {"error": {"code": "not_found", "message": path}})

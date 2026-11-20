@@ -27,9 +27,20 @@ export class HubClient {
         ...init,
         headers: { ...this.headers(), ...(init.headers as Record<string, string> | undefined) },
         signal: AbortSignal.timeout(20000),
+        // A hub never redirects its API; a redirect is Vercel Deployment Protection (SSO login page).
+        redirect: "manual",
       });
     } catch (err) {
       throw new HubError(`The hub at ${this.url} is unreachable (${(err as Error).message}).`);
+    }
+    if (res.status >= 300 && res.status < 400) {
+      const to = res.headers.get("location") ?? "";
+      throw new HubError(
+        /vercel\.com\/sso|vercel\.com\/login/.test(to)
+          ? `The hub at ${this.url} is behind Vercel Deployment Protection. Set the protection bypass secret (gear in the Jigworks view → “Set Vercel protection bypass secret”) or use the production hub URL.`
+          : `The hub at ${this.url} redirected to ${to || "another page"}; check the hub URL.`,
+        res.status,
+      );
     }
     if (res.status === 401) {
       throw new HubError("The hub refused the password. Run “Jigworks: Set hub password” with the hub password.", 401);
