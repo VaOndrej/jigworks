@@ -2,6 +2,8 @@
 
 Checks (each one fails the gate on its own):
 - scope           the diff only touches the allowed paths (default `sample-repo/`)
+- protected tests implement/fix left the tests from write_tests and the pytest configuration
+                  alone (design.md: tests are written by a different agent before implementation)
 - tests           the plain test suite
 - property tests  the invariant property tests (sample-repo/INVARIANTS.md)
 - secret scan     gitleaks if installed, else the built-in rules in secrets.py, on added lines
@@ -31,6 +33,12 @@ DEFAULTS: dict[str, Any] = {
     "property_tests": [sys.executable, "-m", "pytest", "sample-repo/tests/test_invariants.py", "-q",
                        "-p", "no:cacheprovider"],
     "timeout_s": 600,
+    # Read-only for implement and fix: what write_tests left under these paths, pytest
+    # configuration anywhere, and the invariant spec. New test files may be added.
+    "protected_dirs": ["sample-repo/tests/"],
+    "protected_files": ["sample-repo/INVARIANTS.md", "sample-repo/pyproject.toml", "sample-repo/pytest.ini",
+                        "sample-repo/setup.cfg", "sample-repo/tox.ini"],
+    "protected_names": ["conftest.py"],
 }
 
 
@@ -79,6 +87,31 @@ def _scope(files: list[str], allowed: list[str]) -> dict[str, Any]:
     check["summary"] = "ok" if not outside else "changes outside " + ", ".join(allowed) + ": " + ", ".join(outside[:10])
     if outside:
         check["findings"] = len(outside)
+    return check
+
+
+def _protected(cwd: Path, tests_base: str, cfg: dict[str, Any]) -> dict[str, Any]:
+    """Files implement/fix changed since write_tests that they may not touch."""
+    out = _git(cwd, "diff", "--name-status", "--no-renames", tests_base).splitlines()
+    out += [f"A\t{f}" for f in _git(cwd, "ls-files", "--others", "--exclude-standard").splitlines()]
+    touched = []
+    for line in out:
+        status, path = line.split("\t", 1)
+        name = path.rsplit("/", 1)[-1]
+        in_tests = any(path.startswith(d) for d in cfg["protected_dirs"])
+        if (in_tests and status != "A") or path in cfg["protected_files"] or name in cfg["protected_names"]:
+            touched.append(path)
+    check = {"name": "protected tests", "kind": "other", "passed": not touched}
+    if touched:
+        check["findings"] = len(touched)
+        check["summary"] = (
+            "changed after write_tests: " + ", ".join(sorted(set(touched))[:10])
+            + ". The tests from write_tests, the pytest configuration and INVARIANTS.md are read-only for"
+            " implement and fix: restore them and fix the code. If a test itself is wrong, say so;"
+            " a human decides (reject the run and start again)."
+        )
+    else:
+        check["summary"] = "ok"
     return check
 
 
@@ -134,11 +167,14 @@ def _security_scan(cwd: Path, files: list[str]) -> dict[str, Any]:
     return check
 
 
-def run_gate(cwd: Path, base: str, overrides: dict[str, Any] | None = None) -> dict[str, Any]:
+def run_gate(cwd: Path, base: str, overrides: dict[str, Any] | None = None,
+             tests_base: str | None = None) -> dict[str, Any]:
+    """`tests_base` is the commit of write_tests; without one, the run's base commit."""
     cfg = {**DEFAULTS, **(overrides or {})}
     files = changed_files(cwd, base)
     checks = [
         _scope(files, cfg["scope"]),
+        _protected(cwd, tests_base or base, cfg),
         _pytest("pytest", "tests", cfg["tests"], cwd, cfg),
         _pytest("hypothesis invariants", "property_tests", cfg["property_tests"], cwd, cfg),
         _secret_scan(cwd, base),

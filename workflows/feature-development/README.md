@@ -23,7 +23,7 @@ START → plan → [approve_plan] → write_tests → implement → review
 | `workflow.toml` | manifest: version, `plannedPath`, `interruptNodes`, `[models]` (default + per node), `[weights]`, `[permissions]` |
 | `graph.py` | the `StateGraph` (`build_graph`, entrypoint) and the routing functions |
 | `steps/nodes.py` | node functions; per-node tool sets (read-only for plan and review) |
-| `steps/gate.py` | the gate: scope, pytest, Hypothesis property tests, secret scan, bandit |
+| `steps/gate.py` | the gate: scope, protected tests, pytest, Hypothesis property tests, secret scan, bandit |
 | `steps/secrets.py` | built-in secret rules (used when `gitleaks` is not installed) |
 | `steps/runtime.py` | the interface the runner injects; the package never imports the runner |
 | `prompts/*.md` | the phase prompts (`$prompt`, `$plan`, `$scope`, … are filled in by the nodes) |
@@ -38,6 +38,11 @@ START → plan → [approve_plan] → write_tests → implement → review
   sees only the prompt and the approved plan. `fix` resumes the implementer's session.
 - **The agent only changes `sample-repo/`.** The gate's scope check fails on any other path,
   and `open_pr` only runs after a green gate.
+- **Tests written before implementation are read-only.** After `write_tests`, the gate's
+  *protected tests* check fails if `implement` or `fix` changed or deleted a file under
+  `sample-repo/tests/` that existed then, added or changed any `conftest.py`, the pytest
+  configuration or `INVARIANTS.md`. New test files are allowed. So an agent cannot weaken the
+  invariant property tests to get through the gate; a wrong test is a human decision.
 - **The gate is deterministic** (no agent): plain tests, property tests, secret scan on the
   added lines, bandit (medium and up) on the changed Python files. Any failing check fails
   the gate and routes to `fix`.

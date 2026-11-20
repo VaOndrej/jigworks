@@ -124,7 +124,8 @@ def fix(state: dict, rt: Runtime) -> dict:
 
 @step("gate")
 def gate(state: dict, rt: Runtime) -> dict:
-    result = gate_checks.run_gate(rt.cwd, rt.base_commit, rt.options.get("gate"))
+    result = gate_checks.run_gate(rt.cwd, rt.base_commit, rt.options.get("gate"),
+                                  tests_base=(state.get("commits") or {}).get("write_tests"))
     return {
         "gate_passed": result["passed"],
         "gate_report": gate_checks.report(result),

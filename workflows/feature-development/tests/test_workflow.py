@@ -326,6 +326,66 @@ def test_change_outside_sample_repo_fails_the_gate(repo):
     assert not scope["passed"] and "README.md" in scope["summary"]
 
 
+INVARIANT_TESTS = (SAMPLE / "tests" / "test_invariants.py").read_text()
+EXTRA_PROPERTY = """
+
+@given(qty=st.integers(min_value=1, max_value=50))
+def test_new_order_starts_with_nothing_filled(qty):
+    assert qty >= 1
+"""
+
+
+def test_implement_cannot_weaken_the_invariant_tests(repo):
+    # design.md: tests and invariants are written by a different agent before implementation.
+    # Here `implement` breaks I1 and guts the property tests that would catch it: without the
+    # guard every check passes. The gate must fail, and `fix` must restore both.
+    steps = script(
+        implement=[FakeStep("implemented, and 'cleaned up' slow tests",
+                            files={"sample-repo/sample_repo/notes.py": FEATURE,
+                                   "sample-repo/tests/test_invariants.py": "def test_ok():\n    pass\n"},
+                            edit=edit("sample-repo/sample_repo/orders.py", *OVERFILL))],
+        fix=[FakeStep("restored the tests and the remaining check",
+                      files={"sample-repo/tests/test_invariants.py": INVARIANT_TESTS},
+                      edit=edit("sample-repo/sample_repo/orders.py", OVERFILL[1], OVERFILL[0]))],
+    )
+    run, agent = new_run(repo, steps)
+    out = approve_all(run, run.start("Add describe(order)"))
+    assert out.status == "succeeded"
+    first, second = [e["gateResult"] for e in events(run) if e["kind"] == "gate_result"][:2]
+    guard = next(c for c in first["checks"] if c["name"] == "protected tests")
+    assert not first["passed"] and not guard["passed"]
+    assert "sample-repo/tests/test_invariants.py" in guard["summary"]
+    assert second["passed"]
+    fix_call = next(c for c in agent.calls if c.node == "fix")
+    assert "protected tests" in fix_call.prompt
+    check_stream(run)
+
+
+def test_write_tests_may_extend_the_invariant_tests(repo):
+    steps = script(write_tests=[FakeStep("added a property test",
+                                         files={"sample-repo/tests/test_notes.py": FEATURE_TEST,
+                                                "sample-repo/tests/test_invariants.py": INVARIANT_TESTS + EXTRA_PROPERTY})])
+    run, _ = new_run(repo, steps)
+    out = approve_all(run, run.start("Add describe(order)"))
+    assert out.status == "succeeded"
+    gate = next(e for e in events(run) if e["kind"] == "gate_result")["gateResult"]
+    assert gate["passed"]
+    assert next(c for c in gate["checks"] if c["name"] == "protected tests")["passed"]
+
+
+def test_implement_cannot_add_pytest_configuration(repo):
+    weaken = "from hypothesis import settings\nsettings.register_profile('x', max_examples=1)\nsettings.load_profile('x')\n"
+    steps = script(implement=[FakeStep("implemented", files={"sample-repo/sample_repo/notes.py": FEATURE,
+                                                             "sample-repo/conftest.py": weaken})],
+                   fix=[FakeStep("removed it", files={"sample-repo/conftest.py": None})])
+    run, _ = new_run(repo, steps)
+    out = approve_all(run, run.start("Add describe(order)"))
+    assert out.status == "succeeded"
+    first = next(e for e in events(run) if e["kind"] == "gate_result")["gateResult"]
+    guard = next(c for c in first["checks"] if c["name"] == "protected tests")
+    assert not guard["passed"] and "sample-repo/conftest.py" in guard["summary"]
+
+
 def test_open_pr_pushes_demo_branch(repo):
     run, _ = new_run(repo, script(), run_id="run_t05_pr")
     approve_all(run, run.start("Add describe(order)"))
