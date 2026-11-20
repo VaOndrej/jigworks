@@ -14,6 +14,10 @@ from .runtime import GATE_KEY, STATUS_KEY, Runtime, step
 
 PROMPTS = Path(__file__).resolve().parent.parent / "prompts"
 MAX_FIX_LOOPS = 3
+MAX_PLAN_ROUNDS = 5
+QUESTIONS = re.compile(r"^\s*QUESTIONS:", re.IGNORECASE)
+APPROVED_OPEN_QUESTIONS = ("The human approved without answering your questions. State your assumptions "
+                           "explicitly at the top, then write the plan.")
 
 READ_ONLY = ("Read", "Glob", "Grep", "Bash(git diff:*)", "Bash(git log:*)")
 WRITE = ("Read", "Glob", "Grep", "Edit", "Write", "Bash(python -m pytest:*)", "Bash(uv run pytest:*)")
@@ -40,6 +44,18 @@ def call(rt: Runtime, node: str, text: str, tools: tuple[str, ...], resume: str 
     return reply
 
 
+def asks_questions(plan_text: str) -> bool:
+    return bool(QUESTIONS.match(plan_text or ""))
+
+
+def spec(state: dict) -> str:
+    """The approved plan plus the planning conversation that led to it, for the agents after the plan."""
+    talk = state.get("clarifications") or []
+    if not talk:
+        return state.get("plan", "")
+    return state.get("plan", "") + "\n\nAgreed with the human while planning:\n\n" + "\n\n".join(talk)
+
+
 def verdict(text: str) -> bool:
     """PASS only when the reviewer says so explicitly; the last verdict line wins."""
     found = VERDICT.findall(text or "")
@@ -48,35 +64,56 @@ def verdict(text: str) -> bool:
 
 @step("plan")
 def plan(state: dict, rt: Runtime) -> dict:
-    reply = call(rt, "plan", prompt("plan", prompt=state["prompt"], scope=scope_text(rt)), READ_ONLY)
-    return {"plan": reply.text.strip()}
+    rounds = state.get("plan_rounds", 0)
+    limit = int(rt.options.get("max_plan_rounds", MAX_PLAN_ROUNDS))
+    if rounds >= limit:
+        return {"outcome": "failed", "failure": f"planning round limit reached ({limit} rounds)", STATUS_KEY: "failed"}
+    session, feedback = state.get("plan_session"), state.get("plan_feedback")
+    if session and feedback:
+        # Another planning round: the same session, so the planner remembers the conversation.
+        reply = call(rt, "plan", prompt("replan", comment=feedback, scope=scope_text(rt)), READ_ONLY, resume=session)
+    else:
+        reply = call(rt, "plan", prompt("plan", prompt=state["prompt"], scope=scope_text(rt)), READ_ONLY)
+    return {"plan": reply.text.strip(), "plan_session": reply.session_id or session or "", "plan_feedback": "",
+            "plan_rounds": rounds + 1}
 
 
 @step("approve_plan")
 def approve_plan(state: dict, rt: Runtime) -> dict:
-    answer = rt.ask_human("approve_plan", "plan", "Approve the plan?", plan=state.get("plan", ""))
+    plan_text = state.get("plan", "")
+    questions = asks_questions(plan_text)
+    message = ("The planner has questions. Answer them with Request changes." if questions
+               else "Approve the plan? Request changes to discuss it with the planner.")
+    answer = rt.ask_human("approve_plan", "plan", message, plan=plan_text)
     decision = answer["decision"]
     status = "failed" if decision == "reject" else "succeeded"
     update: dict[str, Any] = {"decision": decision, STATUS_KEY: status}
     if decision == "reject":
         update["outcome"] = "rejected"
-    if decision == "request_changes" and answer.get("comment"):
-        # A plan comment is folded into the plan the next agents see.
-        update["plan"] = state.get("plan", "") + "\n\nReviewer note on the plan: " + answer["comment"]
+    feedback = ""
+    if decision == "request_changes":
+        feedback = answer.get("comment") or ""
+    elif decision == "approve" and questions:
+        feedback = APPROVED_OPEN_QUESTIONS  # a question is not a plan
+    if feedback:
+        # Back to the planner; nothing is built on a plan under discussion.
+        update["plan_feedback"] = feedback
+        update["clarifications"] = [*(state.get("clarifications") or []),
+                                    f"Planner:\n{plan_text}\n\nHuman:\n{feedback}"]
     return update
 
 
 @step("write_tests")
 def write_tests(state: dict, rt: Runtime) -> dict:
     # A separate agent session that sees only the spec (prompt + plan), never the implementation.
-    text = prompt("write_tests", prompt=state["prompt"], plan=state.get("plan", ""), scope=scope_text(rt))
+    text = prompt("write_tests", prompt=state["prompt"], plan=spec(state), scope=scope_text(rt))
     reply = call(rt, "write_tests", text, WRITE)
     return {"tests_summary": reply.text.strip()}
 
 
 @step("implement")
 def implement(state: dict, rt: Runtime) -> dict:
-    text = prompt("implement", prompt=state["prompt"], plan=state.get("plan", ""), scope=scope_text(rt))
+    text = prompt("implement", prompt=state["prompt"], plan=spec(state), scope=scope_text(rt))
     reply = call(rt, "implement", text, WRITE)
     return {"implement_session": reply.session_id or ""}
 
@@ -84,7 +121,7 @@ def implement(state: dict, rt: Runtime) -> dict:
 @step("review")
 def review(state: dict, rt: Runtime) -> dict:
     # Independent: a new session that did not write the code.
-    text = prompt("review", prompt=state["prompt"], plan=state.get("plan", ""), base=rt.base_commit, scope=scope_text(rt))
+    text = prompt("review", prompt=state["prompt"], plan=spec(state), base=rt.base_commit, scope=scope_text(rt))
     reply = call(rt, "review", text, READ_ONLY)
     passed = verdict(reply.text)
     return {

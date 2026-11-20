@@ -1,7 +1,7 @@
 # Jigworks — joint brainstorming and architecture design
 
-- **Version:** 0.7 (prototype scope + human delta loop in the architecture)
-- **Last updated:** 19 Nov 2026
+- **Version:** 0.8 (plan agreed with the human before any code)
+- **Last updated:** 20 Nov 2026
 - **Status:** working design, not a finished technical specification
 - **Context:** take-home case study "Design Your Software Factory" (AI Engineer, FTMO & OANDA); recommended time ~4 h, live demo + backup recording, repo incl. agent instructions, prompts, tests, evals and build log; public/synthetic data only.
 - **Primary use:** AI-first software development (target audience = developers)
@@ -128,6 +128,14 @@ feature-development/
 
 The code of published workflows is never executed in the Hub API process.
 
+**Every workflow agrees its plan with the human before it builds anything.** Request changes at
+the plan approval goes back to the planner, which resumes its own agent session, so it remembers
+the conversation; the planner may reply with `QUESTIONS:` instead of a plan; approving open
+questions sends the planner back to state its assumptions. The planning conversation is passed
+on with the approved plan to every agent after it. Planning rounds are limited (5 in
+`feature-development`). Agreeing on the plan is not a follow-up prompt: it comes before the first
+result, the baseline of the human delta (§8).
+
 ## 6. Versions and distribution
 
 `Draft → Validate → Publish immutable release (workflowId, version, digest) → Channel (stable/beta) → Sync to extension → Run pinned version`
@@ -224,7 +232,8 @@ Every run: who started it, release + digest, model, steps, changed files (git sn
 ## 9. First workflow `feature-development`
 
 ```
-START → plan → [human approve plan] → write_tests (different agent, from the spec)
+START → plan ⇄ [human approve plan]   (questions / request changes → plan again, same session)
+      → write_tests (different agent, from the plan and the planning conversation)
       → implement → review (independent agent)
             review FAIL → fix → review          (iteration limit)
             review PASS → gate (tests + invariant property tests)
@@ -276,6 +285,7 @@ Tooling: pnpm workspace (TS), uv workspace (Python).
 
 ## 13. Decision history
 
+- **v0.8 (20 Nov 2026):** the plan is agreed with the human before any code, in every workflow (§5): request changes at the plan re-plans in the planner's session, the planner may ask questions, the planning conversation goes to the later agents, and plan discussion does not count as a follow-up prompt. `feature-development` 1.5.0 (T18).
 - **v0.7 (19 Nov 2026):** human delta loop added to the architecture (§4, §8; not built); its baseline is the first result of a session, and follow-up prompts count as corrections like hand edits. Request changes added to the human review. Models are set by the workflow release, not in VS Code. Editor: Code/Graph toggle, new file/folder, GitHub source shown as planned, no AI edit box. Hub tabs: "Runs & analytics" merged into one, the HR tab renamed "Non-coding teams". VS Code extension: parallel sessions, prompt in the middle, run view with graph position and % of plan (§7). Tickets live in `tickets/`.
 - **v0.6 (19 Nov 2026):** project named Jigworks, license FSL-1.1-ALv2. Web Hub = writing Python + read-only `get_graph()` graph (visual editing dropped). Distribution via Hub API + `.zip` import fallback. Own analytics (tokens × price list with validity). Hosting on Vercel Services + Neon. Target audience is developers, HR only as a text tab. Governance elements (audit, independent review, human approval) moved into the core because of the case study brief. Prototype scope: runner → extension → minimal Hub.
 - **v0.5:** strictly three-part MVP, no policy engine and no DSL, local execution of a Python LangGraph package.

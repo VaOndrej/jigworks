@@ -17,6 +17,7 @@ A second, smaller workflow so the demo can show two sessions in parallel, each w
 ## Acceptance criteria
 
 - [ ] `workflows/bugfix-with-repro/`: reproduce → failing test → approve repro (`interrupt`) → fix → review → gate → approve PR (`interrupt`) → open PR. Reuses steps from `feature-development` where it can.
+- [ ] The repro approval agrees with the human like the plan in `feature-development` (design.md §5): questions and request changes go back to the reproducing agent in its own session, and the conversation goes on to the later agents.
 - [ ] A synthetic bug in `sample-repo` (rounding before fees in P&L) plus a synthetic export in `sample-repo/fixtures/` to reproduce it.
 - [ ] `uv run pytest workflows/bugfix-with-repro` with a fake adapter covers the happy path and a rejected repro.
 

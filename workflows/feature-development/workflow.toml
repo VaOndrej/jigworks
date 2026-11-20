@@ -1,6 +1,6 @@
 name = "feature-development"
-version = "1.4.0"
-description = "Plan, tests from the spec by a separate agent, implement, independent review, gate (tests, property tests, secret and security scan), human approval, PR."
+version = "1.5.0"
+description = "Plan agreed with the human (questions and revisions in one planner session), tests from the spec by a separate agent, implement, independent review, gate (tests, property tests, secret and security scan), human approval, PR."
 entrypoint = "graph:build_graph"
 minRunnerVersion = "0.1.0"
 plannedPath = ["plan", "approve_plan", "write_tests", "implement", "review", "gate", "approve_pr", "open_pr", "summary"]

@@ -1,6 +1,7 @@
 """feature-development (design.md §9).
 
-START → plan → [approve_plan] → write_tests (separate session, from the spec) → implement
+START → plan ⇄ [approve_plan]   (questions / request changes → plan, same session; round limit)
+      [approve_plan] approve → write_tests (separate session, from the spec) → implement
       → review (independent session)
             review FAIL → fix → review        (fix loop limit)
             review PASS → gate (tests, property tests, secret scan, security scan, scope)
@@ -9,7 +10,7 @@ START → plan → [approve_plan] → write_tests (separate session, from the sp
                   approve         → open_pr → summary → END
                   request changes → fix → gate → [approve_pr]   (follow-up prompt)
                   reject          → END
-      [approve_plan] reject → END · fix loop limit reached → END (run failed)
+      [approve_plan] reject → END · fix or planning round limit reached → END (run failed)
 
 The runner injects the runtime (agent, git, events) through the LangGraph config; this
 package never imports the runner, so it runs from a release bundle as-is.
@@ -32,6 +33,10 @@ class State(TypedDict, total=False):
     commits: Annotated[dict[str, str], merge]  # node → git commit of its last snapshot
     prompt: str
     plan: str
+    plan_session: str  # the planner's agent session, resumed on every planning round
+    plan_feedback: str  # the human's latest answer or comment on the plan, consumed by plan
+    plan_rounds: int  # planner calls so far (limit MAX_PLAN_ROUNDS)
+    clarifications: list[str]  # the planning conversation, passed on with the plan
     tests_summary: str
     implement_session: str
     review_passed: bool
@@ -49,8 +54,15 @@ class State(TypedDict, total=False):
     summary: str
 
 
-def after_plan_approval(state: State) -> Literal["write_tests", "__end__"]:
-    return END if state.get("decision") == "reject" else "write_tests"
+def after_plan(state: State) -> Literal["approve_plan", "__end__"]:
+    return END if state.get("outcome") == "failed" else "approve_plan"
+
+
+def after_plan_approval(state: State) -> Literal["plan", "write_tests", "__end__"]:
+    if state.get("decision") == "reject":
+        return END
+    # A comment, an answer, or an approval of open questions: another planning round.
+    return "plan" if state.get("plan_feedback") else "write_tests"
 
 
 def after_review(state: State) -> Literal["fix", "gate"]:
@@ -90,7 +102,7 @@ def build_graph() -> StateGraph:
     g.add_node("summary", nodes.summary)
 
     g.add_edge(START, "plan")
-    g.add_edge("plan", "approve_plan")
+    g.add_conditional_edges("plan", after_plan)
     g.add_conditional_edges("approve_plan", after_plan_approval)
     g.add_edge("write_tests", "implement")
     g.add_edge("implement", "review")

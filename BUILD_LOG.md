@@ -17,7 +17,8 @@ Time is tracked in two columns: **human** (my own time: deciding, directing, rev
 | Extension hub connection (gear, connect flow, status line) | 2 min | ~25 min |
 | Hub sample-data reset, worktree cleanup | 2 min | ~20 min |
 | Hub validation: relative imports | 1 min | ~10 min |
-| **Total** | **3 h 21 min** | **~8 h 30 min** |
+| Plan agreed with the human (T18, feature-development 1.5.0) | 3 min | ~40 min |
+| **Total** | **3 h 24 min** | **~9 h 10 min** |
 
 ## Entries
 
@@ -263,4 +264,26 @@ Two Claude Code sessions (Opus 5.5) in their own worktrees, pushing to `feature/
 **What went wrong / changed course**
 - The hub's validation and the runner's loader are two copies of the same import rule. Nothing
   tied them together; the new test is the tie for now.
+
+### 2026-11-20 — Plan agreed with the human, feature-development 1.5.0 (human 3 min, agent ~40 min)
+
+**What I delegated**
+- T18: Request changes at the plan now re-plans in the planner's own session instead of
+  appending the comment and building on; the planner may answer `QUESTIONS:`; the planning
+  conversation goes to `write_tests`, `implement` and `review`; at most 5 planning rounds.
+  Four tests written red first through `WorkflowRun` + the fake adapter.
+- The runner ledger counts only PR-stage Request changes as follow-up prompts, so agreeing on
+  the plan does not show up as a correction in the human delta.
+- Three runner tests had the workflow version hard-coded; bumped to 1.5.0.
+
+**What I reviewed / decided myself**
+- That every workflow must agree its plan with the human, with memory, before implementation.
+
+**What I wrote by hand**
+- Nothing.
+
+**What went wrong / changed course**
+- The first run of the round-limit test hung (no limit yet, so the loop never ended) and was
+  stopped by hand; the limit made it pass.
+- Only the fake adapter is verified; a real `claude -p` questions round has not been run.
 
