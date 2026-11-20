@@ -100,7 +100,7 @@ Setup notes:
   and Preview, and `.env.local` was updated through a prompt that does not echo it. Rate
   limiting and revocable sessions are still follow-ups.
 
-### 5.2 Major finding (needs a design decision, not fixed): the invariant guard is editable
+### 5.2 Major finding (fixed after the merge, see the next PR): the invariant guard was editable
 
 - The gate runs `sample-repo/tests/test_invariants.py` from the run's own worktree
   (`workflows/feature-development/steps/gate.py:31`).

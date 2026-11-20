@@ -13,7 +13,8 @@ Time is tracked in two columns: **human** (my own time: deciding, directing, rev
 | Public-repo secret audit | 2 min | ~5 min |
 | Overnight two-agent build (HUB + LOCAL, in parallel) | ~2 min | ~2 h 55 min (HUB ~1 h 25 min + LOCAL ~1 h 30 min; ~1 h 30 min wall clock) |
 | Morning review and merge | 10 min | ~1 h 20 min |
-| **Total** | **3 h 14 min** | **~6 h 50 min** |
+| Login rate limit, invariant guard, extension guide | 2 min | ~45 min |
+| **Total** | **3 h 16 min** | **~7 h 35 min** |
 
 ## Entries
 
@@ -171,4 +172,29 @@ Two Claude Code sessions (Opus 5.5) in their own worktrees, pushing to `feature/
 - The first gate run had 3 red gates (`uv run pytest`, `verify:hub`, `verify:local`); all green after the fixes.
 - The disk had 226 MB free; the agent cleared the npm download cache (9.3 GB). Docker Desktop's engine still does not start, so the DB gates ran on the Postgres HUB left on port 54329.
 - Open after the merge: the invariant property tests can be edited by the `implement` and `fix` agents (design decision needed, §5.2 of the review); no rate limit on the hub login; preview DB full of `smoke-check` data; `BLOB_READ_WRITE_TOKEN` should be rotated to type Secret.
+
+### 2026-11-20 — Login rate limit, invariant guard, extension guide (human 2 min, agent ~45 min)
+
+**What I delegated**
+- A rate limit on guessing the hub password. It counts per client IP in Postgres, because Vercel
+  instances share no memory. After 10 wrong passwords within 15 min, the API answers 429 with
+  `Retry-After`, even for the right password. It covers both ways in: `POST /api/session` and a
+  wrong `X-Jigworks-Key` on any endpoint, which the first idea (the login endpoint only) would
+  have missed. 6 API tests, written red first.
+- The invariant guard. A new gate check, *protected tests*, makes everything `write_tests` left
+  in `sample-repo/tests/` read-only for `implement` and `fix`, as well as any `conftest.py`, the
+  pytest configuration and `INVARIANTS.md`. New test files are still allowed. 3 workflow tests:
+  an implementer who guts the property tests and breaks I1 is caught; `write_tests` may extend
+  the invariant tests; a planted `conftest.py` that weakens Hypothesis is caught.
+- `docs/guide-vscode-extension.md`.
+
+**What I reviewed / decided myself**
+- That both fixes were required, not optional follow-ups.
+
+**What went wrong / changed course**
+- The guide had to warn about something the night left implicit: `open_pr` pushes to `origin`,
+  the public GitHub repo, by default. The guide sends the PR branch to a local bare repo instead.
+- The hub's production `stable` channel is the contract's sample release 1.3.0, which does not
+  call agents. The real 1.4.0 has to be published first; the command is in the guide, and
+  nothing was published to production.
 
