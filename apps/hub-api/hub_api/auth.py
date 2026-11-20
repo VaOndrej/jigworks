@@ -11,10 +11,12 @@ import hashlib
 import hmac
 
 from jigworks_contracts import HUB_KEY_HEADER, HUB_SESSION_COOKIE, PUBLIC_ENDPOINTS
+from starlette.concurrency import run_in_threadpool
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from .config import settings
 from .errors import error_response
+from .ratelimit import client_ip, rate_limited, record_failure, retry_after
 
 SESSION_MAX_AGE = 30 * 24 * 3600
 PUBLIC = {tuple(e.split(" ", 1)) for e in PUBLIC_ENDPOINTS}
@@ -60,7 +62,19 @@ class HubPasswordMiddleware:
         if (method, path) in PUBLIC or not path.startswith("/api/"):
             return await self.app(scope, receive, send)
         headers = {k.decode().lower(): v.decode() for k, v in scope["headers"]}
-        if is_authorized(headers, _cookies(headers.get("cookie", ""))):
+        key = headers.get(HUB_KEY_HEADER.lower())
+        if key is not None:
+            # A key header is a password attempt: rate limited like POST /api/session.
+            ip = client_ip(headers, (scope.get("client") or (None,))[0])
+            wait = await run_in_threadpool(retry_after, ip)
+            if wait is not None:
+                return await rate_limited(wait)(scope, receive, send)
+            password = settings().hub_password
+            if password and password_ok(key, password):
+                return await self.app(scope, receive, send)
+            if password:
+                await run_in_threadpool(record_failure, ip)
+        elif is_authorized(headers, _cookies(headers.get("cookie", ""))):
             return await self.app(scope, receive, send)
         message = (
             "hub password is not configured (HUB_PASSWORD)"

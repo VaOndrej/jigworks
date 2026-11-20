@@ -49,6 +49,7 @@ from .auth import SESSION_MAX_AGE, HubPasswordMiddleware, password_ok, session_t
 from .config import settings
 from .db import connect
 from .errors import ApiError, install, not_found
+from .ratelimit import client_ip, rate_limited, record_failure, retry_after
 from .extensions import Overview
 
 PUBLIC: list[dict] = []
@@ -57,6 +58,7 @@ ERRORS = {
     404: {"model": ErrorResponse, "description": "Not found."},
     422: {"model": ErrorResponse, "description": "Body does not match the contract."},
 }
+RATE_LIMITED = {"model": ErrorResponse, "description": "Too many wrong hub passwords from this IP; see Retry-After."}
 WorkflowIdPath = Annotated[str, Path(pattern=r"^[a-z0-9][a-z0-9-]*$", examples=["feature-development"])]
 RunIdPath = Annotated[str, Path(min_length=1, max_length=128, examples=["run_123"])]
 Channel = Literal["stable", "beta"]
@@ -90,10 +92,16 @@ def _secure(request: Request) -> bool:
 
 
 @app.post("/api/session", status_code=204, tags=["public"], openapi_extra={"security": PUBLIC},
-          responses={401: ERRORS[401], 204: {"description": f"Sets the HTTP-only `{HUB_SESSION_COOKIE}` cookie."}})
+          responses={401: ERRORS[401], 429: RATE_LIMITED,
+                     204: {"description": f"Sets the HTTP-only `{HUB_SESSION_COOKIE}` cookie."}})
 def create_session(body: SessionRequest, request: Request) -> Response:
     password = settings().hub_password
+    ip = client_ip(request.headers, request.client.host if request.client else None)
+    wait = retry_after(ip)
+    if wait is not None:
+        return rate_limited(wait)
     if not password or not password_ok(body.password, password):
+        record_failure(ip)
         raise ApiError(401, "unauthorized", "wrong hub password")
     response = Response(status_code=204)
     response.set_cookie(HUB_SESSION_COOKIE, session_token(password), max_age=SESSION_MAX_AGE, httponly=True,
