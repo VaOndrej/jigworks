@@ -47,6 +47,7 @@ T00 comes first because the adapter, the contracts and the cost analytics all de
 | T22 | [Fix loops that ask the human instead of failing (`feature-development` 1.7.0)](../tickets/prototype/T22-fix-loop-escalation.md) | milestone-1 | M | no | T20 |
 | T23 | [Milestones as tickets, review every few tickets](../tickets/prototype/T23-milestone-tickets.md) | milestone-1 | L | no | T22 |
 | T24 | [Hub analytics: resumed runs stay live, every model has a price](../tickets/prototype/T24-hub-resumed-runs-and-prices.md) | milestone-1 | S | no | T13, T22 |
+| T25 | [Blocked fixer, gate deadlocks, usage of resumed sessions](../tickets/prototype/T25-blocked-fixer-and-session-usage.md) | milestone-1 | M | no | T22, T24 |
 | T10 | [.zip import fallback](../tickets/prototype/T10-extension-zip-import.md) | milestone-2 | S | no | T09 |
 | | **— CUT LINE —** | | | | |
 | T11 | [Vercel setup (dashboard steps)](../tickets/prototype/T11-vercel-setup.md) | milestone-3 | S | no | T01 |

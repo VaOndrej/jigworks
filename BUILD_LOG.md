@@ -30,7 +30,8 @@ Time is tracked in two columns: **human** (my own time: deciding, directing, rev
 | Fix loops that ask the human, resume after the limit, release skills (T22, T23 ticket) | 5 min | ~1 h 10 min |
 | Demo application review, case-study reply, time reconciliation | 28 min | — |
 | Hub analytics: resumed runs, missing prices (T24) | 2 min | ~25 min |
-| **Total** | **5 h 32 min** | **~15 h 10 min** |
+| Blocked fixer, gate deadlocks, usage of resumed sessions (T25) | 5 min | ~1 h 10 min |
+| **Total** | **5 h 37 min** | **~16 h 20 min** |
 
 ## Entries
 
@@ -509,3 +510,24 @@ Two Claude Code sessions (Opus 5.5) in their own worktrees, pushing to `feature/
 - Two independent bugs looked like one "analytics is empty" symptom: a resumed run (T22's `resume --more-fixes`) was projected as `failed` because the old `run_finished` summary was applied last, and the production database never got the 5.5 prices because the seed runs only into an empty database (Haiku 5.5 had no price at all). The hub now adds missing price rows on every start.
 - `pnpm verify:hub` tests the Vercel preview, not the working tree; its Workflows test fails on a stale `stable 1.3.0` assertion (pre-existing, left for later).
 - The time totals were reconciled to exactly 5 h 30 min human for the case-study reply; this entry moves them to 5 h 32 min.
+
+### 2026-11-20 — Blocked fixer, gate deadlocks, usage of resumed sessions (T25) (human 5 min, agent ~1 h 10 min)
+
+**What I did**
+- Watched the real demo run loop through fix rounds that changed nothing at a reported $168, then fail the gate on files the fixer may not touch; asked whether it is a workflow bug and to fix everything for 1.7.0, including the cost in the extension.
+- Ran the vendoring command the fixer asked for by hand.
+
+**What I delegated**
+- Diagnosis from the run's `events.jsonl`, a 4-call measurement of `claude -p --resume` usage, the fixes in runner, workflow, gate, hub and extension with a failing test each, ticket T25.
+
+**What I reviewed / decided myself**
+- Fix all of it at once and ship it as 1.7.0 (not published yet).
+
+**What I wrote by hand**
+- Nothing.
+
+**What went wrong / changed course**
+- The cost bug came from a CLI change: the T00 spike observed per-call usage on `--resume`; CLI 2.1.329 reports the session's running total. The fixer session was counted 22 times ($195 shown, ~$25 real), and T24's "$117 = CLI" evidence was inflated the same way.
+- The first runner fix subtracted the sum of earlier records; a run with old running totals followed by new per-call records would then subtract the wrong base. Replaced by one rule shared by runner, hub and extension (leading running totals, then per call). It is a heuristic because the frozen UsageRecord has no field for it.
+- The rule first treated two equal records as a running total that did not grow, which zeroed a contract fixture's repeated calls; a running total must grow in output.
+- New 1.7.0 behaviour broke the existing fake fixers that changed nothing; they now touch a file each round.

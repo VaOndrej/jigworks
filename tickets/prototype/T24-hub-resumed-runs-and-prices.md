@@ -34,6 +34,7 @@ while it was live in the extension (review / fix loop, 64 %). Two bugs:
 
 - Contract fixture change (`prices.json`), approved by the human in the session; the schema is unchanged.
 - Haiku 5.5 input/output ($0.10 / $0.50 per MTok) come from the Anthropic price list. The cache rows ($0.20 write, $0.005 read) are derived with the same ratios as the other 5.5 rows in this file and are **not verified**; the >100K-token prompt tier ($0.50 / $2.50) is not modelled. On the real run Haiku is $0.07 of $117, so the error is negligible.
+- The $117.09 below is inflated: the runner recorded running totals of resumed sessions per call (fixed in T25; the real run costs ~$25). The price table still matches the CLI's own number, which is what this check shows.
 - `pnpm verify:hub` runs Playwright against the Vercel preview (not this change); its Workflows test fails on `stable 1.3.0` because the shared preview database now has newer stable releases. Pre-existing, not fixed here.
 
 ## Evidence
