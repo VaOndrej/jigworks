@@ -24,8 +24,10 @@ Time is tracked in two columns: **human** (my own time: deciding, directing, rev
 | Release skills as a Claude Code plugin, PR conflicts (T19) | 2 min | ~30 min |
 | Brainstorming route, structured context (T20, feature-development 1.6.0) | 3 min | ~1 h |
 | Extension: collapsible live view, Markdown for agent text | 2 min | ~25 min |
-| Extension: gate input, honest gate states, session tabs, live run (T21) | ~10 min | ~1 h |
-| **Total** | **~4 h 47 min** | **~13 h 35 min** |
+| Brainstorming the extension improvements (T21) | 10 min | — |
+| Extension: gate input, honest gate states, session tabs, live run (T21) | — | ~1 h |
+| Brainstorming the demo application | 10 min | — |
+| **Total** | **4 h 57 min** | **~13 h 35 min** |
 
 ## Entries
 
@@ -416,7 +418,15 @@ Two Claude Code sessions (Opus 5.5) in their own worktrees, pushing to `feature/
 - Nothing notable. The live view stays open by default; it does not collapse on its own when
   a decision is waiting.
 
-### 2026-11-20 — T21: gate input, honest gate states, session tabs, a run that looks alive (human ~10 min, agent ~1 h)
+### 2026-11-20 — Brainstorming: extension improvements and the demo application (human 20 min)
+
+**What I did**
+- 10 min brainstorming the extension improvements that became T21: what I saw while using the
+  extension on a real run (lost answers at the gate, a gate that looked approved, tabs that say
+  nothing, a step that looks frozen), written up as the T21 brief.
+- 10 min brainstorming the demo application built with the workflow in `demo/`.
+
+### 2026-11-20 — T21: gate input, honest gate states, session tabs, a run that looks alive (human: in the brainstorming above, agent ~1 h)
 
 **What I delegated**
 - Gate input: Enter sends the typed text as Request changes, Shift+Enter is a newline, Approve is
