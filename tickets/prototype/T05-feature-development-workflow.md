@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | done |
+| Status | review |
 | Owner | local |
 | Label | `milestone-1` |
 | Size | L |
@@ -20,8 +20,10 @@ The LangGraph graph from design.md §9 as a workflow package (design.md §5).
 - [x] Nodes: plan → approve plan (`interrupt`) → write_tests (separate agent session, from the spec only) → implement → review (independent session) → fix loop with an iteration limit → gate (tests + property tests) → review (`interrupt`: approve / request changes / reject; request changes routes the comment to fix → gate → review again) → open PR → summary.
 - [x] `workflow.toml` has `[models]` (default + optional per node); the runner passes them to the adapter. VS Code never chooses the model.
 - [x] The runner records `first_result_commit` at the first review and the number of follow-up prompts in the audit log (input for the planned human delta).
-- [x] Open PR: pushes a branch `demo/<runId>` to this repo and runs `gh pr create` against it; the agent may only change files under `sample-repo/`.
+- [ ] Open PR: pushes a branch `demo/<runId>` to this repo and runs `gh pr create` against it; the agent may only change files under `sample-repo/`.
+  - *Morning review (20 Nov 2026): partly met.* The push of `demo/<runId>` and the `sample-repo/` scope are tested; `gh pr create` (`engine.default_pr_opener`) is implemented but never ran (tests and the T06 live run use a local bare remote). Unticked until it runs once against GitHub.
 - [x] The gate also runs a secret scan (gitleaks) and a static security scan (semgrep or bandit) on the diff; a finding fails the gate like a failing test.
+  - *Morning review (20 Nov 2026):* gitleaks was installed this morning, and its branch was broken: `gitleaks git --log-opts=base..HEAD` scanned every commit of the run, so a key that `fix` removed again kept failing the gate until the fix loop limit (`test_planted_secret_fails_the_gate` failed). The gate now feeds the added lines of the net diff to `gitleaks stdin`; the test runs for both scanners (`[built-in]`, `[gitleaks]`, skipped when gitleaks is missing) and checks the key never appears in the gate result.
 - [x] `uv run pytest workflows/feature-development` with a fake adapter covers: review FAIL → fix → PASS, gate FAIL → fix → PASS, iteration limit reached, reject at an interrupt, request changes → fix → gate → review, a planted fake secret in the diff fails the gate.
 - [x] `uv run python -m workflows.feature_development.export_graph` prints the `get_graph()` JSON.
 
