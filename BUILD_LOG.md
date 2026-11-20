@@ -29,7 +29,8 @@ Time is tracked in two columns: **human** (my own time: deciding, directing, rev
 | Brainstorming the demo application | 10 min | — |
 | Fix loops that ask the human, resume after the limit, release skills (T22, T23 ticket) | 5 min | ~1 h 10 min |
 | Demo application review, case-study reply, time reconciliation | 28 min | — |
-| **Total** | **5 h 30 min** | **~14 h 45 min** |
+| Hub analytics: resumed runs, missing prices (T24) | 2 min | ~25 min |
+| **Total** | **5 h 32 min** | **~15 h 10 min** |
 
 ## Entries
 
@@ -490,3 +491,21 @@ Two Claude Code sessions (Opus 5.5) in their own worktrees, pushing to `feature/
   the source of truth. This entry is booked at 28 min (my estimate was ~30 min) so the total is
   exactly 5 h 30 min.
 
+### 2026-11-20 — Hub analytics: resumed runs, missing prices (T24) (human 2 min, agent ~25 min)
+
+**What I did**
+- Noticed that Runs & analytics showed my live run as "0 running" and "$0.00" and asked why.
+
+**What I delegated**
+- Diagnosis and fix to one Claude Code session: replaying the real run's `events.jsonl` through the hub projection, a failing test per bug, the fix, ticket T24, PR.
+
+**What I reviewed / decided myself**
+- Approved the contract fixture change (`prices.json`) and the fix for both bugs.
+
+**What I wrote by hand**
+- Nothing.
+
+**What went wrong / changed course**
+- Two independent bugs looked like one "analytics is empty" symptom: a resumed run (T22's `resume --more-fixes`) was projected as `failed` because the old `run_finished` summary was applied last, and the production database never got the 5.5 prices because the seed runs only into an empty database (Haiku 5.5 had no price at all). The hub now adds missing price rows on every start.
+- `pnpm verify:hub` tests the Vercel preview, not the working tree; its Workflows test fails on a stale `stable 1.3.0` assertion (pre-existing, left for later).
+- The time totals were reconciled to exactly 5 h 30 min human for the case-study reply; this entry moves them to 5 h 32 min.
