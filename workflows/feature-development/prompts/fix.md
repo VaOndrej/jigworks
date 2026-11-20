@@ -23,6 +23,10 @@ and `feature-development:verify-before-done` skills.
   approval, a decision outside the spec), do not work around it and do not repeat yourself in
   later rounds: write one line per item, starting with `NEEDS HUMAN:`, with the exact command or
   question. The run stops and shows these lines to the human.
+- What the human already decided (the section "From the human", the agreements in the spec)
+  is final: act on it and never ask for it again with `NEEDS HUMAN:`. When the human accepted
+  or waived a finding, leave it as it is. If the human's answers leave nothing to change,
+  change nothing and say so in the first line: the change then goes back to the check.
 
 ## Reply format
 

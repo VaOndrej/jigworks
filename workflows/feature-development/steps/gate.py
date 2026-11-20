@@ -227,8 +227,17 @@ def written_by_tests(cwd: Path, base: str, tests_base: str) -> set[str]:
     return set(_git(cwd, "diff", "--name-only", "--no-renames", base, tests_base).splitlines()) if tests_base != base else set()
 
 
-def _protected(cwd: Path, base: str, tests_base: str, cfg: dict[str, Any]) -> dict[str, Any]:
-    """Files implement/fix changed since write_tests that they may not touch."""
+def content_id(cwd: Path, path: str) -> str:
+    """What the human accepts for a protected file: the git blob hash of its current content."""
+    return _git(cwd, "hash-object", "--", path).strip() if (cwd / path).is_file() else "deleted"
+
+
+def protected_changes(cwd: Path, base: str, tests_base: str, cfg: dict[str, Any],
+                      accepted: dict[str, str] | None = None) -> list[tuple[str, str]]:
+    """(path, label) of every file implement/fix changed since write_tests that they may not
+    touch, except changes the human accepted at approve_fix (pinned to the exact content: any
+    later edit counts again)."""
+    accepted = accepted or {}
     root = gate_root(cfg["scope"])
     by_tests = written_by_tests(cwd, base, tests_base)
     out = _git(cwd, "diff", "--name-status", "--no-renames", tests_base).splitlines()
@@ -242,7 +251,7 @@ def _protected(cwd: Path, base: str, tests_base: str, cfg: dict[str, Any]) -> di
                 before = _test_settings(name, _show(cwd, tests_base, path))
                 now = _test_settings(name, (cwd / path).read_text() if (cwd / path).is_file() else None)
                 if before is not None and before != now:
-                    touched.append(f"{path} (test script)")
+                    touched.append((path, f"{path} (test script)"))
             continue
         in_dirs = any(path.startswith(d) for d in cfg["protected_dirs"])
         if name == INVARIANTS and status == "A" and path not in by_tests:
@@ -254,15 +263,22 @@ def _protected(cwd: Path, base: str, tests_base: str, cfg: dict[str, Any]) -> di
             or name in cfg["protected_names"]
             or path == root + CONFIG
         ):
-            touched.append(path)
+            touched.append((path, path))
+    return [(p, label) for p, label in dict.fromkeys(touched) if accepted.get(p) != content_id(cwd, p)]
+
+
+def _protected(cwd: Path, base: str, tests_base: str, cfg: dict[str, Any],
+               accepted: dict[str, str] | None = None) -> dict[str, Any]:
+    touched = [label for _, label in protected_changes(cwd, base, tests_base, cfg, accepted)]
     check = {"name": "protected tests", "kind": "other", "passed": not touched}
     if touched:
         check["findings"] = len(touched)
         check["summary"] = (
             "changed after write_tests: " + ", ".join(sorted(set(touched))[:10])
             + ". The tests from write_tests, the test configuration and test script, INVARIANTS.md and"
-            f" {CONFIG} are read-only for implement and fix: restore them and fix the code. If a test"
-            " itself is wrong, say so; a human decides (reject the run and start again)."
+            f" {CONFIG} are read-only for implement and fix: restore them and fix the code. If the human"
+            " ruled that a test is wrong (or it is), keep the change and write `NEEDS HUMAN: accept the"
+            " change to <path>`: the human sees the diff and can accept exactly that content."
         )
     else:
         check["summary"] = "ok"
@@ -344,11 +360,12 @@ def settings(cwd: Path, base: str, overrides: dict[str, Any] | None = None) -> d
 
 
 def run_gate(cwd: Path, base: str, overrides: dict[str, Any] | None = None,
-             tests_base: str | None = None) -> dict[str, Any]:
-    """`tests_base` is the commit of write_tests; without one, the run's base commit."""
+             tests_base: str | None = None, accepted: dict[str, str] | None = None) -> dict[str, Any]:
+    """`tests_base` is the commit of write_tests; without one, the run's base commit.
+    `accepted`: protected files the human accepted at approve_fix, path → content_id()."""
     cfg = settings(cwd, base, overrides)
     files = changed_files(cwd, base)
-    checks = [_scope(files, cfg["scope"]), _protected(cwd, base, tests_base or base, cfg)]
+    checks = [_scope(files, cfg["scope"]), _protected(cwd, base, tests_base or base, cfg, accepted)]
     for cmd in _commands(cfg.get("setup")):
         checks.append(_command("setup", "other", cmd, cwd, cfg))
     tests = _commands(cfg.get("tests"))

@@ -127,7 +127,7 @@ def spec(state: dict) -> str:
     parts = [
         section("Approved plan", state.get("plan")),
         section("Approved design (agreed with the human while brainstorming)", state.get("design")),
-        section("Agreed with the human while planning", "\n\n".join(talk)),
+        section("Agreed with the human (planning, review and fix rounds; these decisions are final)", "\n\n".join(talk)),
     ]
     return "\n\n".join(p for p in parts if p)
 
@@ -150,8 +150,9 @@ def verdict(text: str) -> bool:
 
 
 def is_fixed(rest: str) -> bool:
-    """`FIXED`, `— fixed`, `: Fixed.` after a finding ID; `NOT FIXED` is open."""
-    return rest.strip(" \t-—–:*").upper().startswith("FIXED")
+    """`FIXED`, `— fixed`, `: Fixed.` after a finding ID, or `ACCEPTED` (the human accepted or
+    waived it); `NOT FIXED` is open."""
+    return rest.strip(" \t-—–:*").upper().startswith(("FIXED", "ACCEPTED"))
 
 
 def open_findings(text: str) -> int:
@@ -170,6 +171,11 @@ def first_open_finding(text: str) -> str:
         if found and not is_fixed(found.group(2)):
             return first_line(line)
     return first_line(text)
+
+
+def without_questions(text: str) -> str:
+    """A review reply without its QUESTION lines (once the human has answered them)."""
+    return "\n".join(ln for ln in (text or "").splitlines() if not REVIEW_QUESTION.match(ln)).strip()
 
 
 def review_questions(text: str) -> list[str]:
@@ -246,19 +252,27 @@ NO_CHANGES = "no changes"
 CHECK_NAMES = {"review": "independent review", "gate": "gate"}
 WHY = {
     "questions": "The reviewer has questions only you can answer. Answer them in the comment field.",
-    "needs_human": "The fixer is blocked on something only you can do (see below). Do it, then Continue.",
-    "no_changes": "The last fix changed nothing; another round would cost tokens without progress.",
+    "needs_human": "The fixer is blocked on something only you can do (see below). Do it and say what you did, "
+                   "or Approve to re-run the check as it is.",
+    "no_changes": "The last fix changed nothing and nobody had answered since the last check; another fix "
+                  "round would cost tokens without progress.",
     "stalled": f"The last {STALL_ROUNDS} fixes did not lower the number of open problems.",
     "limit": "The fixes reached their cap.",
 }
 
 
-def fix_report(state: dict) -> str:
+def fix_report(state: dict, protected: str = "") -> str:
     """Markdown the human reads at approve_fix: why, the reviewer's questions, every round
-    (what was found, what the fixer changed) and the trend of open problems."""
+    (what was found, what the fixer changed) and the trend of open problems. `protected`: the
+    diff of protected files the gate rejects, which Approve accepts."""
     history = state.get("fix_history") or []
     reason = state.get("escalation", "")
     parts = [f"**Why you are asked:** {WHY.get(reason, reason)}"]
+    if protected:
+        parts.append("## Changes to protected files\n\nThe gate rejects these changes to files the agents may not "
+                     "touch (tests from write_tests, test configuration, INVARIANTS.md). **Approve accepts exactly "
+                     "this content** and re-runs the gate; any later edit of these files fails it again. To have "
+                     "them restored instead, say so in the comment.\n\n" + protected)
     questions = state.get("review_questions") or []
     if questions:
         parts.append("## Questions from the reviewer\n\n" + "\n".join(f"{i}. {q}" for i, q in enumerate(questions, 1)))
@@ -285,10 +299,26 @@ def fix_report(state: dict) -> str:
         counts = [str(h["open"]) for h in history if h.get("kind") == "check" and h.get("check") == check]
         if len(counts) > 1:
             parts.append(f"**Open {CHECK_NAMES[check]} problems per round:** {' → '.join(counts)}")
-    latest = state.get("review_findings") if state.get("fix_target") == "review" else state.get("gate_report")
+    check = state.get("fix_target", "review")
+    latest = state.get("review_findings") if check == "review" else state.get("gate_report")
     if latest:
-        parts.append("## Latest findings\n\n" + latest)
+        if answered_since_check(history):
+            # The human already answered after this check: show what it found, not its questions again.
+            parts.append(f"## Findings of the last {CHECK_NAMES.get(check, check)} (before your answers above)\n\n"
+                         + without_questions(latest))
+        else:
+            parts.append("## Latest findings\n\n" + latest)
     return "\n\n".join(parts)
+
+
+def answered_since_check(history: list[dict]) -> bool:
+    """The human decided at approve_fix after the last review or gate."""
+    for h in reversed(history):
+        if h.get("kind") == "check":
+            return False
+        if h.get("kind") == "human":
+            return True
+    return False
 
 
 def record_check(state: dict, rt: Runtime, check: str, passed: bool, problems: int, note: str,
@@ -475,7 +505,10 @@ def fix(state: dict, rt: Runtime) -> dict:
     needs = fixer_needs(reply.text)
     # A fixer that is blocked or changed nothing goes straight to the human: another review
     # round would only re-find the same problems (and a new reviewer words them differently).
-    escalate = "needs_human" if needs else ("no_changes" if changed == NO_CHANGES else "")
+    # Except right after the human answered: then changing nothing is the right fix (the answer
+    # settled it), and only a new check can tell; asking the human again would loop
+    # approve_fix → fix → approve_fix forever (run_20261120161021_60bbf3).
+    escalate = "needs_human" if needs else ("no_changes" if changed == NO_CHANGES and not human.strip() else "")
     update: dict[str, Any] = {"fix_loops": loops + 1, "implement_summary": reply.text.strip(), "fix_history": history,
                               "fix_note": "", "fixer_requests": needs, "escalation": escalate}
     if reply.session_id:
@@ -486,7 +519,8 @@ def fix(state: dict, rt: Runtime) -> dict:
 @step("gate")
 def gate(state: dict, rt: Runtime) -> dict:
     result = gate_checks.run_gate(rt.cwd, rt.base_commit, rt.options.get("gate"),
-                                  tests_base=(state.get("commits") or {}).get("write_tests"))
+                                  tests_base=(state.get("commits") or {}).get("write_tests"),
+                                  accepted=state.get("protected_accepted"))
     return {
         "gate_passed": result["passed"],
         "gate_report": gate_checks.report(result),
@@ -497,6 +531,29 @@ def gate(state: dict, rt: Runtime) -> dict:
         GATE_KEY: result,
         STATUS_KEY: "succeeded" if result["passed"] else "failed",
     }
+
+
+PROTECTED_DIFF_LIMIT = 8000
+
+
+def protected_pending(state: dict, rt: Runtime) -> tuple[dict[str, str], str]:
+    """Protected files the last gate rejected and the human has not accepted: path →
+    content_id, and their diff since write_tests (what the human accepts with Approve)."""
+    tests_base = (state.get("commits") or {}).get("write_tests")
+    if state.get("fix_target") != "gate" or not tests_base:
+        return {}, ""
+    cwd = Path(rt.cwd)
+    cfg = gate_checks.settings(cwd, rt.base_commit, rt.options.get("gate"))
+    changes = gate_checks.protected_changes(cwd, rt.base_commit, tests_base, cfg, state.get("protected_accepted"))
+    paths = list(dict.fromkeys(p for p, _ in changes))
+    if not paths:
+        return {}, ""
+    diff = subprocess.run(["git", "diff", "--no-color", tests_base, "--", *paths], cwd=cwd, capture_output=True,
+                          text=True).stdout
+    if len(diff) > PROTECTED_DIFF_LIMIT:
+        diff = diff[:PROTECTED_DIFF_LIMIT] + f"\n… (cut; the whole diff: git diff {tests_base[:12]} -- {' '.join(paths)})"
+    listing = "\n".join(f"- `{label}`" for _, label in changes)
+    return {p: gate_checks.content_id(cwd, p) for p in paths}, f"{listing}\n\n```diff\n{diff.strip()}\n```"
 
 
 @step("approve_fix")
@@ -515,11 +572,17 @@ def approve_fix(state: dict, rt: Runtime) -> dict:
         "limit": f"{loops} fixes so far: the cap is reached. Approve to continue ({EXTRA_FIXES} more fixes), "
                  "type a hint for the fixer and press Enter, or Reject to stop the run.",
         "needs_human": "The fixer is blocked on something only you can do. Do it, then type what you did and "
-                       "press Enter (the fixer reads it first), or Reject to stop the run.",
-        "no_changes": "The last fix changed nothing. Type a hint for the fixer and press Enter, Approve to let it "
-                      "try again, or Reject to stop the run.",
+                       "press Enter (the fixer reads it first), Approve to re-run the "
+                       f"{CHECK_NAMES.get(state.get('fix_target', 'review'), 'check')} as it is, or Reject to stop the run.",
+        "no_changes": f"The last fix changed nothing. Approve to re-run the {CHECK_NAMES.get(state.get('fix_target', 'review'), 'check')} "
+                      "on the current change, type a hint for the fixer and press Enter, or Reject to stop the run.",
     }.get(reason, "Approve to continue fixing, type a hint and press Enter, or Reject to stop.")
-    answer = rt.ask_human("approve_fix", "plan", message, plan=fix_report(state))
+    pending, protected = protected_pending(state, rt)
+    if pending:
+        message = ("The gate rejects changes to protected files (see the report). Approve accepts exactly these "
+                   "changes and re-runs the gate; type a comment for the fixer instead (e.g. restore them), or "
+                   "Reject to stop the run.")
+    answer = rt.ask_human("approve_fix", "plan", message, plan=fix_report(state, protected))
     decision = answer["decision"]
     if decision == "reject":
         return {"decision": decision, "outcome": "rejected", "escalation": "",
@@ -528,21 +591,43 @@ def approve_fix(state: dict, rt: Runtime) -> dict:
     if not comment and reason == "questions":
         comment = ("The human approved without answering the reviewer's questions. Decide them yourself "
                    "(the option the reviewer recommended) and say so in your reply.")
-    history = [*(state.get("fix_history") or []),
-               {"kind": "human", "decision": "continue", "note": first_line(comment) if comment else f"+{EXTRA_FIXES} fixes"}]
+    accept = decision == "approve" and bool(pending)
+    # Approve after a fix that changed nothing or that only the human could unblock: nothing new
+    # for the fixer, so check the change again (accepted protected files: the gate again).
+    recheck = accept or (reason in ("no_changes", "needs_human") and not comment)
+    check = state.get("fix_target", "review")
+    note = first_line(comment) if comment else (f"re-run the {check}" if recheck else f"+{EXTRA_FIXES} fixes")
+    if accept:
+        note = "accepted the changes to " + ", ".join(pending)
+    history = [*(state.get("fix_history") or []), {"kind": "human", "decision": "continue", "note": note}]
     update: dict[str, Any] = {
         "decision": decision,
         "escalation": "",
+        "recheck": recheck,
         "fix_cap": loops + EXTRA_FIXES,
         "fix_history": history,
         "fix_stall_from": len(history),
         "fix_note": comment,
         "fixer_requests": [],
+        "review_questions": [],  # answered (or left to the fixer): never shown again
         STATUS_KEY: "succeeded",
     }
-    if comment and reason == "questions":
-        talk = "\n".join(f"- {q}" for q in state.get("review_questions") or [])
-        update["clarifications"] = [*(state.get("clarifications") or []), f"Reviewer asked:\n{talk}\n\nHuman:\n{comment}"]
+    if accept:
+        update["protected_accepted"] = {**(state.get("protected_accepted") or {}), **pending}
+        update["clarifications"] = [*(state.get("clarifications") or []),
+                                    "The human accepted these changes to protected files (final; do not restore "
+                                    "them): " + ", ".join(pending)]
+    if comment:
+        # Every answer is kept for the rest of the run (spec()), so the next reviewer and fixer
+        # see it too and nobody asks the same thing again.
+        who, asked = {"questions": ("Reviewer asked", state.get("review_questions")),
+                      "needs_human": ("Fixer asked", state.get("fixer_requests"))}.get(reason, ("", None))
+        if asked:
+            context = f"{who}:\n" + "\n".join(f"- {q}" for q in asked)
+        else:
+            context = f"During the fix rounds ({WHY.get(reason, 'a note for the fixer')}):"
+        update["clarifications"] = [*(update.get("clarifications") or state.get("clarifications") or []),
+                                    f"{context}\n\nHuman:\n{comment}"]
     return update
 
 

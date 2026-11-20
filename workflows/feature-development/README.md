@@ -13,7 +13,7 @@ START → triage                          ("brainstorm…" in the prompt, else a
                agent writes the design; at most 15 rounds) → plan (from the approved design)
 plan ⇄ [approve_plan]                   (questions / request changes → plan, same session; at most 5 rounds)
   [approve_plan] approve → write_tests → implement → review
-  review FAIL → fix → review            (at most 3 fixes per run, then the run fails)
+  review FAIL → fix → review            (while the open findings shrink; else [approve_fix])
   review PASS → gate
   gate FAIL   → fix → gate
   gate PASS   → [approve_pr]
@@ -64,7 +64,10 @@ plan ⇄ [approve_plan]                   (questions / request changes → plan,
   `tox.ini`, `INVARIANTS.md`, the gate config, or the test script / pytest settings in
   `package.json` / `pyproject.toml` (the rest of those files may change: dependencies). New
   test files are allowed. So an agent cannot weaken the
-  invariant property tests to get through the gate; a wrong test is a human decision.
+  invariant property tests to get through the gate; a wrong test is a human decision (1.8.0):
+  when the fixer keeps a change the human ruled (`NEEDS HUMAN:`), `[approve_fix]` shows the diff
+  of the protected files and Approve accepts exactly that content (pinned by git blob hash; any
+  later edit fails the gate again). The run goes on; nothing is built again.
 - **The gate is deterministic** (no agent): plain tests, property tests, secret scan on the
   added lines, bandit (medium and up) on the changed Python files. Any failing check fails
   the gate and routes to `fix`.
@@ -78,6 +81,14 @@ plan ⇄ [approve_plan]                   (questions / request changes → plan,
   run fails. `write_tests`, `implement` and `review` get the approved plan plus the planning
   conversation. Plan discussion is not counted as a follow-up prompt.
 
+- **Fix rounds ask the human only when it helps (1.7.0, 1.8.0).** Fixes run on their own while
+  the open findings shrink. `[approve_fix]` asks the human, with a round-by-round report, when two
+  fixes made no progress, at the fix cap (8), when the reviewer has a `QUESTION:`, when the fixer
+  is blocked (`NEEDS HUMAN:`), or when a fix changed nothing. Every answer there is kept in the
+  run's agreements, so the next reviewer and fixer see it as a final decision (a waived finding
+  is reported `ACCEPTED`); answered questions are not shown again. A fix right after an answer
+  always goes on to review / gate, even when it changed nothing, and Approve after a no-change
+  fix re-runs the check, so `approve_fix ⇄ fix` cannot loop.
 - **Larger changes are brainstormed first (1.6.0).** `triage` routes the run: the word
   *brainstorm* (or *brainstorming*) in the prompt goes straight to brainstorming; otherwise a
   Sonnet call at low effort answers `ROUTE: QUICK` or `ROUTE: BRAINSTORM` (an answer without a
