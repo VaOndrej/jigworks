@@ -19,6 +19,10 @@ and `feature-development:verify-before-done` skills.
 - Only change files in $scope.
 - If a secret or credential was flagged, remove it; do not obfuscate it.
 - Run the tests the gate runs ($tests) before you finish.
+- If something only the human can do blocks you (a download or command that is denied, an
+  approval, a decision outside the spec), do not work around it and do not repeat yourself in
+  later rounds: write one line per item, starting with `NEEDS HUMAN:`, with the exact command or
+  question. The run stops and shows these lines to the human.
 
 ## Reply format
 

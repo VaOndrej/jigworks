@@ -219,10 +219,18 @@ def _test_settings(name: str, text: str | None) -> Any:
     return None
 
 
+INVARIANTS = "INVARIANTS.md"
+
+
+def written_by_tests(cwd: Path, base: str, tests_base: str) -> set[str]:
+    """Files write_tests changed: read-only for implement and fix."""
+    return set(_git(cwd, "diff", "--name-only", "--no-renames", base, tests_base).splitlines()) if tests_base != base else set()
+
+
 def _protected(cwd: Path, base: str, tests_base: str, cfg: dict[str, Any]) -> dict[str, Any]:
     """Files implement/fix changed since write_tests that they may not touch."""
     root = gate_root(cfg["scope"])
-    by_tests = set(_git(cwd, "diff", "--name-only", "--no-renames", base, tests_base).splitlines()) if tests_base != base else set()
+    by_tests = written_by_tests(cwd, base, tests_base)
     out = _git(cwd, "diff", "--name-status", "--no-renames", tests_base).splitlines()
     out += [f"A\t{f}" for f in _git(cwd, "ls-files", "--others", "--exclude-standard").splitlines()]
     touched = []
@@ -237,6 +245,8 @@ def _protected(cwd: Path, base: str, tests_base: str, cfg: dict[str, Any]) -> di
                     touched.append(f"{path} (test script)")
             continue
         in_dirs = any(path.startswith(d) for d in cfg["protected_dirs"])
+        if name == INVARIANTS and status == "A" and path not in by_tests:
+            continue  # a new INVARIANTS.md is the implementer's (the plan can give it one); an existing one is not
         if (
             path in by_tests
             or (in_dirs and status != "A")
@@ -287,7 +297,11 @@ def _secret_scan(cwd: Path, base: str) -> dict[str, Any]:
     return check
 
 
-def _security_scan(cwd: Path, files: list[str]) -> dict[str, Any]:
+def _security_scan(cwd: Path, files: list[str], read_only: set[str] | None = None) -> dict[str, Any]:
+    """bandit on the changed Python files. Findings in the tests from write_tests are reported but
+    not counted: implement and fix may not edit those files, so the fixer could never clear them
+    (the reviewer and the human see them in the summary)."""
+    read_only = read_only or set()
     py = [f for f in files if f.endswith(".py") and (cwd / f).is_file()]
     if not py:
         return {"name": "bandit", "kind": "security_scan", "passed": True, "summary": "no changed Python files"}
@@ -300,14 +314,23 @@ def _security_scan(cwd: Path, files: list[str]) -> dict[str, Any]:
     except json.JSONDecodeError:
         return {"name": "bandit", "kind": "security_scan", "passed": False,
                 "summary": "bandit did not run: " + _tail(proc.stderr, 3), "findings": 1}
-    check = {"name": "bandit", "kind": "security_scan", "passed": not results}
-    if results:
-        check["findings"] = len(results)
-        check["summary"] = "; ".join(
-            f"{r['test_id']} {r['issue_severity'].lower()} in {r['filename']}:{r['line_number']}" for r in results[:10]
-        )
-    else:
-        check["summary"] = "ok"
+    def where(r: dict) -> str:
+        return f"{r['test_id']} {r['issue_severity'].lower()} in {r['filename']}:{r['line_number']}"
+
+    def path_of(r: dict) -> str:
+        name = r["filename"]
+        return name[2:] if name.startswith("./") else name
+
+    counted = [r for r in results if path_of(r) not in read_only]
+    ignored = [r for r in results if path_of(r) in read_only]
+    check = {"name": "bandit", "kind": "security_scan", "passed": not counted}
+    parts = []
+    if counted:
+        check["findings"] = len(counted)
+        parts.append("; ".join(where(r) for r in counted[:10]))
+    if ignored:
+        parts.append("not counted, in the read-only tests from write_tests: " + "; ".join(where(r) for r in ignored[:10]))
+    check["summary"] = " · ".join(parts) or "ok"
     return check
 
 
@@ -339,7 +362,7 @@ def run_gate(cwd: Path, base: str, overrides: dict[str, Any] | None = None,
         checks.append(_command("tests", "tests", cmd, cwd, cfg))
     for cmd in _commands(cfg.get("property_tests")):
         checks.append(_command("property tests", "property_tests", cmd, cwd, cfg))
-    checks += [_secret_scan(cwd, base), _security_scan(cwd, files)]
+    checks += [_secret_scan(cwd, base), _security_scan(cwd, files, written_by_tests(cwd, base, tests_base or base))]
     return {"passed": all(c["passed"] for c in checks), "checks": checks}
 
 

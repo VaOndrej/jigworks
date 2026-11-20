@@ -67,8 +67,9 @@ class State(TypedDict, total=False):
     fix_history: list[dict]  # every check and fix round, for the report the human sees at approve_fix
     fix_cap: int  # fixes allowed before the human is asked (raised by Continue at approve_fix)
     fix_stall_from: int  # index in fix_history where stall detection starts (after a Continue)
-    escalation: str  # why the human is asked: questions | stalled | limit ("" = keep fixing)
+    escalation: str  # why the human is asked: questions | stalled | limit | needs_human | no_changes ("" = keep fixing)
     review_questions: list[str]  # questions the reviewer could not decide without the human
+    fixer_requests: list[str]  # NEEDS HUMAN lines of the last fix: what only the human can do
     fix_note: str  # the human's note or answers for the next fix, consumed by fix
     outcome: Literal["succeeded", "failed", "rejected"]
     failure: str
@@ -117,9 +118,11 @@ def after_fix_approval(state: State) -> Literal["fix", "__end__"]:
     return END if state.get("decision") == "reject" else "fix"
 
 
-def after_fix(state: State) -> Literal["review", "gate", "__end__"]:
+def after_fix(state: State) -> Literal["review", "gate", "approve_fix", "__end__"]:
     if state.get("outcome") == "failed":
         return END
+    if state.get("escalation"):  # the fixer is blocked or changed nothing: ask before the next check
+        return "approve_fix"
     return state.get("fix_target", "review")
 
 
