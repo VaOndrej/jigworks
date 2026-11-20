@@ -4,7 +4,9 @@ Built on the facts in docs/spikes/claude-stream-json.md:
 
 - invocation: prompt first (the tool flags are variadic), `--verbose` is required, stdin closed;
 - success = exit 0 and `result.is_error == false` (`result.subtype` alone is not a signal);
-- usage = one UsageRecord per key of `result.modelUsage` (never from assistant events);
+- usage = one UsageRecord per key of `result.modelUsage` (never from assistant events); on a
+  `--resume` call newer CLIs report the session's running total, turned into this call's usage
+  (`jigworks_contracts.usage.this_call`);
 - a non-`allowed` `rate_limit_event` → `usage_limit`; an `is_error` result after a `rejected`
   rate limit is "paused by usage limit", not a failure;
 - `assistant.error` (e.g. `authentication_failed`) → `error`; `permission_denials` → `agent_output`
@@ -20,6 +22,8 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+
+from jigworks_contracts import usage as usage_rules
 
 from ..events import NodeContext, iso
 from .base import AgentOptions, AgentResult
@@ -152,6 +156,15 @@ class StreamParser:
             self.ctx.emit("usage_limit", usageLimit={**payload, "paused": False})
         # `rejected` is reported in finish(): only then do we know if the call was paused.
 
+    def _earlier_usage(self, model: str) -> list[dict[str, Any]]:
+        """Usage already recorded in this run for the same session and model (jigworks_contracts.usage)."""
+        if not self.session_id:
+            return []
+        return [
+            e["usage"] for e in self.ctx.sink.events
+            if e.get("kind") == "usage" and e["usage"].get("sessionId") == self.session_id and e["usage"]["model"] == model
+        ]
+
     def finish(self, exit_code: int | None, stderr: str = "") -> AgentResult:
         res = self.result_event
         result = AgentResult(status="failed", session_id=self.session_id, exit_code=exit_code)
@@ -159,6 +172,8 @@ class StreamParser:
         if res:
             result.num_turns = res.get("num_turns")
             result.cli_cost_usd = res.get("total_cost_usd")
+            if result.cli_cost_usd is not None and any(self._earlier_usage(m) for m in res.get("modelUsage") or {}):
+                result.cli_cost_usd = None  # set below from this call's records (total may be per session)
             at = self.ctx.sink.now()
             for model, mu in (res.get("modelUsage") or {}).items():
                 record = {
@@ -177,8 +192,11 @@ class StreamParser:
                     record["sessionId"] = self.session_id
                 if mu.get("costUSD") is not None:
                     record["cliCostUsd"] = float(mu["costUSD"])
+                record = usage_rules.this_call(record, self._earlier_usage(model))
                 result.usage.append(record)
                 self.ctx.emit("usage", model=model, usage=record)
+            if result.cli_cost_usd is None and res.get("total_cost_usd") is not None:
+                result.cli_cost_usd = sum(u.get("cliCostUsd") or 0.0 for u in result.usage)
             for denial in res.get("permission_denials") or []:
                 tool = {
                     "id": denial.get("tool_use_id", ""),

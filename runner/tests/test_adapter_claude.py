@@ -326,3 +326,84 @@ def test_adapter_live_smoke(tmp_path):
     assert result.ok, result.error
     assert result.usage and all(contracts.validate("UsageRecord", u) == [] for u in result.usage)
     assert_all_valid(c)
+
+
+# --- resumed sessions -------------------------------------------------------------------------
+
+
+def cumulative_resume_lines(base: str, totals: tuple[int, int, int, int], cost: float) -> list[str]:
+    """Synthetic, from resume-2.jsonl: newer CLIs (2.1.329, measured 2026-11-20) report
+    `result.modelUsage` and `total_cost_usd` summed over the whole resumed session, not per call."""
+    out = []
+    for raw in lines(base):
+        msg = json.loads(raw)
+        if msg["type"] == "result":
+            inp, outp, cw, cr = totals
+            for mu in msg["modelUsage"].values():
+                mu.update(inputTokens=inp, outputTokens=outp, cacheCreationInputTokens=cw, cacheReadInputTokens=cr, costUSD=cost)
+            msg["total_cost_usd"] = cost
+        out.append(json.dumps(msg))
+    return out
+
+
+def usage_records(c: NodeContext) -> list[dict]:
+    return [e["usage"] for e in c.sink.events if e["kind"] == "usage"]
+
+
+def test_adapter_resumed_session_with_cumulative_usage_records_only_this_call():
+    """Real numbers of a resumed Haiku 5.5 session on CLI 2.1.329: the 4th call used in 2 / out 6 /
+    cache_write 73 / cache_read 281468, but modelUsage reported the session's running total."""
+    c = ctx("implement")
+    parse_lines(cumulative_resume_lines("resume-1.jsonl", (1182, 21, 80818, 0), 0.0162923), c)
+    c2 = NodeContext(c.sink, "fix", 1)
+    parse_lines(cumulative_resume_lines("resume-2.jsonl", (1186, 33, 493988, 149768), 0.4369827), c2)
+    c3 = NodeContext(c.sink, "fix", 2)
+    result = parse_lines(cumulative_resume_lines("resume-2.jsonl", (1188, 39, 494061, 431236), 0.4511451), c3)
+    last = usage_records(c)[-1]
+    assert (last["input"], last["output"], last["cache_write"], last["cache_read"]) == (2, 6, 73, 281468)
+    assert last["cliCostUsd"] == pytest.approx(0.4511451 - 0.4369827)
+    assert result.cli_cost_usd == pytest.approx(0.4511451 - 0.4369827)
+    # the records add up to the session total, not to the sum of running totals
+    assert sum(u["cache_write"] for u in usage_records(c)) == 494061
+    assert_all_valid(c)
+
+
+def test_adapter_resumed_session_with_per_call_usage_is_kept_as_is():
+    """Older CLIs (the T00 recordings) report per call; nothing is subtracted."""
+    c = ctx("plan")
+    parse_lines(lines("resume-1.jsonl"), c)
+    parse_lines(lines("resume-2.jsonl"), NodeContext(c.sink, "plan", 2))
+    second = usage_records(c)[-1]
+    assert (second["input"], second["output"], second["cache_write"], second["cache_read"]) == (10, 79, 226, 6448)
+
+
+def test_adapter_resumed_session_after_running_totals_were_recorded():
+    """Runs recorded before this fix hold running totals per call; the next call subtracts the
+    last of them instead of their sum."""
+    c = ctx("implement")
+    parse_lines(cumulative_resume_lines("resume-1.jsonl", (1182, 21, 80818, 0), 0.0162923), c)
+    c.sink.events[-1]["usage"].update(input=1184, output=27, cache_write=286424, cache_read=75839)  # legacy 2nd call
+    c.sink.events.append({**c.sink.events[-1], "seq": c.sink.next_seq})
+    c.sink.events[-1]["usage"] = {**c.sink.events[-2]["usage"], "input": 1186, "output": 33,
+                                  "cache_write": 493988, "cache_read": 149768}
+    c.sink.next_seq += 1
+    parse_lines(cumulative_resume_lines("resume-2.jsonl", (1188, 39, 494061, 431236), 0.4511451), NodeContext(c.sink, "fix", 3))
+    last = usage_records(c)[-1]
+    assert (last["input"], last["output"], last["cache_write"], last["cache_read"]) == (2, 6, 73, 281468)
+
+
+def test_adapter_resumed_session_after_a_mix_of_running_totals_and_per_call_records():
+    """A run recorded with the old runner (running totals), continued with this one: the call
+    after the first per-call record still subtracts the whole session total."""
+    c = ctx("implement")
+    parse_lines(cumulative_resume_lines("resume-1.jsonl", (1182, 21, 80818, 0), 0.0162923), c)
+    legacy = {**c.sink.events[-1], "seq": c.sink.next_seq}
+    legacy["usage"] = {**legacy["usage"], "input": 1184, "output": 27, "cache_write": 286424, "cache_read": 75839,
+                       "cliCostUsd": 0.2257063}
+    c.sink.events.append(legacy)
+    c.sink.next_seq += 1
+    parse_lines(cumulative_resume_lines("resume-2.jsonl", (1186, 33, 493988, 149768), 0.4369827), NodeContext(c.sink, "fix", 2))
+    parse_lines(cumulative_resume_lines("resume-2.jsonl", (1188, 39, 494061, 431236), 0.4511451), NodeContext(c.sink, "fix", 3))
+    third, fourth = usage_records(c)[-2:]
+    assert (third["input"], third["cache_write"], third["cache_read"]) == (2, 207564, 73929)
+    assert (fourth["input"], fourth["output"], fourth["cache_write"], fourth["cache_read"]) == (2, 6, 73, 281468)

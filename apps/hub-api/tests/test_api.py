@@ -342,6 +342,30 @@ def test_register_is_idempotent_and_ingest_dedupes(client):
     assert summary["updatedAt"] == events[-1]["at"]
 
 
+def test_running_totals_of_a_resumed_session_are_counted_once(client):
+    """run_20261120122836_6ab988: the runner recorded each resumed fix call with the session's
+    running total, so the hub summed 22 running totals ($168 instead of ~$23)."""
+    client.post("/api/runs", json=_new_run(client))
+    totals = [(228, 207699, 691789, 25527388, 7.3973408), (240, 213688, 705496, 27827461, 7.7420901),
+              (246, 215863, 713785, 29007035, 7.9149655)]
+    events = []
+    for seq, (i, o, cw, cr, cost) in enumerate(totals):
+        usage = {"runId": "run_t12_live", "node": "fix", "attempt": seq + 1, "model": "claude-sonnet-5-5",
+                 "adapter": "claude", "input": i, "output": o, "cache_write": cw, "cache_read": cr,
+                 "sessionId": "924d95b6", "cliCostUsd": cost, "at": "2026-11-20T15:30:00Z"}
+        events.append({"runId": "run_t12_live", "seq": seq, "kind": "usage", "at": "2026-11-20T15:30:00Z",
+                       "node": "fix", "attempt": seq + 1, "usage": usage})
+    assert client.post("/api/runs/run_t12_live/events", json={"events": events[:2]}).status_code == 200
+    assert client.post("/api/runs/run_t12_live/events", json={"events": events[2:]}).status_code == 200
+    summary = client.get("/api/runs/run_t12_live").json()["summary"]
+    assert summary["usage"]["output"] == 215863
+    assert summary["usage"]["cliCostUsd"] == pytest.approx(7.9149655)
+    report = client.get("/api/analytics/usage?groupBy=model").json()
+    sonnet = next(r for r in report["rows"] if r["key"] == "claude-sonnet-5-5")
+    assert sonnet["cliCostUsd"] == pytest.approx(7.9149655, abs=1e-5)
+    assert sonnet["costUsd"] == pytest.approx(7.9149655, rel=0.01), "price table ≈ the CLI's own cost"
+
+
 def test_ingest_rejects_bad_events(client):
     client.post("/api/runs", json=_new_run(client))
     ok = {"runId": "run_t12_live", "seq": 0, "at": "2026-11-19T15:00:00Z", "node": "plan", "status": "running"}

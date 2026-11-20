@@ -8,6 +8,7 @@ import type {
   RunStatus,
   UsageRecord,
 } from "@jigworks/contracts";
+import { perCall, type UsageSeries } from "./cost";
 
 export interface NodeState {
   id: string;
@@ -77,7 +78,9 @@ export interface SessionView {
   interrupt?: InterruptPayload & { node: string; seq: number };
   lastGate?: GateResultPayload;
   usage: { input: number; output: number; cache_write: number; cache_read: number; cliCostUsd: number };
+  /** One record per agent call (running totals of resumed sessions already turned into calls). */
   usageRecords: UsageRecord[];
+  usageSeries: UsageSeries;
   output: AgentLine[];
   activity: ActivityLine[];
   branch?: string;
@@ -116,6 +119,7 @@ export function emptySession(runId: string): SessionView {
     followUps: 0,
     usage: { input: 0, output: 0, cache_write: 0, cache_read: 0, cliCostUsd: 0 },
     usageRecords: [],
+    usageSeries: {},
     output: [],
     activity: [],
     fixRounds: [],
@@ -303,7 +307,7 @@ export function applyEvent(s: SessionView, e: RunEvent): SessionView {
       break;
     }
     case "usage": {
-      const u = e.usage!;
+      const u = perCall(s.usageSeries, e.usage!);
       s.lastActivityAt = e.at;
       s.usageRecords.push(u);
       s.usage.input += u.input;

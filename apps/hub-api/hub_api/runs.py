@@ -7,6 +7,7 @@ from typing import Any
 import psycopg
 
 import jigworks_contracts as c
+from jigworks_contracts.usage import per_call
 
 from .db import Jsonb
 from .errors import ApiError, not_found
@@ -63,15 +64,6 @@ def ingest(conn: psycopg.Connection, run_id: str, events: list[dict[str, Any]]) 
             duplicates += 1
             continue
         accepted += 1
-        if kind == "usage":
-            u = ev["usage"]
-            conn.execute(
-                """INSERT INTO usage (run_id, seq, node, attempt, model, adapter, input, output, cache_write,
-                                      cache_read, cli_cost_usd, at)
-                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) ON CONFLICT DO NOTHING""",
-                (run_id, ev["seq"], u["node"], u["attempt"], u["model"], u["adapter"], u["input"], u["output"],
-                 u["cache_write"], u["cache_read"], u.get("cliCostUsd"), u.get("at") or ev["at"]),
-            )
 
     if accepted:
         reproject(conn, run_id, run["created"])
@@ -84,11 +76,30 @@ def ingest(conn: psycopg.Connection, run_id: str, events: list[dict[str, Any]]) 
 
 def reproject(conn: psycopg.Connection, run_id: str, created: dict[str, Any]) -> None:
     rows = conn.execute("SELECT body FROM events WHERE run_id = %s ORDER BY seq", (run_id,)).fetchall()
-    summary, audit = project(created, [r["body"] for r in rows])
+    events = [r["body"] for r in rows]
+    summary, audit = project(created, events)
+    store_usage(conn, run_id, events)
     conn.execute(
         "UPDATE runs SET status = %s, updated_at = %s, summary = %s, audit = %s WHERE run_id = %s",
         (summary["status"], summary.get("updatedAt") or summary["startedAt"], Jsonb(summary), Jsonb(audit), run_id),
     )
+
+
+def store_usage(conn: psycopg.Connection, run_id: str, events: list[dict[str, Any]]) -> None:
+    """Rebuild the run's usage rows from all its usage events, one row per agent call. A record
+    can only be read as per call together with the earlier records of its session (runs recorded
+    before T25 hold running totals of resumed sessions), so the rows are rebuilt, not appended."""
+    usage_events = [e for e in events if (e.get("kind") or "node_status") == "usage"]
+    calls = per_call([e["usage"] for e in usage_events])
+    conn.execute("DELETE FROM usage WHERE run_id = %s", (run_id,))
+    for ev, u in zip(usage_events, calls, strict=True):
+        conn.execute(
+            """INSERT INTO usage (run_id, seq, node, attempt, model, adapter, input, output, cache_write,
+                                  cache_read, cli_cost_usd, at)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+            (run_id, ev["seq"], u["node"], u["attempt"], u["model"], u["adapter"], u["input"], u["output"],
+             u["cache_write"], u["cache_read"], u.get("cliCostUsd"), u.get("at") or ev["at"]),
+        )
 
 
 def events_after(conn: psycopg.Connection, run_id: str, after: int, limit: int) -> dict[str, Any]:

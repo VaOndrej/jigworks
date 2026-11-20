@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from jigworks_contracts.usage import per_call
+
 TERMINAL = {"succeeded", "failed", "rejected", "cancelled"}
 TOKEN_FIELDS = ("input", "output", "cache_write", "cache_read")
 
@@ -128,6 +130,7 @@ def project(created: dict[str, Any], events: list[dict[str, Any]]) -> tuple[dict
         s.pop("currentNode", None)
         s["finishedAt"] = s.get("updatedAt", s["startedAt"])
 
+    usage = per_call(usage)  # resumed sessions recorded as running totals (jigworks_contracts.usage)
     totals = {t: sum(u[t] for u in usage) for t in TOKEN_FIELDS}
     totals["cliCostUsd"] = round(sum(u.get("cliCostUsd") or 0 for u in usage), 6)
     s["usage"] = totals
