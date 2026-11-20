@@ -11,6 +11,8 @@ export interface WorkflowInfo {
   path: string;
   source: "workspace" | "imported" | "hub";
   channel?: string;
+  /** Workspace package whose name is also published (hub/imported) with a different digest. */
+  changed?: boolean;
   description?: string;
   plannedPath: string[];
   interruptNodes: string[];

@@ -52,7 +52,9 @@ const runParam = params.get("run") ?? "run_fd_0007";
 const visibleRuns = (params.get("runs") ?? "run_fd_0007,run_fd_0005,run_fd_0002").split(",");
 
 const state: HostState = {
-  workflows: [FD, OLDER],
+  workflows: params.get("local") === "changed"
+    ? [FD, OLDER, { ...FD, key: "workspace:feature-development@1.3.0", source: "workspace", channel: undefined, digest: "sha256:local", changed: true }]
+    : [FD, OLDER],
   selectedWorkflow: FD.key,
   sessions: Object.fromEntries(visibleRuns.filter((r) => RUNS[r]).map((r) => [r, RUNS[r]])),
   running: ["run_fd_0007"],

@@ -59,8 +59,10 @@ export class WorkflowRegistry {
     return item;
   }
 
-  /** `workflows/*` of every workspace folder that holds a workflow.toml. */
+  /** `workflows/*` of every workspace folder that holds a workflow.toml. Entries are replaced in
+   *  place and stale ones dropped only afterwards, so the list is never empty mid-scan. */
   async scanWorkspace(roots: string[]): Promise<void> {
+    const seen = new Set<string>();
     for (const root of roots) {
       const dir = path.join(root, "workflows");
       if (!fs.existsSync(dir)) continue;
@@ -68,13 +70,14 @@ export class WorkflowRegistry {
         const pkg = path.join(dir, name);
         if (fs.existsSync(path.join(pkg, "workflow.toml"))) {
           try {
-            await this.add(pkg, "workspace");
+            seen.add((await this.add(pkg, "workspace")).key);
           } catch {
             // a broken package in the workspace must not stop the extension
           }
         }
       }
     }
+    this.remove((w) => w.source === "workspace" && !seen.has(w.key));
   }
 
   /** Packages unpacked into the extension's cache: <cache>/<digest prefix>/ with jigworks-source.json.
