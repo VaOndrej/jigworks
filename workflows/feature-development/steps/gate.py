@@ -85,13 +85,21 @@ def _scope(files: list[str], allowed: list[str]) -> dict[str, Any]:
 def _secret_scan(cwd: Path, base: str) -> dict[str, Any]:
     gitleaks = shutil.which("gitleaks")
     if gitleaks:
-        proc = subprocess.run(
-            [gitleaks, "git", "--no-banner", "--redact", "--exit-code", "1", f"--log-opts={base}..HEAD", "."],
-            cwd=cwd, capture_output=True, text=True,
+        # Scan the added lines of the net diff, like the built-in rules. `gitleaks git` over
+        # base..HEAD would scan every commit of the run, so a secret that `fix` removed again
+        # would keep failing the gate until the fix loop limit.
+        added = "\n".join(
+            ln for ln in diff_text(cwd, base).splitlines() if ln.startswith("+") and not ln.startswith("+++")
         )
-        passed = proc.returncode == 0
-        return {"name": "gitleaks", "kind": "secret_scan", "passed": passed,
-                "summary": "ok" if passed else _tail(proc.stdout + proc.stderr, 5), **({} if passed else {"findings": 1})}
+        proc = subprocess.run(
+            [gitleaks, "stdin", "--no-banner", "--no-color", "--redact", "--verbose", "--exit-code", "1"],
+            cwd=cwd, input=added, capture_output=True, text=True,
+        )
+        if proc.returncode == 0:
+            return {"name": "gitleaks", "kind": "secret_scan", "passed": True, "summary": "ok"}
+        rules = [ln.split(":", 1)[1].strip() for ln in proc.stdout.splitlines() if ln.startswith("RuleID:")]
+        return {"name": "gitleaks", "kind": "secret_scan", "passed": False, "findings": max(len(rules), 1),
+                "summary": "; ".join(rules[:10]) or _tail(proc.stdout + proc.stderr, 5)}
     findings = secrets.scan_diff(diff_text(cwd, base))
     check = {"name": "secret-scan (built-in rules)", "kind": "secret_scan", "passed": not findings}
     if findings:

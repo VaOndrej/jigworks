@@ -278,7 +278,15 @@ def test_request_changes_goes_fix_gate_review(repo):
     check_stream(run)
 
 
-def test_planted_secret_fails_the_gate(repo):
+@pytest.mark.parametrize("scanner", ["built-in", "gitleaks"])
+def test_planted_secret_fails_the_gate(repo, monkeypatch, scanner):
+    real_which = shutil.which
+    if scanner == "gitleaks":
+        if not real_which("gitleaks"):
+            pytest.skip("gitleaks is not installed")
+    else:
+        monkeypatch.setattr(shutil, "which", lambda name, *a, **k: None if name == "gitleaks" else real_which(name, *a, **k))
+    rule = "aws-access-key-id" if scanner == "built-in" else "aws-access-token"
     leaky = FEATURE + f'\nAWS_ACCESS_KEY_ID = "{FAKE_KEY}"\n'
     steps = script(
         implement=[FakeStep("implemented", files={"sample-repo/sample_repo/notes.py": leaky})],
@@ -289,7 +297,8 @@ def test_planted_secret_fails_the_gate(repo):
     assert out.status == "succeeded"
     first, second = [e["gateResult"] for e in events(run) if e["kind"] == "gate_result"]
     secret = next(c for c in first["checks"] if c["kind"] == "secret_scan")
-    assert not first["passed"] and not secret["passed"] and "aws-access-key-id" in secret["summary"]
+    assert not first["passed"] and not secret["passed"] and rule in secret["summary"]
+    assert FAKE_KEY not in json.dumps(first)
     assert all(c["passed"] for c in first["checks"] if c["kind"] != "secret_scan")
     assert second["passed"]
     check_stream(run)
