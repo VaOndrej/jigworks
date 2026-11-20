@@ -17,12 +17,16 @@ Ask only when **all** of these hold:
 - two reasonable readings of the task lead to different results.
 
 Everything else you decide, and you state the decision in the plan ("Assumption: …").
+Facts are your job, decisions are the human's: never ask for something you could look up.
 
 ## How to ask
 
 - At most 5 questions, numbered, most important first.
 - Each question is answerable in one line. Offer the options you see and say which you would
-  pick: "Round half up or half to even? (I would pick half to even, like the existing P&L.)"
+  pick, worded so "yes" accepts your pick: "Round half up or half to even? (I would pick half
+  to even, like the existing P&L.)"
+- Leave out a question whose answer depends on another question in the same round; ask it
+  after the answers, if it is still open.
 - No questions about style, naming or anything the repo already decides.
 
 ## After the answers

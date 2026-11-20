@@ -110,9 +110,13 @@ def check_stream(run: WorkflowRun) -> None:
 
 
 def approve_all(run: WorkflowRun, outcome):
-    while outcome.status == "waiting_human":
+    """Approve every gate except approve_fix: approving that one grants more fixes, so a fixer
+    that never fixes would loop forever. The test decides there itself."""
+    for _ in range(20):
+        if outcome.status != "waiting_human" or outcome.interrupt["node"] == "approve_fix":
+            return outcome
         outcome = run.decide("approve", APPROVER)
-    return outcome
+    raise AssertionError("still waiting for a human after 20 approvals")
 
 
 # --- paths ------------------------------------------------------------------------------------
@@ -232,16 +236,88 @@ def test_gate_fail_on_broken_invariant_then_fix_then_pass(repo):
     check_stream(run)
 
 
-def test_fix_loop_limit_ends_the_run_failed(repo):
-    run, agent = new_run(repo, script(review=[FakeStep("VERDICT: FAIL")]), max_fix_loops=2)
-    out = approve_all(run, run.start("Add describe(order)"))
-    assert out.status == "failed"
+def failing_review(*open_counts: int) -> list[FakeStep]:
+    """One failing review per count, with that many open findings (IDs F1..Fn)."""
+    return [FakeStep("\n".join(f"- F{i} notes.py:{i} problem {i}" for i in range(1, n + 1)) + "\nVERDICT: FAIL")
+            for n in open_counts]
+
+
+def test_fixes_go_on_by_themselves_while_the_findings_shrink(repo):
+    run, agent = new_run(repo, script(review=[*failing_review(4, 3, 2, 1), FakeStep("- F1 FIXED\nVERDICT: PASS")],
+                                      fix=[FakeStep("fixed one more")]))
+    out = run.start("Add describe(order)")
+    assert out.interrupt["node"] == "approve_plan"
+    out = run.decide("approve", APPROVER)
+    assert out.interrupt["node"] == "approve_pr", "progress never asks the human"
+    assert [c.node for c in agent.calls].count("fix") == 4
+    assert out.status == "waiting_human"
+    check_stream(run)
+
+
+def test_stalled_fixes_ask_the_human_with_a_round_by_round_report(repo):
+    run, agent = new_run(repo, script(review=failing_review(3, 2, 2, 2), fix=[FakeStep("tightened the limit check")]))
+    run.start("Add describe(order)")
+    out = run.decide("approve", APPROVER)
+    assert out.status == "waiting_human" and out.interrupt["node"] == "approve_fix"
+    assert [c.node for c in agent.calls].count("fix") == 3, "3 → 2 is progress; 2 → 2 → 2 is two fixes without it"
+    report = out.interrupt["plan"]
+    assert "did not lower the number of open problems" in report
+    assert "3 → 2 → 2 → 2" in report and "tightened the limit check" in report
+    assert report.count("| fix |") == 3
+    assert "## Latest findings" in report and "F2 notes.py:2" in report
+    assert node_trace(run)[-1] == ("approve_fix", "waiting_human")
+    check_stream(run)
+
+
+def test_continue_at_approve_fix_grants_more_fixes_and_passes_the_hint(repo):
+    run, agent = new_run(repo, script(review=[*failing_review(2, 2, 2), FakeStep("- F1 FIXED\n- F2 FIXED\nVERDICT: PASS")]))
+    run.start("Add describe(order)")
+    out = run.decide("approve", APPROVER)
+    assert out.interrupt["node"] == "approve_fix"
+    out = run.decide("request_changes", APPROVER, comment="Use the remaining quantity, not the total.")
+    assert out.interrupt["node"] == "approve_pr"
+    last_fix = [c for c in agent.calls if c.node == "fix"][-1]
+    assert "Use the remaining quantity, not the total." in last_fix.prompt
+    rereview = [c for c in agent.calls if c.node == "review"][-1]
+    assert "Findings of the previous review" in rereview.prompt and "F2 notes.py:2" in rereview.prompt
+    assert approve_all(run, out).status == "succeeded"
+    check_stream(run)
+
+
+def test_fix_cap_asks_the_human_even_with_progress(repo):
+    run, agent = new_run(repo, script(review=failing_review(5, 4, 3, 2)), max_fix_loops=2)
+    run.start("Add describe(order)")
+    out = run.decide("approve", APPROVER)
+    assert out.interrupt["node"] == "approve_fix" and "cap is reached" in out.interrupt["message"]
     assert [c.node for c in agent.calls].count("fix") == 2
-    trace = node_trace(run)
-    assert trace[-1] == ("fix", "failed")
-    err = [e for e in events(run) if e["kind"] == "error"][-1]
-    assert "fix loop limit" in err["error"]["message"]
-    assert events(run)[-1]["runStatus"] == "failed"
+    check_stream(run)
+
+
+def test_a_reviewer_question_goes_to_the_human_before_any_fix(repo):
+    question = "QUESTION: Should describe() print EUR or USD? I recommend USD."
+    run, agent = new_run(repo, script(review=[FakeStep(f"- F1 notes.py:3 currency missing\n{question}\nVERDICT: FAIL"),
+                                              FakeStep("- F1 FIXED\nVERDICT: PASS")]))
+    run.start("Add describe(order)")
+    out = run.decide("approve", APPROVER)
+    assert out.interrupt["node"] == "approve_fix"
+    assert "fix" not in [c.node for c in agent.calls], "the human answers before anyone fixes"
+    assert "## Questions from the reviewer" in out.interrupt["plan"] and "EUR or USD" in out.interrupt["plan"]
+    out = run.decide("request_changes", APPROVER, comment="USD.")
+    fix_call = next(c for c in agent.calls if c.node == "fix")
+    assert "USD." in fix_call.prompt
+    rereview = [c for c in agent.calls if c.node == "review"][-1]
+    assert "Human:\nUSD." in rereview.prompt, "the reviewer sees the human's answer too"
+    assert out.interrupt["node"] == "approve_pr"
+    check_stream(run)
+
+
+def test_reject_at_approve_fix_stops_the_run(repo):
+    run, _ = new_run(repo, script(review=failing_review(1)))
+    run.start("Add describe(order)")
+    out = run.decide("approve", APPROVER)
+    assert out.interrupt["node"] == "approve_fix"
+    out = run.decide("reject", APPROVER)
+    assert out.status == "rejected"
     check_stream(run)
 
 
@@ -560,7 +636,7 @@ def test_security_finding_fails_the_gate(repo):
     run, _ = new_run(repo, script(implement=[FakeStep("implemented", files={"sample-repo/sample_repo/notes.py": risky})]),
                      max_fix_loops=1)
     out = approve_all(run, run.start("Add describe(order)"))
-    assert out.status == "failed"
+    assert out.status == "waiting_human" and out.interrupt["node"] == "approve_fix", "1.7.0 asks the human, never fails"
     gate = next(e for e in events(run) if e["kind"] == "gate_result")["gateResult"]
     bandit = next(c for c in gate["checks"] if c["kind"] == "security_scan")
     assert not bandit["passed"] and "B602" in bandit["summary"]

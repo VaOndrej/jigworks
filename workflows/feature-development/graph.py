@@ -6,15 +6,18 @@ START → triage   (keyword "brainstorm" in the prompt, or the triage agent judg
                    until the agent writes the design; round limit) → plan (from the design)
       plan ⇄ [approve_plan]   (questions / request changes → plan, same session; round limit)
       [approve_plan] approve → write_tests (separate session, from the spec) → implement
-      → review (independent session)
-            review FAIL → fix → review        (fix loop limit)
+      → review (independent session; after a fix it re-checks the earlier findings and regressions)
+            review FAIL → fix → review        (while the open findings shrink)
             review PASS → gate (tests, property tests, secret scan, security scan, scope)
             gate FAIL → fix → gate
+            no progress for 2 fixes, the fix cap, or a reviewer question → [approve_fix]
+                  approve / request changes (a note or the answers) → fix, with more fixes
+                  reject                                            → END
             gate PASS → [approve_pr]
                   approve         → open_pr → summary → END
                   request changes → fix → gate → [approve_pr]   (follow-up prompt)
                   reject          → END
-      [approve_plan] reject → END · fix or planning round limit reached → END (run failed)
+      [approve_plan] reject → END · planning or brainstorming round limit reached → END (run failed)
 
 The runner injects the runtime (agent, git, events) through the LangGraph config; this
 package never imports the runner, so it runs from a release bundle as-is.
@@ -61,6 +64,12 @@ class State(TypedDict, total=False):
     fix_target: Literal["review", "gate"]
     fix_reason: Literal["review", "gate", "request_changes"]
     fix_loops: int
+    fix_history: list[dict]  # every check and fix round, for the report the human sees at approve_fix
+    fix_cap: int  # fixes allowed before the human is asked (raised by Continue at approve_fix)
+    fix_stall_from: int  # index in fix_history where stall detection starts (after a Continue)
+    escalation: str  # why the human is asked: questions | stalled | limit ("" = keep fixing)
+    review_questions: list[str]  # questions the reviewer could not decide without the human
+    fix_note: str  # the human's note or answers for the next fix, consumed by fix
     outcome: Literal["succeeded", "failed", "rejected"]
     failure: str
     pr_url: str
@@ -92,12 +101,20 @@ def after_plan_approval(state: State) -> Literal["plan", "write_tests", "__end__
     return "plan" if state.get("plan_feedback") else "write_tests"
 
 
-def after_review(state: State) -> Literal["fix", "gate"]:
-    return "gate" if state.get("review_passed") else "fix"
+def after_review(state: State) -> Literal["fix", "gate", "approve_fix"]:
+    if state.get("review_passed"):
+        return "gate"
+    return "approve_fix" if state.get("escalation") else "fix"
 
 
-def after_gate(state: State) -> Literal["fix", "approve_pr"]:
-    return "approve_pr" if state.get("gate_passed") else "fix"
+def after_gate(state: State) -> Literal["fix", "approve_pr", "approve_fix"]:
+    if state.get("gate_passed"):
+        return "approve_pr"
+    return "approve_fix" if state.get("escalation") else "fix"
+
+
+def after_fix_approval(state: State) -> Literal["fix", "__end__"]:
+    return END if state.get("decision") == "reject" else "fix"
 
 
 def after_fix(state: State) -> Literal["review", "gate", "__end__"]:
@@ -127,6 +144,7 @@ def build_graph() -> StateGraph:
     g.add_node("review", nodes.review)
     g.add_node("fix", nodes.fix)
     g.add_node("gate", nodes.gate)
+    g.add_node("approve_fix", nodes.approve_fix)
     g.add_node("approve_pr", nodes.approve_pr)
     g.add_node("open_pr", nodes.open_pr)
     g.add_node("summary", nodes.summary)
@@ -142,6 +160,7 @@ def build_graph() -> StateGraph:
     g.add_conditional_edges("review", after_review)
     g.add_conditional_edges("fix", after_fix)
     g.add_conditional_edges("gate", after_gate)
+    g.add_conditional_edges("approve_fix", after_fix_approval)
     g.add_conditional_edges("approve_pr", after_pr_review)
     g.add_edge("open_pr", "summary")
     g.add_edge("summary", END)

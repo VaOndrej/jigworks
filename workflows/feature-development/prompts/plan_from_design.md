@@ -24,6 +24,8 @@ $design
    - what is explicitly left for later.
 3. Do not edit any file. Reply with the plan only, no preamble.
 
+Use the `feature-development:slice-the-plan` and `feature-development:deep-modules` skills.
+
 Use the `feature-development:clarify-before-planning` skill. Only if something that changes the
 plan is neither in the design nor in the code, reply with `QUESTIONS:` on the first line followed
 by at most 5 numbered questions, and nothing else.
