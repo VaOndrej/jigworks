@@ -6,6 +6,7 @@ import { describeLine, describeTool, elapsed, livenessState, recentActions, step
 import { foldEvents, nodeDone, type AgentLine, type SessionView } from "../../shared/session";
 import { shortTitle, tabChrome, tabIcon } from "../../shared/tabTitle";
 import { apiCost } from "../../shared/cost";
+import { fixButtons } from "../../shared/fixButtons";
 import type { PriceEntry } from "@jigworks/contracts";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -222,5 +223,26 @@ suite("T21 units", () => {
       const cost = apiCost(prices, s.usageRecords).usd;
       assert.ok(Math.abs(cost - s.usage.cliCostUsd) / s.usage.cliCostUsd < 0.01, `price table ${cost} vs CLI ${s.usage.cliCostUsd}`);
     });
+  });
+});
+
+suite("T26 approve_fix buttons", () => {
+  const protectedPlan = "**Why you are asked:** …\n\n## Changes to protected files\n\n- `tests/test_notes.py`";
+  test("protected files or suppressions waiting: the button says it accepts them", () => {
+    for (const plan of [protectedPlan, "## New suppressions\n\n- `a.py`: `x = 1  # nosec`"]) {
+      const b = fixButtons({ message: "The gate rejects changes only you can accept", plan });
+      assert.equal(b.approve, "Accept these changes");
+      assert.match(b.idleHint, /a note does not accept them/);
+    }
+  });
+  test("after a fix that changed nothing or a blocked fixer: the button re-runs the check", () => {
+    for (const message of ["The last fix changed nothing. Approve (in VS Code: Re-run the check) …",
+                           "The fixer is blocked on something only you can do. …"]) {
+      assert.equal(fixButtons({ message, plan: "## Rounds" }).approve, "Re-run the check");
+    }
+  });
+  test("otherwise it continues fixing, as before", () => {
+    const b = fixButtons({ message: "The reviewer needs your answer before the next fix.", plan: "## Questions from the reviewer" });
+    assert.deepEqual([b.approve, b.note, b.stop], ["Continue fixing", "Continue with my note", "Stop the run"]);
   });
 });

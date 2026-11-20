@@ -33,6 +33,7 @@ one string; `python` as the first argument means the runner's Python):
 from __future__ import annotations
 
 import json
+import re
 import os
 import shlex
 import shutil
@@ -222,13 +223,80 @@ def _test_settings(name: str, text: str | None) -> Any:
 INVARIANTS = "INVARIANTS.md"
 
 
+TEST_DIRS = {"tests", "test", "__tests__", "spec", "specs"}
+
+
+def is_test_file(path: str) -> bool:
+    """A test, a fixture or test support: what write_tests writes for the gate. Anything else it
+    wrote (a scratch script at the root) is not protected."""
+    *dirs, name = path.split("/")
+    return (any(d in TEST_DIRS for d in dirs) or name.startswith("test_") or name == "conftest.py"
+            or name.endswith(("_test.py", "_test.go")) or ".test." in name or ".spec." in name)
+
+
+# Markers that silence a scanner, a type checker or a test instead of fixing the cause.
+SUPPRESSION = re.compile(
+    r"#\s*nosec\b|#\s*noqa\b|#\s*type:\s*ignore|#\s*pragma:\s*no\s*cover|pytest\.mark\.(?:skip|skipif|xfail)\b"
+    r"|pytest\.(?:skip|xfail)\(|unittest\.skip|eslint-disable|@ts-ignore|@ts-expect-error|istanbul\s+ignore"
+    r"|//\s*nolint|#\[allow\(|gitleaks:allow",
+    re.IGNORECASE,
+)
+
+
+def suppression_key(path: str, line: str) -> str:
+    return f"{path}\t{line.strip()}"
+
+
+def new_suppressions(cwd: Path, tests_base: str, scope: list[str], accepted: list[str] | None = None) -> list[tuple[str, str]]:
+    """(path, line) of every suppression marker implement or fix added since write_tests, except
+    the lines the human accepted at approve_fix (by file and exact text)."""
+    accepted_keys = set(accepted or [])
+    roots = [gate_root([p]) or "." for p in scope]
+    found: list[tuple[str, str]] = []
+    path = ""
+    for line in _git(cwd, "diff", "--no-color", "--unified=0", tests_base, "--", *roots).splitlines():
+        if line.startswith("+++ "):
+            path = line[6:] if line.startswith("+++ b/") else ""
+        elif line.startswith("+") and path and SUPPRESSION.search(line):
+            found.append((path, line[1:]))
+    for new in _git(cwd, "ls-files", "--others", "--exclude-standard", "--", *roots).splitlines():
+        try:
+            text = (cwd / new).read_text()
+        except (OSError, UnicodeDecodeError):
+            continue
+        found += [(new, ln) for ln in text.splitlines() if SUPPRESSION.search(ln)]
+    return [(p, ln) for p, ln in found if suppression_key(p, ln) not in accepted_keys]
+
+
+def _suppressions(cwd: Path, tests_base: str, scope: list[str], accepted: list[str] | None) -> dict[str, Any]:
+    found = new_suppressions(cwd, tests_base, scope, accepted)
+    check = {"name": "suppressions", "kind": "other", "passed": not found}
+    if found:
+        check["findings"] = len(found)
+        check["summary"] = ("added by implement or fix: " + "; ".join(f"{p}: {ln.strip()}" for p, ln in found[:10])
+                            + ". Fix the cause instead of silencing it. If it is a false positive, keep it and write"
+                            " `NEEDS HUMAN: accept the suppression in <path>` with why: only the human can accept it.")
+    else:
+        check["summary"] = "ok"
+    return check
+
+
 def written_by_tests(cwd: Path, base: str, tests_base: str) -> set[str]:
     """Files write_tests changed: read-only for implement and fix."""
     return set(_git(cwd, "diff", "--name-only", "--no-renames", base, tests_base).splitlines()) if tests_base != base else set()
 
 
-def _protected(cwd: Path, base: str, tests_base: str, cfg: dict[str, Any]) -> dict[str, Any]:
-    """Files implement/fix changed since write_tests that they may not touch."""
+def content_id(cwd: Path, path: str) -> str:
+    """What the human accepts for a protected file: the git blob hash of its current content."""
+    return _git(cwd, "hash-object", "--", path).strip() if (cwd / path).is_file() else "deleted"
+
+
+def protected_changes(cwd: Path, base: str, tests_base: str, cfg: dict[str, Any],
+                      accepted: dict[str, str] | None = None) -> list[tuple[str, str]]:
+    """(path, label) of every file implement/fix changed since write_tests that they may not
+    touch, except changes the human accepted at approve_fix (pinned to the exact content: any
+    later edit counts again)."""
+    accepted = accepted or {}
     root = gate_root(cfg["scope"])
     by_tests = written_by_tests(cwd, base, tests_base)
     out = _git(cwd, "diff", "--name-status", "--no-renames", tests_base).splitlines()
@@ -242,27 +310,34 @@ def _protected(cwd: Path, base: str, tests_base: str, cfg: dict[str, Any]) -> di
                 before = _test_settings(name, _show(cwd, tests_base, path))
                 now = _test_settings(name, (cwd / path).read_text() if (cwd / path).is_file() else None)
                 if before is not None and before != now:
-                    touched.append(f"{path} (test script)")
+                    touched.append((path, f"{path} (test script)"))
             continue
         in_dirs = any(path.startswith(d) for d in cfg["protected_dirs"])
         if name == INVARIANTS and status == "A" and path not in by_tests:
             continue  # a new INVARIANTS.md is the implementer's (the plan can give it one); an existing one is not
         if (
-            path in by_tests
+            (path in by_tests and is_test_file(path))
             or (in_dirs and status != "A")
             or path in cfg["protected_files"]
             or name in cfg["protected_names"]
             or path == root + CONFIG
         ):
-            touched.append(path)
+            touched.append((path, path))
+    return [(p, label) for p, label in dict.fromkeys(touched) if accepted.get(p) != content_id(cwd, p)]
+
+
+def _protected(cwd: Path, base: str, tests_base: str, cfg: dict[str, Any],
+               accepted: dict[str, str] | None = None) -> dict[str, Any]:
+    touched = [label for _, label in protected_changes(cwd, base, tests_base, cfg, accepted)]
     check = {"name": "protected tests", "kind": "other", "passed": not touched}
     if touched:
         check["findings"] = len(touched)
         check["summary"] = (
             "changed after write_tests: " + ", ".join(sorted(set(touched))[:10])
             + ". The tests from write_tests, the test configuration and test script, INVARIANTS.md and"
-            f" {CONFIG} are read-only for implement and fix: restore them and fix the code. If a test"
-            " itself is wrong, say so; a human decides (reject the run and start again)."
+            f" {CONFIG} are read-only for implement and fix: restore them and fix the code. If the human"
+            " ruled that a test is wrong (or it is), keep the change and write `NEEDS HUMAN: accept the"
+            " change to <path>`: the human sees the diff and can accept exactly that content."
         )
     else:
         check["summary"] = "ok"
@@ -344,11 +419,15 @@ def settings(cwd: Path, base: str, overrides: dict[str, Any] | None = None) -> d
 
 
 def run_gate(cwd: Path, base: str, overrides: dict[str, Any] | None = None,
-             tests_base: str | None = None) -> dict[str, Any]:
-    """`tests_base` is the commit of write_tests; without one, the run's base commit."""
+             tests_base: str | None = None, accepted: dict[str, str] | None = None,
+             accepted_suppressions: list[str] | None = None) -> dict[str, Any]:
+    """`tests_base` is the commit of write_tests; without one, the run's base commit.
+    `accepted`: protected files the human accepted at approve_fix, path → content_id();
+    `accepted_suppressions`: suppression lines the human accepted, suppression_key()."""
     cfg = settings(cwd, base, overrides)
     files = changed_files(cwd, base)
-    checks = [_scope(files, cfg["scope"]), _protected(cwd, base, tests_base or base, cfg)]
+    checks = [_scope(files, cfg["scope"]), _protected(cwd, base, tests_base or base, cfg, accepted),
+              _suppressions(cwd, tests_base or base, cfg["scope"], accepted_suppressions)]
     for cmd in _commands(cfg.get("setup")):
         checks.append(_command("setup", "other", cmd, cwd, cfg))
     tests = _commands(cfg.get("tests"))

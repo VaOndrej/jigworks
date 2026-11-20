@@ -10,9 +10,16 @@ START → triage   (keyword "brainstorm" in the prompt, or the triage agent judg
             review FAIL → fix → review        (while the open findings shrink)
             review PASS → gate (tests, property tests, secret scan, security scan, scope)
             gate FAIL → fix → gate
-            no progress for 2 fixes, the fix cap, or a reviewer question → [approve_fix]
+            no progress for 2 fixes, the fix cap, a reviewer question, a blocked fixer
+            (NEEDS HUMAN) or a fix that changed nothing → [approve_fix]
                   approve / request changes (a note or the answers) → fix, with more fixes
+                  approve after a fix that changed nothing or that
+                  was blocked on the human (NEEDS HUMAN)            → review / gate again
+                  approve with protected files or new suppressions
+                  the gate rejects                                  → accept exactly those, gate again
                   reject                                            → END
+            a fix right after the human's answer always goes on to review / gate, even if it
+            changed nothing (the answer settled it), so approve_fix ⇄ fix cannot loop
             gate PASS → [approve_pr]
                   approve         → open_pr → summary → END
                   request changes → fix → gate → [approve_pr]   (follow-up prompt)
@@ -71,6 +78,10 @@ class State(TypedDict, total=False):
     review_questions: list[str]  # questions the reviewer could not decide without the human
     fixer_requests: list[str]  # NEEDS HUMAN lines of the last fix: what only the human can do
     fix_note: str  # the human's note or answers for the next fix, consumed by fix
+    recheck: bool  # approve_fix: re-run the check without another fix (Approve after a no-change fix)
+    protected_accepted: dict[str, str]  # protected file → content (git blob) the human accepted at approve_fix
+    suppressions_accepted: list[str]  # suppression lines (file + text) the human accepted at approve_fix
+    pending_commented: list[str]  # what waited for acceptance when the human answered with a comment instead
     outcome: Literal["succeeded", "failed", "rejected"]
     failure: str
     pr_url: str
@@ -114,8 +125,10 @@ def after_gate(state: State) -> Literal["fix", "approve_pr", "approve_fix"]:
     return "approve_fix" if state.get("escalation") else "fix"
 
 
-def after_fix_approval(state: State) -> Literal["fix", "__end__"]:
-    return END if state.get("decision") == "reject" else "fix"
+def after_fix_approval(state: State) -> Literal["fix", "review", "gate", "__end__"]:
+    if state.get("decision") == "reject":
+        return END
+    return state.get("fix_target", "review") if state.get("recheck") else "fix"
 
 
 def after_fix(state: State) -> Literal["review", "gate", "approve_fix", "__end__"]:

@@ -1,5 +1,5 @@
 name = "feature-development"
-version = "1.7.0"
+version = "1.8.0"
 description = "Triage (quick fix or brainstorming), brainstorming in as many rounds of questions as the design needs for larger changes, plan agreed with the human (questions and revisions in one planner session), tests from the spec by a separate agent, implement, independent review, fix rounds while they make progress (the human decides when they stall), gate (tests, property tests, secret and security scan), human approval, PR."
 entrypoint = "graph:build_graph"
 minRunnerVersion = "0.1.0"
@@ -54,5 +54,6 @@ allowedTools = [
   "Bash(pnpm test:*)", "Bash(pnpm install:*)", "Bash(pnpm add:*)",
   "Bash(npm test:*)", "Bash(npm install:*)", "Bash(yarn test:*)", "Bash(yarn add:*)",
   "Bash(go test:*)", "Bash(cargo test:*)",
+  "Bash(git rm:*)", "Bash(bandit:*)", "Bash(gitleaks:*)",
 ]
 network = false

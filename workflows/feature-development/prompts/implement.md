@@ -29,6 +29,12 @@ Use the `feature-development:test-first`, `feature-development:deep-modules` and
 - Keep every invariant (`INVARIANTS.md`, the design's `## Invariants`). A change that breaks one
   fails the gate.
 - Do what the plan says, nothing more. No secrets, credentials or tokens anywhere.
+- The gate also runs $scanners. Run them on your change. Fix what they find; do not silence it
+  (`# nosec`, `noqa`, `type: ignore`, `skip`, `xfail`, …): the gate rejects new suppressions
+  until the human accepts them.
+- Leave no scratch or debug files in the repo (one-off scripts, dumps, `dbg_*.py`): use a temporary
+  directory outside it, or delete them with `git rm` / Write before you finish. Never hide them
+  with a `.gitignore` rule.
 
 ## Reply format
 

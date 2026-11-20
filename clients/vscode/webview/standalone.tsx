@@ -18,7 +18,9 @@ import md3 from "../test-fixtures/runs/run_md_0003-running-write-tests.jsonl";
 import md4 from "../test-fixtures/runs/run_md_0004-brainstorm-round-1.jsonl";
 import md5 from "../test-fixtures/runs/run_md_0005-fix-limit-1.6.0.jsonl";
 import md6 from "../test-fixtures/runs/run_md_0006-approve-fix-question.jsonl";
+import md7 from "../test-fixtures/runs/run_md_0007-approve-fix-protected.jsonl";
 import graph17 from "../test-fixtures/feature-development-1.7.0.graph.json";
+import graph18 from "../test-fixtures/feature-development-1.8.0.graph.json";
 import { foldEvents } from "../src/shared/session";
 import { tabChrome } from "../src/shared/tabTitle";
 import type { HostState, ToHost, ToWebview, WorkflowInfo } from "../src/shared/messages";
@@ -33,7 +35,7 @@ import "./standalone.css";
 const parse = (text: string): RunEvent[] => text.split("\n").filter((l) => l.trim()).map((l) => JSON.parse(l) as RunEvent);
 
 const RUNS: Record<string, RunEvent[]> = Object.fromEntries(
-  [r7, r5, r2, r6, r1, md1, md2, md3, md4, md5, md6].map(parse).map((events) => [events[0].runId, events]),
+  [r7, r5, r2, r6, r1, md1, md2, md3, md4, md5, md6, md7].map(parse).map((events) => [events[0].runId, events]),
 );
 
 const FD: WorkflowInfo = {
@@ -58,6 +60,10 @@ const FD17: WorkflowInfo = {
   channel: undefined, digest: "sha256:local", plannedPath: PLANNED_17,
   interruptNodes: ["approve_brainstorm", "approve_plan", "approve_fix", "approve_pr"], graph: graph17 as GraphJSON,
 };
+const FD18: WorkflowInfo = {
+  ...FD17, key: "workspace:feature-development@1.8.0", version: "1.8.0", release: "feature-development@1.8.0",
+  graph: graph18 as GraphJSON,
+};
 const FD16: WorkflowInfo = {
   ...FD17, key: "hub:feature-development@1.6.0", version: "1.6.0", release: "feature-development@1.6.0", source: "hub",
   interruptNodes: ["approve_brainstorm", "approve_plan", "approve_pr"],
@@ -74,7 +80,7 @@ if (params.get("now")) window.__JIGWORKS_NOW__ = params.get("now")!;
 const state: HostState = {
   workflows: params.get("local") === "changed"
     ? [FD, OLDER, { ...FD, key: "workspace:feature-development@1.3.0", source: "workspace", channel: undefined, digest: "sha256:local", changed: true }]
-    : [FD, OLDER, FD16, FD17],
+    : [FD, OLDER, FD16, FD17, FD18],
   selectedWorkflow: FD.key,
   sessions: Object.fromEntries(visibleRuns.filter((r) => RUNS[r]).map((r) => [r, RUNS[r]])),
   running: ["run_fd_0007", "run_md_0002", "run_md_0003"],

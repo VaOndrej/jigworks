@@ -4,6 +4,7 @@
     jigworks approve <runId> | request-changes <runId> --comment "…" | reject <runId>
     jigworks resume <runId>          # after a crash, a kill or a usage-limit pause
     jigworks resume <runId> --more-fixes 3 [--comment ..]   # after the fix loop limit (releases < 1.7.0)
+    jigworks upgrade <runId> --workflow <dir>   # switch a stopped run to a newer release of its workflow
     jigworks ls [--json]             # runs and their status
     jigworks show <runId>            # RunSummary JSON
     jigworks audit <runId>           # AuditRecord JSON (+ API-equivalent cost)
@@ -256,6 +257,50 @@ def cmd_resume(args: argparse.Namespace) -> int:
     return report(outcome, args.run_id)
 
 
+def graph_nodes(package) -> set[str]:
+    return set(package.build_graph().nodes)
+
+
+def cmd_upgrade(args: argparse.Namespace) -> int:
+    """Switch a run that is not being worked on (waiting for a human, paused, interrupted) to a
+    newer release of the same workflow, keeping its state, sessions, commits and answers. The
+    next command (a decision, `resume`) runs the new release's code from the run's checkpoint.
+
+    Only for releases whose graph keeps every node of the old one: the checkpoint names the next
+    node to run, and LangGraph re-runs a waiting interrupt node, so its new code shows the human
+    the new screen. The run's event log keeps the release it started with in `run_started`;
+    later events carry the new release."""
+    store = Store(home_for(args))
+    rd = store.get(args.run_id)
+    workflow = Path(args.workflow).resolve()
+    with rd.lock():
+        meta = rd.meta()
+        status = _ledger(rd).status
+        if status in ("succeeded", "rejected"):
+            raise RunStateError(f"run {args.run_id} is {status}: nothing left to upgrade")
+        old = load_package(rd.package_dir, digest=meta["digest"])
+        files = bundle_files(workflow)
+        new = load_package(workflow)
+        if new.name != old.name:
+            raise UsageError(f"{new.release} is not a release of {old.name}")
+        if new.digest == old.digest:
+            eprint(f"{args.run_id}: already on {old.release} ({old.digest[:19]}…)")
+            return 0
+        missing = graph_nodes(old) - graph_nodes(new)
+        if missing:
+            raise UsageError(f"{new.release} drops nodes the run's checkpoint may need: {', '.join(sorted(missing))}")
+        store.copy_package(rd, files)
+        load_package(rd.package_dir, digest=new.digest)  # the copy loads, before the run points at it
+        meta["upgrades"] = [*meta.get("upgrades", []), {"from": old.release, "fromDigest": old.digest,
+                                                        "to": new.release, "toDigest": new.digest,
+                                                        "at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}]
+        meta.update(workflowDir=str(workflow), digest=new.digest, release=new.release)
+        rd.write_meta(meta)
+    eprint(f"{args.run_id}: {old.release} → {new.release} ({new.digest[:19]}…), status {status}. "
+           f"The next decision or `jigworks resume {args.run_id}` runs the new release.")
+    return 0
+
+
 def _ledger(rd: RunDir) -> Ledger:
     meta = rd.meta()
     return Ledger.replay(rd.events(), meta.get("weights") or {})
@@ -466,6 +511,10 @@ def build_parser() -> argparse.ArgumentParser:
     rs.add_argument("--comment", help="with --more-fixes: a hint for the fixer")
     rs.add_argument("--as", dest="as_email", help="who decided to continue (default: git config user.email)")
     rs.set_defaults(fn=cmd_resume)
+    up = with_home(sub.add_parser("upgrade", help="switch a stopped run to a newer release of its workflow"))
+    up.add_argument("run_id")
+    up.add_argument("--workflow", required=True, help="workflow package directory of the new release")
+    up.set_defaults(fn=cmd_upgrade)
     for name, fn, help_ in (("show", cmd_show, "print the RunSummary"),
                             ("audit", cmd_audit, "print the AuditRecord and the API-equivalent cost"),
                             ("events", cmd_events, "print the event log")):

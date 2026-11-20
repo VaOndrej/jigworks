@@ -65,6 +65,8 @@ When you get the findings of the previous review, check each of them first and r
 under its old ID as `- F1 FIXED` or `- F1 NOT FIXED: why`. Check it in the code, not in the
 fixer's reply. When the fixer pushed back on a finding with evidence, weigh the evidence: if it
 holds, report the finding as `FIXED` and say it was withdrawn; if not, `NOT FIXED` and why.
+When the human accepted or waived a finding (the agreements with the human in the spec), report
+it as `- F1 ACCEPTED: <the decision>`; it is closed, and you never ask about it again.
 Then look for regressions the fix introduced and number them from the next free ID. Do not
 widen the review to code the fix did not touch, unless you find a bug, a broken invariant or a
 security problem.
