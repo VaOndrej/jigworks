@@ -71,6 +71,7 @@ def edit(path: str, old: str, new: str):
 
 def script(**overrides) -> dict:
     base = {
+        "triage": [FakeStep("ROUTE: QUICK\nREASON: one small function.")],
         "plan": [FakeStep("1. Add describe(order) in sample-repo/sample_repo/notes.py.\n2. Test it.")],
         "write_tests": [FakeStep("added test_describe_order", files={"sample-repo/tests/test_notes.py": FEATURE_TEST})],
         "implement": [FakeStep("implemented describe", files={"sample-repo/sample_repo/notes.py": FEATURE})],
@@ -127,7 +128,7 @@ def test_happy_path_approved_first_time(repo):
     out = run.decide("approve", APPROVER)
     assert out.status == "succeeded"
     assert node_trace(run) == [
-        ("plan", "succeeded"), ("approve_plan", "waiting_human"), ("approve_plan", "succeeded"),
+        ("triage", "succeeded"), ("plan", "succeeded"), ("approve_plan", "waiting_human"), ("approve_plan", "succeeded"),
         ("write_tests", "succeeded"), ("implement", "succeeded"), ("review", "succeeded"),
         ("gate", "succeeded"), ("approve_pr", "waiting_human"), ("approve_pr", "succeeded"),
         ("open_pr", "succeeded"), ("summary", "succeeded"),
@@ -147,7 +148,7 @@ def test_one_git_commit_per_node(repo):
     run, _ = new_run(repo, script())
     approve_all(run, run.start("Add describe(order)"))
     log = sh(repo, "git", "log", "--format=%s", f"{run.base_commit}..HEAD").splitlines()
-    assert log[-1].startswith("jigworks: plan (attempt 1)")
+    assert log[-1].startswith("jigworks: triage (attempt 1)")
     assert len(log) == len([s for s in run.ledger.steps if s.get("commit")])
     assert all(s.get("commit") for s in run.ledger.steps)
 
@@ -157,11 +158,11 @@ def test_models_come_from_the_release(repo):
     approve_all(run, run.start("Add describe(order)"))
     models = {c.node: c.options.model for c in agent.calls}
     assert models == {
-        "plan": "claude-opus-5-5", "write_tests": "claude-opus-5-5", "implement": "claude-sonnet-5-5",
+        "triage": "claude-sonnet-5-5", "plan": "claude-opus-5-5", "write_tests": "claude-opus-5-5", "implement": "claude-sonnet-5-5",
         "review": "claude-opus-5-5", "summary": "claude-sonnet-5-5",
     }
     efforts = {c.node: c.options.effort for c in agent.calls}
-    assert efforts["review"] == "medium" and efforts["implement"] is None
+    assert efforts["review"] == "medium" and efforts["triage"] == "low" and efforts["implement"] is None
     declared = set(run.package.allowed_tools())
     assert all(set(c.options.allowed_tools) <= declared for c in agent.calls)
 
@@ -249,7 +250,7 @@ def test_reject_at_the_plan(repo):
     run.start("Add describe(order)")
     out = run.decide("reject", APPROVER)
     assert out.status == "rejected"
-    assert [c.node for c in agent.calls] == ["plan"]
+    assert [c.node for c in agent.calls] == ["triage", "plan"]
     decision = next(e for e in events(run) if e["kind"] == "review_decision")
     assert decision["runStatus"] == "rejected" and decision["reviewDecision"]["approverEmail"] == APPROVER
     assert node_trace(run)[-1] == ("approve_plan", "failed")
@@ -323,6 +324,171 @@ def test_planning_round_limit_ends_the_run_failed(repo):
     assert len([c for c in agent.calls if c.node == "plan"]) == 5
     assert "planning round limit" in next(e for e in events(run) if e["kind"] == "error")["error"]["message"]
     check_stream(run)
+
+
+# --- brainstorming (1.6.0) -----------------------------------------------------------------------
+
+DESIGN_TEXT = ("DESIGN:\n## Goal\nA describe(order) helper for the order log.\n## Invariants\n"
+               "- describe never changes the order.\n## Decisions and assumptions\n- lower-case side (human).")
+
+
+def brainstorm_script(**overrides) -> dict:
+    steps = {
+        "triage": [FakeStep("ROUTE: BRAINSTORM\nREASON: a new module with open scope.")],
+        "brainstorm": [
+            FakeStep("QUESTIONS:\n## Scope\n1. Only orders, or fills too?\n2. Upper- or lower-case side?"),
+            FakeStep("QUESTIONS:\n## Format\n1. You said fills too: one line per fill?"),
+            FakeStep(DESIGN_TEXT),
+        ],
+    }
+    steps.update(overrides)
+    return script(**steps)
+
+
+def test_quick_route_skips_brainstorming(repo):
+    run, agent = new_run(repo, script())
+    approve_all(run, run.start("Fix the typo in describe(order)"))
+    assert "brainstorm" not in [c.node for c in agent.calls]
+    assert run.ledger.steps[0]["node"] == "triage"
+
+
+def test_keyword_in_the_prompt_goes_to_brainstorming_without_a_triage_call(repo):
+    run, agent = new_run(repo, brainstorm_script(triage=[FakeStep("ROUTE: QUICK")]))
+    out = run.start("Brainstorming: an order log for the desk")
+    assert [c.node for c in agent.calls] == ["brainstorm"]  # no agent decided; the human did
+    assert out.interrupt["stage"] == "plan" and "Brainstorming, round 1" in out.interrupt["message"]
+    assert "Only orders, or fills too?" in out.interrupt["plan"]
+
+
+def test_triage_agent_routes_a_large_change_to_brainstorming(repo):
+    run, agent = new_run(repo, brainstorm_script())
+    out = run.start("Build an order log module for the desk")
+    assert [c.node for c in agent.calls] == ["triage", "brainstorm"]
+    assert out.interrupt["stage"] == "plan" and "question" in out.interrupt["message"].lower()
+
+
+def test_brainstorming_asks_rounds_until_the_design_is_complete(repo):
+    run, agent = new_run(repo, brainstorm_script())
+    run.start("Brainstorm an order log")
+    out = run.decide("request_changes", APPROVER, comment="1. Fills too. 2. Lower-case.")
+    assert "Brainstorming, round 2" in out.interrupt["message"] and "one line per fill" in out.interrupt["plan"]
+    out = run.decide("request_changes", APPROVER, comment="Yes, one line per fill.")
+    assert "design is complete" in out.interrupt["message"] and "## Goal" in out.interrupt["plan"]
+    calls = [c for c in agent.calls if c.node == "brainstorm"]
+    assert len(calls) == 3
+    assert calls[1].options.resume_session_id == calls[0].session_id  # one conversation
+    assert calls[2].options.resume_session_id == calls[0].session_id
+    assert "Fills too" in calls[1].prompt and "one line per fill" in calls[2].prompt
+    assert "plan" not in [c.node for c in agent.calls]  # nothing is planned before the design is approved
+    out = run.decide("approve", APPROVER)
+    # The design goes to the planner, then the usual plan approval.
+    assert out.interrupt["stage"] == "plan" and "Approve the plan" in out.interrupt["message"]
+    plan_call = next(c for c in agent.calls if c.node == "plan")
+    assert "## Approved design" in plan_call.prompt and "describe never changes the order" in plan_call.prompt
+    assert "DESIGN:" not in plan_call.prompt
+    out = run.decide("approve", APPROVER)
+    for node in ("write_tests", "implement", "review"):
+        assert "describe never changes the order" in next(c for c in agent.calls if c.node == node).prompt, node
+    assert approve_all(run, out).status == "succeeded"
+    trace = [n for n, st in node_trace(run) if st != "waiting_human"]
+    assert trace[:9] == ["triage", "brainstorm", "approve_brainstorm", "brainstorm", "approve_brainstorm",
+                         "brainstorm", "approve_brainstorm", "plan", "approve_plan"]
+    assert events(run)[-1]["progress"] == 100.0  # the planned path is complete on this branch too
+    assert events(run)[-1]["summary"]["followUpPrompts"] == 0
+    check_stream(run)
+
+
+def test_approving_open_brainstorm_questions_asks_for_a_design(repo):
+    run, agent = new_run(repo, brainstorm_script(brainstorm=[FakeStep("QUESTIONS:\n1. Fills too?"), FakeStep(DESIGN_TEXT)]))
+    run.start("Brainstorm an order log")
+    out = run.decide("approve", APPROVER)
+    assert "design is complete" in out.interrupt["message"]
+    assert "Decide every open point yourself" in [c for c in agent.calls if c.node == "brainstorm"][1].prompt
+    assert "plan" not in [c.node for c in agent.calls]
+
+
+def test_brainstorm_model_and_effort_come_from_the_release(repo):
+    run, agent = new_run(repo, brainstorm_script())
+    run.start("Brainstorm an order log")
+    c = next(c for c in agent.calls if c.node == "brainstorm")
+    assert c.options.model == "claude-opus-5-5" and c.options.effort == "high"
+    assert set(c.options.allowed_tools) <= {"Read", "Glob", "Grep", "Bash(git diff:*)", "Bash(git log:*)"}
+
+
+def test_reject_while_brainstorming(repo):
+    run, agent = new_run(repo, brainstorm_script())
+    run.start("Brainstorm an order log")
+    out = run.decide("reject", APPROVER)
+    assert out.status == "rejected"
+    assert node_trace(run)[-1] == ("approve_brainstorm", "failed")
+
+
+def test_brainstorming_round_limit_ends_the_run_failed(repo):
+    run, agent = new_run(repo, brainstorm_script(brainstorm=[FakeStep("QUESTIONS:\n1. Which one?")]), max_brainstorm_rounds=3)
+    out = run.start("Brainstorm an order log")
+    while out.status == "waiting_human":
+        out = run.decide("request_changes", APPROVER, comment="An answer.")
+    assert out.status == "failed"
+    assert len([c for c in agent.calls if c.node == "brainstorm"]) == 3
+    assert "brainstorming round limit" in next(e for e in events(run) if e["kind"] == "error")["error"]["message"]
+
+
+def test_brainstorming_survives_a_new_process_from_the_checkpoint(repo, tmp_path):
+    """The run is driven by a new process between rounds (the extension calls the CLI once per
+    decision): the LangGraph checkpoint brings back the brainstormer's session and the answers."""
+    import sqlite3
+
+    from langgraph.checkpoint.sqlite import SqliteSaver
+
+    db = tmp_path / "checkpoints.sqlite"
+    with sqlite3.connect(db, check_same_thread=False) as conn:
+        run, agent = new_run(repo, brainstorm_script())
+        run.graph = run.package.build_graph().compile(checkpointer=SqliteSaver(conn))
+        run.start("Brainstorm an order log")
+        run.decide("request_changes", APPROVER, comment="1. Fills too. 2. Lower-case.")
+        first_session = agent.calls[1].session_id
+        saved_events, base = list(run.sink.events), run.base_commit
+    with sqlite3.connect(db, check_same_thread=False) as conn:
+        from jigworks_runner.events import EventSink
+
+        agent2 = FakeAdapter(brainstorm_script())
+        sink = EventSink(run_id="run_t05", events=saved_events, next_seq=len(saved_events))
+        run2 = WorkflowRun(load_package(PACKAGE_DIR), run_id="run_t05", cwd=repo, agent=agent2, author_email=AUTHOR,
+                           sink=sink, checkpointer=SqliteSaver(conn), base_commit=base,
+                           options={"gate": {"scope": ["sample-repo/"]}}, branch="jigworks/run_t05", repo="jigworks")
+        out = run2.decide("request_changes", APPROVER, comment="Yes, one line per fill.")
+        assert "design is complete" in out.interrupt["message"]
+        (call_,) = agent2.calls
+        assert call_.node == "brainstorm" and call_.options.resume_session_id == first_session
+        out = run2.decide("approve", APPROVER)
+        plan_call = next(c for c in agent2.calls if c.node == "plan")
+        assert "describe never changes the order" in plan_call.prompt  # the design came from the checkpoint
+
+
+def test_every_agent_gets_the_context_it_needs(repo):
+    run, agent = new_run(repo, brainstorm_script(
+        write_tests=[FakeStep("tests/test_notes.py: test_describe_order checks the text",
+                              files={"sample-repo/tests/test_notes.py": FEATURE_TEST})],
+        implement=[FakeStep("notes.py: added describe()", files={"sample-repo/sample_repo/notes.py": FEATURE})],
+        brainstorm=[FakeStep(DESIGN_TEXT)],
+    ))
+    approve_all(run, run.start("Brainstorm an order log"))
+    by = {c.node: c.prompt for c in agent.calls}
+    for node in ("write_tests", "implement", "review"):
+        assert "## Task (from the human)" in by[node] and "## Approved plan" in by[node], node
+        assert "## Approved design" in by[node] and "describe never changes the order" in by[node], node
+    assert "test_describe_order checks the text" in by["implement"]  # the implementer knows the tests
+    assert "test_describe_order checks the text" in by["review"] and "added describe()" in by["review"]
+    assert "added describe()" not in by["write_tests"]  # the test writer never sees the implementation
+    assert "Route: brainstorm" in by["summary"] and "describe never changes the order" in by["summary"]
+    for text in by.values():
+        assert "$" + "prompt" not in text and "$" + "spec" not in text and "$" + "earlier" not in text
+
+
+def test_triage_answer_without_a_route_goes_the_quick_way(repo):
+    run, agent = new_run(repo, script(triage=[FakeStep("I think this is small.")]))
+    out = run.start("Add describe(order)")
+    assert [c.node for c in agent.calls] == ["triage", "plan"] and out.interrupt["stage"] == "plan"
 
 
 def test_reject_at_the_pr_review(repo):
@@ -506,7 +672,7 @@ def test_agent_failure_fails_the_run(repo):
     assert out.status == "failed"
     kinds = [e["kind"] for e in events(run)]
     assert kinds.count("error") == 2 and kinds[-1] == "run_finished"  # adapter error + runner error
-    assert node_trace(run) == [("plan", "failed")]
+    assert node_trace(run) == [("triage", "succeeded"), ("plan", "failed")]
     check_stream(run)
 
 

@@ -7,7 +7,11 @@ human approves twice. It is project-agnostic: the repo is the one the run starts
 in repo A, a new feature in repo B); nothing in it is specific to `sample-repo/`.
 
 ```
-START → plan ⇄ [approve_plan]           (questions / request changes → plan, same session; at most 5 rounds)
+START → triage                          ("brainstorm…" in the prompt, else a short read-only agent call)
+  quick      → plan
+  brainstorm → brainstorm ⇄ [approve_brainstorm]   (rounds of questions in one session until the
+               agent writes the design; at most 15 rounds) → plan (from the approved design)
+plan ⇄ [approve_plan]                   (questions / request changes → plan, same session; at most 5 rounds)
   [approve_plan] approve → write_tests → implement → review
   review FAIL → fix → review            (at most 3 fixes per run, then the run fails)
   review PASS → gate
@@ -30,7 +34,7 @@ START → plan ⇄ [approve_plan]           (questions / request changes → pla
 | `steps/secrets.py` | built-in secret rules (used when `gitleaks` is not installed) |
 | `steps/runtime.py` | the interface the runner injects; the package never imports the runner |
 | `plugin/` | the release's skills, loaded by every agent call (`--plugin-dir`) |
-| `prompts/*.md` | the phase prompts (`$prompt`, `$plan`, `$scope`, … are filled in by the nodes) |
+| `prompts/*.md` | the phase prompts (`$prompt`, `$spec`, `$earlier`, `$scope`, … are filled in by the nodes) |
 | `requirements.lock` | pinned runtime dependencies (one venv per release digest) |
 | `tests/` | fake-adapter tests of every path (not part of the release bundle) |
 
@@ -74,11 +78,36 @@ START → plan ⇄ [approve_plan]           (questions / request changes → pla
   run fails. `write_tests`, `implement` and `review` get the approved plan plus the planning
   conversation. Plan discussion is not counted as a follow-up prompt.
 
+- **Larger changes are brainstormed first (1.6.0).** `triage` routes the run: the word
+  *brainstorm* (or *brainstorming*) in the prompt goes straight to brainstorming; otherwise a
+  Sonnet call at low effort answers `ROUTE: QUICK` or `ROUTE: BRAINSTORM` (an answer without a
+  route goes the quick way, which still plans with the human). The brainstormer (Opus, high
+  effort, read-only) asks as many questions per round and as many rounds as the design needs
+  (`QUESTIONS:`), each with its recommended option, and ends with `DESIGN:` and a design in fixed
+  sections (goal, scenarios, scope, where it lives, architecture, data model, invariants,
+  analytics, milestones, test strategy, decisions). The human answers with Request changes;
+  Approve on open questions makes the agent decide them itself. After the design is approved,
+  `plan` turns it into an implementation plan of up to 40 lines (`prompts/plan_from_design.md`),
+  approved as usual. The brainstorming nodes are off the planned path, like `fix`: % of plan
+  is the same on both routes. Limit: `max_brainstorm_rounds` (15).
+- **Every agent gets the context it needs, in the same structure.** Prompts read Role → Task
+  (from the human) → context sections → Your job → Rules → Reply format. The context is built
+  from the checkpointed state (`spec()`, `earlier()` in `steps/nodes.py`): the approved plan,
+  the approved design, the planning conversation; the implementer also gets the test writer's
+  list, the reviewer gets that list and the implementer's report (and is told not to trust it),
+  a fixer without a session to resume gets everything, and the test writer never sees the
+  implementation. Each reply format says who reads it next.
+- **Checkpoints.** Every node is its own LangGraph step: the runner keeps a SQLite checkpoint
+  per run, one git commit per node and a journal of node results, so a run resumes after a
+  crash, a usage limit or a new process (the extension calls the CLI once per decision) with
+  the same sessions, answers and design. Everything an agent needs later is in the graph state,
+  never only in an agent's memory.
 - **Skills ship with the release.** `plugin/` is a Claude Code plugin (`.claude-plugin/plugin.json`
   + `skills/*/SKILL.md`); the runner passes it to every agent call as
   `claude -p --plugin-dir <package>/plugin`, so the skills are versioned and covered by the
   release digest, and every developer's run uses the same ones. The prompts name the skill each
-  node uses (`clarify-before-planning`, `tests-from-the-spec`, `independent-review`). The target
+  node uses (`brainstorm-before-planning`, `clarify-before-planning`, `tests-from-the-spec`,
+  `independent-review`). The target
   repo's own `.claude/skills/` and `CLAUDE.md` apply too (`--setting-sources project`); personal
   skills and settings in `~/.claude` never do.
 
@@ -90,6 +119,11 @@ START → plan ⇄ [approve_plan]           (questions / request changes → pla
 2. Optional: commit a `.jigworks/gate.toml` when the detected test command is not the right one.
 3. Start a session from the target repo's workspace. Without a test setup, `write_tests` sets
    up the smallest one that fits the stack, and `implement` cannot change it afterwards.
+
+- **Long builds:** every agent call has a 40-turn limit by default. For a larger build pass
+  `--max-turns` (VS Code: `"jigworks.runArgs": ["--max-turns", "150"]`).
+- **Where the gate looks:** test setups are detected only in the root of the scope; a project in
+  a subfolder needs a root `pytest.ini` / package.json test script that runs it.
 
 ## Commands
 

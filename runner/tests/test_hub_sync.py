@@ -75,7 +75,7 @@ def test_hub_sync_registers_the_run_and_streams_events(env, hub):
     p = start(env, "run_hub_live")
     assert p.returncode == 0, p.stderr
     assert "hub synced" in p.stderr
-    assert hub.runs["run_hub_live"]["release"] == "feature-development@1.5.0"
+    assert hub.runs["run_hub_live"]["release"] == "feature-development@1.6.0"
     assert contracts.validate("RunCreate", hub.runs["run_hub_live"]) == []
     assert hub.seqs("run_hub_live") == local_seqs(env, "run_hub_live")
     assert ("POST", "/api/runs", 201) in hub.requests
