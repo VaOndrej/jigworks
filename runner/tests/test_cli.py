@@ -342,7 +342,7 @@ def test_progress_weights_from_history_of_the_same_digest():
 def test_cli_graph_prints_graph_json(env):
     out = jw(env, "graph", str(WORKFLOW))
     graph = json.loads(out.stdout)
-    assert contracts.validate("GraphJSON", graph) == [] and graph["release"] == "feature-development@1.6.0"
+    assert contracts.validate("GraphJSON", graph) == [] and graph["release"] == "feature-development@1.7.0"
 
 
 def test_runner_home_ignores_run_state_but_not_the_gate_config(tmp_path):
@@ -358,3 +358,53 @@ def test_runner_home_ignores_run_state_but_not_the_gate_config(tmp_path):
     ignored = subprocess.run(["git", "check-ignore", ".jigworks/gate.toml", ".jigworks/runs/r.json"],
                              cwd=tmp_path, capture_output=True, text=True).stdout.split()
     assert ignored == [".jigworks/runs/r.json"]
+
+
+# --- fix loop limit (releases before 1.7.0) ----------------------------------------------------
+
+RELEASE_1_6_0 = "394d630"  # main with feature-development 1.6.0, which ends the run at the fix loop limit
+
+
+@pytest.fixture
+def workflow_1_6_0(tmp_path: Path) -> Path:
+    root = Path(__file__).resolve().parents[2]
+    out = tmp_path / "wf-1.6.0"
+    out.mkdir()
+    try:
+        archive = subprocess.run(["git", "archive", f"{RELEASE_1_6_0}:workflows/feature-development"], cwd=root,
+                                 capture_output=True, check=True).stdout
+    except subprocess.CalledProcessError:
+        pytest.skip(f"commit {RELEASE_1_6_0} not in this clone")
+    subprocess.run(["tar", "-x", "-C", str(out)], input=archive, check=True)
+    assert 'version = "1.6.0"' in (out / "workflow.toml").read_text()
+    return out
+
+
+def test_cli_continue_a_run_that_failed_at_the_fix_loop_limit(env, workflow_1_6_0):
+    fail = {"text": "- F1 notes.py:1 describe() ignores the limit\nVERDICT: FAIL"}
+    steps = script(env["tmp"], review=[fail, fail, fail, {"text": "- F1 FIXED\nVERDICT: PASS"}])
+    jw(env, "run", "--workflow", str(workflow_1_6_0), "--repo", str(env["repo"] / "sample-repo"), "--prompt",
+       "Add describe(order)", "--adapter", "fake", "--fake-script", str(steps), "--run-id", "run_lim",
+       "--home", str(env["home"]), "--pr-remote", str(env["remote"]), "--max-fix-loops", "2")
+    failed = jw(env, "approve", "run_lim", check=False)
+    assert failed.returncode == 1
+    assert node_events(log(env, "run_lim"), "fix")[-1] == ("failed", 3)
+
+    plain = jw(env, "resume", "run_lim", check=False)
+    assert plain.returncode != 0 and "--more-fixes" in plain.stderr, "the hint names the way out"
+
+    cont = jw(env, "resume", "run_lim", "--more-fixes", "2", "--comment", "Clamp to the remaining quantity.")
+    assert "waiting for" in cont.stderr or "approve_pr" in cont.stderr, cont.stderr
+    events = log(env, "run_lim")
+    check_log(events)
+    decision = [e for e in events if e["kind"] == "review_decision"][-1]
+    assert decision["node"] == "fix" and "Clamp to the remaining quantity." in decision["reviewDecision"]["comment"]
+    assert node_events(events, "fix")[-2:] == [("running", 4), ("succeeded", 4)]
+    assert node_events(events, "review")[-1] == ("succeeded", 4)
+    assert [e for e in events if e["kind"] == "interrupt"][-1]["node"] == "approve_pr"
+    meta = json.loads((env["home"] / "runs" / "run_lim" / "run.json").read_text())
+    assert meta["options"]["max_fix_loops"] == 4, "the new limit is saved with the run"
+    shown = json.loads(jw(env, "show", "run_lim").stdout)
+    assert shown["status"] == "waiting_human"
+    assert jw(env, "approve", "run_lim").returncode == 0
+    assert json.loads(jw(env, "show", "run_lim").stdout)["status"] == "succeeded"
