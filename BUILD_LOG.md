@@ -17,9 +17,11 @@ Time is tracked in two columns: **human** (my own time: deciding, directing, rev
 | Extension hub connection (gear, connect flow, status line) | 2 min | ~25 min |
 | Hub sample-data reset, worktree cleanup | 2 min | ~20 min |
 | Hub validation: relative imports | 1 min | ~10 min |
+| Extension: one entry for identical local and hub workflows | 1 min | ~15 min |
 | Plan agreed with the human (T18, feature-development 1.5.0) | 3 min | ~40 min |
 | Project-agnostic workflow, Opus 5.5 / Sonnet 5.5 (T19) | 5 min | ~1 h 15 min |
-| **Total** | **3 h 29 min** | **~10 h 25 min** |
+| Prompting and brainstorming the workflow improvements (T18, T19, A/B idea) | 1 h | — |
+| **Total** | **4 h 30 min** | **~10 h 40 min** |
 
 ## Entries
 
@@ -265,6 +267,25 @@ Two Claude Code sessions (Opus 5.5) in their own worktrees, pushing to `feature/
 **What went wrong / changed course**
 - The hub's validation and the runner's loader are two copies of the same import rule. Nothing
   tied them together; the new test is the tie for now.
+
+### 2026-11-20 — Extension: one entry for identical local and hub workflows (human 1 min, agent ~15 min)
+
+**What I delegated**
+- The sidebar listed `feature-development 1.4.0` twice: the hub's release and the workspace's
+  `workflows/feature-development`, with the same digest. A workspace package identical to a
+  published one is now hidden; one that differs from a published package of the same name is
+  tagged `local (changed)`.
+- A file watcher on `workflows/**` rescans the workspace, so the tag follows edits without a
+  reload. Tests written red first (hidden at v1, changed at v2, edit → changed → undo → hidden).
+
+**What I reviewed / decided myself**
+- Hide identical copies, tag the others `local (changed)`.
+
+**What went wrong / changed course**
+- The first watcher broke three existing tests: the runner's `inspect` writes `__pycache__`
+  into the package, the filter missed the directory event, and the rescan dropped the
+  workspace entries before re-inspecting them. The filter now checks every path segment and
+  the scan replaces entries in place, dropping stale ones only at the end.
 
 ### 2026-11-20 — Plan agreed with the human, feature-development 1.5.0 (human 3 min, agent ~40 min)
 

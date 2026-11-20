@@ -9,6 +9,7 @@ import { checkClaude } from "./runner/preflight";
 import { WorkflowRegistry } from "./workflows";
 import type { HostState, Preflight, ToHost, ToWebview, ViewKind, WorkflowInfo } from "./shared/messages";
 import { foldEvents } from "./shared/session";
+import { visibleSelection, visibleWorkflows } from "./shared/visible";
 
 export interface JigworksApi {
   bridge: RunnerBridge;
@@ -93,6 +94,29 @@ class Host {
     return path.join(this.ctx.globalStorageUri.fsPath, "workflows");
   }
 
+  private rescanTimer?: NodeJS.Timeout;
+
+  /** Re-read `workflows/*` of the workspace after an edit, so `local (changed)` follows the files. */
+  watchWorkspaceWorkflows(): vscode.Disposable {
+    const watcher = vscode.workspace.createFileSystemWatcher("**/workflows/**");
+    const rescan = (uri: vscode.Uri) => {
+      // The runner's own `inspect` writes bytecode there; reacting to it would rescan forever.
+      if (uri.fsPath.split(path.sep).includes("__pycache__")) return;
+      clearTimeout(this.rescanTimer);
+      this.rescanTimer = setTimeout(() => void this.rescanWorkspace(), 300);
+    };
+    watcher.onDidChange(rescan);
+    watcher.onDidCreate(rescan);
+    watcher.onDidDelete(rescan);
+    return { dispose: () => { clearTimeout(this.rescanTimer); watcher.dispose(); } };
+  }
+
+  async rescanWorkspace(): Promise<void> {
+    const roots = (vscode.workspace.workspaceFolders ?? []).map((f) => f.uri.fsPath);
+    await this.registry.scanWorkspace(roots).catch(() => undefined);
+    this.broadcast();
+  }
+
   async init(): Promise<void> {
     const roots = (vscode.workspace.workspaceFolders ?? []).map((f) => f.uri.fsPath);
     await Promise.allSettled([this.registry.scanWorkspace(roots), this.registry.scanCache(this.cacheDir())]);
@@ -120,9 +144,11 @@ class Host {
   }
 
   state(): HostState {
+    const all = this.registry.list();
+    const workflows = visibleWorkflows(all);
     return {
-      workflows: this.registry.list(),
-      selectedWorkflow: this.selected,
+      workflows,
+      selectedWorkflow: visibleSelection(all, workflows, this.selected),
       sessions: this.bridge.snapshot(),
       running: this.bridge.running(),
       preflight: this.preflightResult,
@@ -540,6 +566,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Jigwor
       if (row) await vscode.commands.executeCommand("vscode.openFolder", vscode.Uri.file(row.worktree), { forceNewWindow: true });
     }),
   );
+  context.subscriptions.push(host.watchWorkspaceWorkflows());
   await host.init();
 
   return {
