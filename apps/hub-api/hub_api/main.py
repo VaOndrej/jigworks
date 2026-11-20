@@ -43,14 +43,14 @@ from jigworks_contracts.models import (
     WorkflowList,
 )
 
-from . import analytics, drafts, releases, runs
+from . import analytics, drafts, releases, runs, sample_data
 from . import bundles as bundle_store
 from .auth import SESSION_MAX_AGE, HubPasswordMiddleware, password_ok, session_token
 from .config import settings
 from .db import connect
 from .errors import ApiError, install, not_found
 from .ratelimit import client_ip, rate_limited, record_failure, retry_after
-from .extensions import Overview
+from .extensions import Overview, SampleDataRemoved
 
 PUBLIC: list[dict] = []
 ERRORS = {
@@ -425,6 +425,19 @@ def overview(
 ):
     with connect() as conn:
         return analytics.overview(conn, workflowId, _aware(from_), _aware(to))
+
+
+@app.post("/api/admin/remove-sample-data", response_model=SampleDataRemoved, tags=["admin"],
+          responses={401: ERRORS[401]},
+          description="Hub-only (not in the frozen contract): delete the sample workflow releases and runs the hub "
+                      "seeded from the contract fixtures. Real releases and runs stay; the hub does not seed again. "
+                      "Idempotent.")
+def remove_sample_data():
+    with connect() as conn:
+        counts, urls = sample_data.remove(conn)
+    # After the commit: a failed Blob delete leaves orphaned files, never a release without its bytes.
+    bundle_store.delete_blobs(urls)
+    return counts
 
 
 # --- OpenAPI ------------------------------------------------------------------------------

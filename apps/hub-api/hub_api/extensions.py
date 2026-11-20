@@ -56,3 +56,12 @@ class Overview(GroupStats):
 
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
+
+
+class SampleDataRemoved(_Model):
+    """Hub-only: what `POST /api/admin/remove-sample-data` deleted."""
+
+    runs: int
+    releases: int
+    workflows: int
+    blobBundles: int

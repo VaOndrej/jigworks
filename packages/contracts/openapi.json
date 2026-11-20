@@ -1559,6 +1559,38 @@
           }
         }
       }
+    },
+    "/api/admin/remove-sample-data": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Remove Sample Data",
+        "description": "Hub-only (not in the frozen contract): delete the sample workflow releases and runs the hub seeded from the contract fixtures. Real releases and runs stay; the hub does not seed again. Idempotent.",
+        "operationId": "remove_sample_data_api_admin_remove_sample_data_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SampleDataRemoved"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong session cookie / X-Jigworks-Key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -4557,6 +4589,36 @@
         ],
         "title": "RunSummary",
         "description": "Current state of a run. Sent by the runner in run_finished; returned by the hub (which adds costUsd, computed from the price table at read time)."
+      },
+      "SampleDataRemoved": {
+        "properties": {
+          "runs": {
+            "type": "integer",
+            "title": "Runs"
+          },
+          "releases": {
+            "type": "integer",
+            "title": "Releases"
+          },
+          "workflows": {
+            "type": "integer",
+            "title": "Workflows"
+          },
+          "blobBundles": {
+            "type": "integer",
+            "title": "Blobbundles"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "runs",
+          "releases",
+          "workflows",
+          "blobBundles"
+        ],
+        "title": "SampleDataRemoved",
+        "description": "Hub-only: what `POST /api/admin/remove-sample-data` deleted."
       },
       "SessionRequest": {
         "properties": {
