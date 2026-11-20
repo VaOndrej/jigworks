@@ -240,6 +240,74 @@ def test_reject_at_the_plan(repo):
     check_stream(run)
 
 
+def test_request_changes_at_the_plan_replans_in_the_same_session(repo):
+    steps = script(plan=[
+        FakeStep("1. Add describe(order) in sample-repo/sample_repo/notes.py."),
+        FakeStep("1. Add describe(order) in sample-repo/sample_repo/notes.py, lower-case side.\n2. Test it."),
+    ])
+    run, agent = new_run(repo, steps)
+    run.start("Add describe(order)")
+    out = run.decide("request_changes", APPROVER, comment="Use the lower-case side name.")
+    assert out.status == "waiting_human" and out.interrupt["stage"] == "plan"
+    assert "lower-case side" in out.interrupt["plan"]
+    first, second = [c for c in agent.calls if c.node == "plan"]
+    assert second.options.resume_session_id == first.session_id  # the planner keeps its memory
+    assert "Use the lower-case side name." in second.prompt
+    assert "write_tests" not in [c.node for c in agent.calls]  # nothing is built on a plan under discussion
+    out = run.decide("approve", APPROVER)
+    tests_call = next(c for c in agent.calls if c.node == "write_tests")
+    assert "lower-case side" in tests_call.prompt
+    out = run.decide("approve", APPROVER)
+    # Agreeing on the plan comes before the first result, so it is not a correction of it (design.md §8).
+    assert events(run)[-1]["summary"]["followUpPrompts"] == 0
+    check_stream(run)
+
+
+def test_planner_asks_questions_before_it_plans(repo):
+    steps = script(plan=[
+        FakeStep("QUESTIONS:\n1. Should the side be upper- or lower-case?"),
+        FakeStep("1. Add describe(order) in sample-repo/sample_repo/notes.py, lower-case side.\n2. Test it."),
+    ])
+    run, agent = new_run(repo, steps)
+    out = run.start("Add describe(order)")
+    assert out.interrupt["stage"] == "plan" and "question" in out.interrupt["message"].lower()
+    assert "upper- or lower-case" in out.interrupt["plan"]
+    out = run.decide("request_changes", APPROVER, comment="Lower-case.")
+    assert "Lower-case." in [c for c in agent.calls if c.node == "plan"][1].prompt
+    run.decide("approve", APPROVER)
+    # The agents after the plan see what was agreed, not only the final plan.
+    for node in ("write_tests", "implement", "review"):
+        call_ = next(c for c in agent.calls if c.node == node)
+        assert "upper- or lower-case" in call_.prompt and "Lower-case." in call_.prompt, node
+    check_stream(run)
+
+
+def test_approving_open_questions_does_not_start_the_build(repo):
+    steps = script(plan=[
+        FakeStep("QUESTIONS:\n1. Should the side be upper- or lower-case?"),
+        FakeStep("Assuming lower-case.\n1. Add describe(order) in sample-repo/sample_repo/notes.py."),
+    ])
+    run, agent = new_run(repo, steps)
+    run.start("Add describe(order)")
+    out = run.decide("approve", APPROVER)
+    assert out.interrupt["stage"] == "plan"  # a question is not a plan; the planner states assumptions first
+    assert "assumptions" in [c for c in agent.calls if c.node == "plan"][1].prompt
+    assert "write_tests" not in [c.node for c in agent.calls]
+
+
+def test_planning_round_limit_ends_the_run_failed(repo):
+    run, agent = new_run(repo, script(plan=[FakeStep("QUESTIONS:\n1. Which one?")]))
+    out = run.start("Add describe(order)")
+    rounds = 1
+    while out.status == "waiting_human":
+        out = run.decide("request_changes", APPROVER, comment=f"Answer {rounds}.")
+        rounds += 1
+    assert out.status == "failed"
+    assert len([c for c in agent.calls if c.node == "plan"]) == 5
+    assert "planning round limit" in next(e for e in events(run) if e["kind"] == "error")["error"]["message"]
+    check_stream(run)
+
+
 def test_reject_at_the_pr_review(repo):
     run, _ = new_run(repo, script())
     run.start("Add describe(order)")

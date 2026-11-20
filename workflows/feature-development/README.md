@@ -5,7 +5,8 @@ in which the tests are written by a different agent from the spec, an independen
 reviews, a deterministic gate checks the invariants, and a human approves twice.
 
 ```
-START → plan → [approve_plan] → write_tests → implement → review
+START → plan ⇄ [approve_plan]           (questions / request changes → plan, same session; at most 5 rounds)
+  [approve_plan] approve → write_tests → implement → review
   review FAIL → fix → review            (at most 3 fixes per run, then the run fails)
   review PASS → gate
   gate FAIL   → fix → gate
@@ -49,8 +50,12 @@ START → plan → [approve_plan] → write_tests → implement → review
 - **Request changes** at the PR review sends the comment back to the agent; the runner counts
   it as a follow-up prompt and records the first reviewed commit (`firstResultCommit`), the
   baseline of the human delta (design.md §8).
-- **Request changes at the plan** does not re-plan: the comment is appended to the plan that
-  the later agents see.
+- **The plan is agreed before anything is built** (design.md §5). The planner may reply with
+  `QUESTIONS:` instead of a plan; Request changes at the plan (the answers, or a comment) goes
+  back to the planner, which resumes its own session and remembers the conversation. Approving
+  open questions sends the planner back to state its assumptions. After 5 planning rounds the
+  run fails. `write_tests`, `implement` and `review` get the approved plan plus the planning
+  conversation. Plan discussion is not counted as a follow-up prompt.
 
 ## Commands
 

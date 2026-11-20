@@ -86,7 +86,8 @@ class Ledger:
                 {k: v for k, v in {"stage": d["stage"], "decision": d["decision"], "approverEmail": d["approverEmail"],
                                    "comment": d.get("comment"), "at": e["at"]}.items() if v is not None}
             )
-            if d["decision"] == "request_changes":
+            if d["decision"] == "request_changes" and d["stage"] == "pr":
+                # A follow-up prompt corrects a result; agreeing on the plan comes before the first one.
                 self.follow_ups += 1
             if d["decision"] == "approve" and d["stage"] == "pr":
                 self.approver_email, self.approved_at = d["approverEmail"], e["at"]

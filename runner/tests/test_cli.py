@@ -342,4 +342,4 @@ def test_progress_weights_from_history_of_the_same_digest():
 def test_cli_graph_prints_graph_json(env):
     out = jw(env, "graph", str(WORKFLOW))
     graph = json.loads(out.stdout)
-    assert contracts.validate("GraphJSON", graph) == [] and graph["release"] == "feature-development@1.4.0"
+    assert contracts.validate("GraphJSON", graph) == [] and graph["release"] == "feature-development@1.5.0"
