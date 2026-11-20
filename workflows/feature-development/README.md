@@ -130,4 +130,10 @@ plan ⇄ [approve_plan]                   (questions / request changes → plan,
 ```bash
 uv run pytest workflows/feature-development                  # every path, fake adapter, real gate
 uv run python -m workflows.feature_development.export_graph  # get_graph() as GraphJSON
+uv run python scripts/publish-workflow.py workflows/feature-development                  # dry run against the hub
+uv run python scripts/publish-workflow.py workflows/feature-development --channel stable --yes
 ```
+
+Publishing needs `JIGWORKS_HUB_URL` and `HUB_PASSWORD` in the environment. Deploying the hub
+does not publish a workflow: a release exists only after this script (or Publish in the hub's
+editor) has run.
