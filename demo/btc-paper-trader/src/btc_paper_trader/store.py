@@ -113,21 +113,18 @@ class SqliteStore:
         accounts = [dict(r) for r in await db.execute_fetchall("SELECT * FROM accounts ORDER BY account_id")]
         if not accounts:
             return None
-        cols = ",".join(f"o.{c}" for c in ORDER_COLS)
-        join = "JOIN accounts a ON a.account_id = o.account_id AND a.epoch = o.epoch"
-        # Only module constants (column names, status list) are interpolated; values use "?".
         live = await db.execute_fetchall(
-            f"SELECT {cols} FROM orders o {join} WHERE o.status IN {LIVE_SQL}"  # nosec B608
+            "SELECT o.* FROM orders o JOIN accounts a ON a.account_id = o.account_id AND a.epoch = o.epoch "
+            "WHERE o.status IN ('new','open','partially_filled')"
         )
         done = await db.execute_fetchall(
-            f"SELECT {','.join(ORDER_COLS)} FROM (SELECT {cols}, ROW_NUMBER() OVER "  # nosec B608
-            f"(PARTITION BY o.account_id ORDER BY o.order_id DESC) AS rn FROM orders o {join} "
-            f"WHERE o.status NOT IN {LIVE_SQL}) WHERE rn <= ?",
+            "SELECT * FROM (SELECT o.*, ROW_NUMBER() OVER (PARTITION BY o.account_id ORDER BY o.order_id DESC) "
+            "AS rn FROM orders o JOIN accounts a ON a.account_id = o.account_id AND a.epoch = o.epoch "
+            "WHERE o.status NOT IN ('new','open','partially_filled')) WHERE rn <= ?",
             (ORDERS_KEPT,),
         )
-        fcols = ",".join(f"f.{c}" for c in FILL_COLS)
         fills = await db.execute_fetchall(
-            f"SELECT {','.join(FILL_COLS)} FROM (SELECT {fcols}, ROW_NUMBER() OVER (PARTITION BY f.account_id "  # nosec B608
+            "SELECT * FROM (SELECT f.*, ROW_NUMBER() OVER (PARTITION BY f.account_id "
             "ORDER BY f.trade_id DESC, f.order_id DESC) AS rn FROM fills f JOIN accounts a "
             "ON a.account_id = f.account_id AND a.epoch = f.epoch) WHERE rn <= ? "
             "ORDER BY account_id, trade_id, order_id",
