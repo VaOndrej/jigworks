@@ -1,0 +1,89 @@
+{
+  "fixtures": {
+    "runs/run_fd_0001-approved-first-time.jsonl": {
+      "def": "RunEvent",
+      "jsonl": true
+    },
+    "runs/run_fd_0002-fix-loops-request-changes.jsonl": {
+      "def": "RunEvent",
+      "jsonl": true
+    },
+    "runs/run_fd_0003-rejected-at-plan.jsonl": {
+      "def": "RunEvent",
+      "jsonl": true
+    },
+    "runs/run_fd_0004-gate-fail-then-approved.jsonl": {
+      "def": "RunEvent",
+      "jsonl": true
+    },
+    "runs/run_fd_0005-waiting-for-review.jsonl": {
+      "def": "RunEvent",
+      "jsonl": true
+    },
+    "runs/run_fd_0006-paused-usage-limit.jsonl": {
+      "def": "RunEvent",
+      "jsonl": true
+    },
+    "runs/run_fd_0007-running-implement.jsonl": {
+      "def": "RunEvent",
+      "jsonl": true
+    },
+    "api/health.json": {
+      "def": "HealthResponse"
+    },
+    "api/workflow-list.json": {
+      "def": "WorkflowList"
+    },
+    "api/release-list.json": {
+      "def": "ReleaseList"
+    },
+    "api/channel-stable.json": {
+      "def": "ChannelResolution"
+    },
+    "api/validation-ok.json": {
+      "def": "ValidationResult"
+    },
+    "api/validation-failed.json": {
+      "def": "ValidationResult"
+    },
+    "api/run-create.json": {
+      "def": "RunCreate"
+    },
+    "api/event-batch.json": {
+      "def": "EventBatch"
+    },
+    "api/event-batch-result.json": {
+      "def": "EventBatchResult"
+    },
+    "api/run-list.json": {
+      "def": "RunList"
+    },
+    "api/run-detail.json": {
+      "def": "RunDetail"
+    },
+    "api/error-unauthorized.json": {
+      "def": "ErrorResponse"
+    },
+    "audit/run_fd_0002.audit.json": {
+      "def": "AuditRecord"
+    },
+    "prices.json": {
+      "def": "PriceEntry",
+      "list": true
+    },
+    "human-deltas.json": {
+      "def": "HumanDelta",
+      "list": true
+    },
+    "graph/feature-development-1.3.0.graph.json": {
+      "def": "GraphJSON"
+    }
+  },
+  "bundles": {
+    "bundles/feature-development-1.2.0.zip": "sha256:7fdedf35076f54adb12d1393a0e6a5599e378d708f8da85b36660bff2d01fa3f",
+    "bundles/feature-development-1.3.0.zip": "sha256:e941f267e18b97560bcb4292047781b0844c70f6fea282c8c2a1c14733854c30"
+  },
+  "tampered": {
+    "bundles/feature-development-1.3.0.tampered.zip": "sha256:e941f267e18b97560bcb4292047781b0844c70f6fea282c8c2a1c14733854c30"
+  }
+}

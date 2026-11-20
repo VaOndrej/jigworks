@@ -1,0 +1,14 @@
+src/**
+webview/**
+test-fixtures/**
+out/test/**
+out/standalone/**
+out/runner/**
+out/shared/**
+out/workflows.js
+out/**/*.map
+node_modules/**
+build.mjs
+tsconfig*.json
+*.vsix
+.vscode-test/**

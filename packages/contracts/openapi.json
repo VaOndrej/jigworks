@@ -1,0 +1,5456 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Jigworks Hub API",
+    "description": "Jigworks hub. Every endpoint except `GET /api/health` and `POST /api/session` requires the session cookie `jigworks_session` (set by `POST /api/session`) or the `X-Jigworks-Key` header carrying the hub password (HUB_PASSWORD). Engineers never log in: the runner reports `git config user.email` as author/approver. Costs are API equivalent.",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/health": {
+      "get": {
+        "tags": [
+          "public"
+        ],
+        "summary": "Health",
+        "operationId": "health_api_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/session": {
+      "post": {
+        "tags": [
+          "public"
+        ],
+        "summary": "Create Session",
+        "operationId": "create_session_api_session_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Sets the HTTP-only `jigworks_session` cookie."
+          },
+          "401": {
+            "description": "Missing or wrong session cookie / X-Jigworks-Key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      },
+      "delete": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Delete Session",
+        "operationId": "delete_session_api_session_delete",
+        "responses": {
+          "204": {
+            "description": "Clears the cookie."
+          }
+        }
+      }
+    },
+    "/api/workflows": {
+      "get": {
+        "tags": [
+          "workflows"
+        ],
+        "summary": "List Workflows",
+        "operationId": "list_workflows_api_workflows_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkflowList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong session cookie / X-Jigworks-Key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workflows/{workflowId}/draft": {
+      "get": {
+        "tags": [
+          "workflows"
+        ],
+        "summary": "Get Draft",
+        "operationId": "get_draft_api_workflows__workflowId__draft_get",
+        "parameters": [
+          {
+            "name": "workflowId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]*$",
+              "examples": [
+                "feature-development"
+              ],
+              "title": "Workflowid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Draft"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong session cookie / X-Jigworks-Key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Body does not match the contract.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "workflows"
+        ],
+        "summary": "Put Draft",
+        "description": "Full replacement of the draft's files (create, rename and delete files and folders). An unknown workflow id creates the workflow; an empty file list fills it from the template.",
+        "operationId": "put_draft_api_workflows__workflowId__draft_put",
+        "parameters": [
+          {
+            "name": "workflowId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]*$",
+              "examples": [
+                "feature-development"
+              ],
+              "title": "Workflowid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DraftUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Draft"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong session cookie / X-Jigworks-Key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Body does not match the contract.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workflows/{workflowId}/validate": {
+      "post": {
+        "tags": [
+          "workflows"
+        ],
+        "summary": "Validate Draft",
+        "description": "Validate the current draft in isolation (Vercel Sandbox): manifest, syntax, imports, compile, get_graph(). The published code never runs in the API process.",
+        "operationId": "validate_draft_api_workflows__workflowId__validate_post",
+        "parameters": [
+          {
+            "name": "workflowId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]*$",
+              "examples": [
+                "feature-development"
+              ],
+              "title": "Workflowid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong session cookie / X-Jigworks-Key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Body does not match the contract.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workflows/{workflowId}/publish": {
+      "post": {
+        "tags": [
+          "workflows"
+        ],
+        "summary": "Publish",
+        "description": "Bundle the draft as a deterministic .zip, store it in Blob, compute the digest, create an immutable release; optionally point a channel to it.",
+        "operationId": "publish_api_workflows__workflowId__publish_post",
+        "parameters": [
+          {
+            "name": "workflowId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]*$",
+              "examples": [
+                "feature-development"
+              ],
+              "title": "Workflowid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublishRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Release"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong session cookie / X-Jigworks-Key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Body does not match the contract.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Version already exists or the draft does not validate.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workflows/{workflowId}/releases": {
+      "get": {
+        "tags": [
+          "releases"
+        ],
+        "summary": "List Releases",
+        "operationId": "list_releases_api_workflows__workflowId__releases_get",
+        "parameters": [
+          {
+            "name": "workflowId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]*$",
+              "examples": [
+                "feature-development"
+              ],
+              "title": "Workflowid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReleaseList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong session cookie / X-Jigworks-Key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Body does not match the contract.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workflows/{workflowId}/channels/{channel}": {
+      "get": {
+        "tags": [
+          "releases"
+        ],
+        "summary": "Resolve Channel",
+        "operationId": "resolve_channel_api_workflows__workflowId__channels__channel__get",
+        "parameters": [
+          {
+            "name": "workflowId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]*$",
+              "examples": [
+                "feature-development"
+              ],
+              "title": "Workflowid"
+            }
+          },
+          {
+            "name": "channel",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "stable",
+                "beta"
+              ],
+              "type": "string",
+              "title": "Channel"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChannelResolution"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong session cookie / X-Jigworks-Key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Body does not match the contract.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "releases"
+        ],
+        "summary": "Update Channel",
+        "description": "Point a channel to a release (publish to a channel or roll back).",
+        "operationId": "update_channel_api_workflows__workflowId__channels__channel__put",
+        "parameters": [
+          {
+            "name": "workflowId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]*$",
+              "examples": [
+                "feature-development"
+              ],
+              "title": "Workflowid"
+            }
+          },
+          {
+            "name": "channel",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "stable",
+                "beta"
+              ],
+              "type": "string",
+              "title": "Channel"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChannelUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChannelResolution"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong session cookie / X-Jigworks-Key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Body does not match the contract.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/releases/{releaseId}/bundle": {
+      "get": {
+        "tags": [
+          "releases"
+        ],
+        "summary": "Download Bundle",
+        "operationId": "download_bundle_api_releases__releaseId__bundle_get",
+        "parameters": [
+          {
+            "name": "releaseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "title": "Releaseid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The release .zip. Header X-Jigworks-Digest: sha256:<hex> of these bytes; the client verifies it.",
+            "content": {
+              "application/json": {
+                "schema": {}
+              },
+              "application/zip": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            },
+            "headers": {
+              "X-Jigworks-Digest": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong session cookie / X-Jigworks-Key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Body does not match the contract.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/runs": {
+      "post": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "Create Run",
+        "description": "Register a run with its pinned release. Idempotent on runId (a repeat returns the existing run).",
+        "operationId": "create_run_api_runs_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunSummary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong session cookie / X-Jigworks-Key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Body does not match the contract.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "List Runs",
+        "operationId": "list_runs_api_runs_get",
+        "parameters": [
+          {
+            "name": "workflowId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Workflowid"
+            }
+          },
+          {
+            "name": "release",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "examples": [
+                "feature-development@1.3.0"
+              ],
+              "title": "Release"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "One status or a comma-separated list; `live` = running, waiting_human, paused_usage_limit.",
+              "title": "Status"
+            },
+            "description": "One status or a comma-separated list; `live` = running, waiting_human, paused_usage_limit."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong session cookie / X-Jigworks-Key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/runs/{runId}": {
+      "get": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "Get Run",
+        "operationId": "get_run_api_runs__runId__get",
+        "parameters": [
+          {
+            "name": "runId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "examples": [
+                "run_123"
+              ],
+              "title": "Runid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong session cookie / X-Jigworks-Key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Body does not match the contract.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/runs/{runId}/events": {
+      "post": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "Ingest Events",
+        "description": "Event ingest (batch). Each event needs runId == path runId and a seq; (runId, seq) is stored once, re-sent events count as duplicates. Events for an unregistered run are rejected with 404.",
+        "operationId": "ingest_events_api_runs__runId__events_post",
+        "parameters": [
+          {
+            "name": "runId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "examples": [
+                "run_123"
+              ],
+              "title": "Runid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EventBatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventBatchResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong session cookie / X-Jigworks-Key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Body does not match the contract.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "List Events",
+        "description": "Polling fallback for the stream: events with seq > after, in seq order.",
+        "operationId": "list_events_api_runs__runId__events_get",
+        "parameters": [
+          {
+            "name": "runId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "examples": [
+                "run_123"
+              ],
+              "title": "Runid"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": -1,
+              "default": -1,
+              "title": "After"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 1000,
+              "minimum": 1,
+              "default": 500,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventPage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong session cookie / X-Jigworks-Key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Body does not match the contract.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/runs/{runId}/events/stream": {
+      "get": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "Stream Events",
+        "operationId": "stream_events_api_runs__runId__events_stream_get",
+        "parameters": [
+          {
+            "name": "runId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "examples": [
+                "run_123"
+              ],
+              "title": "Runid"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": -1,
+              "default": -1,
+              "title": "After"
+            }
+          },
+          {
+            "name": "Last-Event-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Last-Event-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "SSE. Each message: `id: <seq>`, `event: <kind>`, `data: <RunEvent JSON>`. Vercel functions time out, so clients reconnect with Last-Event-ID (or ?after=) or fall back to polling.",
+            "content": {
+              "application/json": {
+                "schema": {}
+              },
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong session cookie / X-Jigworks-Key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Body does not match the contract.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/analytics/usage": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Usage Report",
+        "description": "Raw tokens grouped by release, model, node or day; cost computed at read time from the price table (API equivalent).",
+        "operationId": "usage_report_api_analytics_usage_get",
+        "parameters": [
+          {
+            "name": "groupBy",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "release",
+                "model",
+                "node",
+                "day"
+              ],
+              "type": "string",
+              "default": "release",
+              "title": "Groupby"
+            }
+          },
+          {
+            "name": "workflowId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Workflowid"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsageReport"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong session cookie / X-Jigworks-Key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/analytics/releases": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Release Comparison",
+        "description": "Version comparison per release: runs, success rate, fix loops, follow-up prompts, cost.",
+        "operationId": "release_comparison_api_analytics_releases_get",
+        "parameters": [
+          {
+            "name": "workflowId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Workflowid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReleaseComparison"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong session cookie / X-Jigworks-Key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/analytics/outcomes": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Outcomes",
+        "description": "PLANNED human-delta outcomes; returns sample data (sample=true) until capture is built.",
+        "operationId": "outcomes_api_analytics_outcomes_get",
+        "parameters": [
+          {
+            "name": "workflowId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Workflowid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutcomeReport"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong session cookie / X-Jigworks-Key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/analytics/overview": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Overview",
+        "description": "Hub-only (not in the frozen contract): key numbers for the Workflows and Runs & analytics tabs. Default period: the last 7 days.",
+        "operationId": "overview_api_analytics_overview_get",
+        "parameters": [
+          {
+            "name": "workflowId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Workflowid"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Overview"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong session cookie / X-Jigworks-Key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AgentOutputPayload": {
+        "properties": {
+          "block": {
+            "type": "string",
+            "enum": [
+              "text",
+              "tool_use",
+              "tool_result",
+              "thinking"
+            ],
+            "title": "Block"
+          },
+          "messageId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Messageid"
+          },
+          "sessionId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sessionid"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          },
+          "tool": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ToolCall"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "toolUseId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tooluseid"
+          },
+          "isError": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Iserror"
+          },
+          "denied": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Denied"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "block"
+        ],
+        "title": "AgentOutputPayload",
+        "description": "Pass-through of stream-json content for the optional live agent output (design.md \u00a77). One event per content block. thinking blocks are normally skipped."
+      },
+      "Artifact": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Path"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "Artifact"
+      },
+      "AuditDecision": {
+        "properties": {
+          "stage": {
+            "type": "string",
+            "enum": [
+              "plan",
+              "pr"
+            ],
+            "title": "Stage"
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "approve",
+              "request_changes",
+              "reject"
+            ],
+            "title": "Decision"
+          },
+          "approverEmail": {
+            "type": "string",
+            "pattern": "^[^@\\s]+@[^@\\s]+$",
+            "title": "Approveremail"
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "stage",
+          "decision",
+          "approverEmail",
+          "at"
+        ],
+        "title": "AuditDecision"
+      },
+      "AuditRecord": {
+        "properties": {
+          "runId": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Runid"
+          },
+          "workflowId": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*$",
+            "title": "Workflowid"
+          },
+          "release": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*@[0-9]+\\.[0-9]+\\.[0-9]+([-+][0-9A-Za-z.-]+)?$",
+            "title": "Release"
+          },
+          "digest": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "title": "Digest"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "running",
+              "waiting_human",
+              "paused_usage_limit",
+              "succeeded",
+              "failed",
+              "rejected",
+              "cancelled"
+            ],
+            "title": "Status"
+          },
+          "authorEmail": {
+            "type": "string",
+            "pattern": "^[^@\\s]+@[^@\\s]+$",
+            "title": "Authoremail"
+          },
+          "approverEmail": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[^@\\s]+@[^@\\s]+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approveremail"
+          },
+          "approvedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approvedat"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Startedat"
+          },
+          "finishedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finishedat"
+          },
+          "models": {
+            "$ref": "#/components/schemas/ModelAssignment"
+          },
+          "adapter": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "claude",
+                  "codex",
+                  "fake"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Adapter"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/AuditStep"
+            },
+            "type": "array",
+            "title": "Steps"
+          },
+          "decisions": {
+            "items": {
+              "$ref": "#/components/schemas/AuditDecision"
+            },
+            "type": "array",
+            "title": "Decisions"
+          },
+          "changedFiles": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Changedfiles"
+          },
+          "firstResultCommit": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9a-f]{7,40}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Firstresultcommit"
+          },
+          "finalCommit": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9a-f]{7,40}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finalcommit"
+          },
+          "prUrl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prurl"
+          },
+          "usage": {
+            "items": {
+              "$ref": "#/components/schemas/UsageRecord"
+            },
+            "type": "array",
+            "title": "Usage"
+          },
+          "cliCostUsd": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clicostusd"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "runId",
+          "workflowId",
+          "release",
+          "digest",
+          "status",
+          "authorEmail",
+          "startedAt",
+          "models",
+          "steps",
+          "decisions",
+          "usage"
+        ],
+        "title": "AuditRecord",
+        "description": "Audit trail of one run (design.md \u00a78 Audit): who started it, release + digest, models, steps with git snapshots, gate results, who approved and when, tokens. Written by the runner to its local audit log; the hub can rebuild it from the events."
+      },
+      "AuditStep": {
+        "properties": {
+          "node": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Node"
+          },
+          "attempt": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Attempt"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "running",
+              "waiting_human",
+              "succeeded",
+              "failed",
+              "skipped",
+              "cancelled"
+            ],
+            "title": "Status"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Startedat"
+          },
+          "finishedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finishedat"
+          },
+          "commit": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9a-f]{7,40}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Commit"
+          },
+          "changedFiles": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Changedfiles"
+          },
+          "gate": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GateResultPayload"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "node",
+          "attempt",
+          "status",
+          "startedAt"
+        ],
+        "title": "AuditStep"
+      },
+      "ChannelResolution": {
+        "properties": {
+          "workflowId": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*$",
+            "title": "Workflowid"
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "stable",
+              "beta"
+            ],
+            "title": "Channel"
+          },
+          "releaseId": {
+            "type": "string",
+            "title": "Releaseid"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "digest": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "title": "Digest"
+          },
+          "bundleUrl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bundleurl"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "workflowId",
+          "channel",
+          "releaseId",
+          "version",
+          "digest"
+        ],
+        "title": "ChannelResolution"
+      },
+      "ChannelUpdate": {
+        "properties": {
+          "releaseId": {
+            "type": "string",
+            "title": "Releaseid"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "releaseId"
+        ],
+        "title": "ChannelUpdate",
+        "description": "Point a channel to a release (publish or rollback)."
+      },
+      "Channels": {
+        "properties": {
+          "stable": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stable"
+          },
+          "beta": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Beta"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Channels",
+        "description": "Channel \u2192 version currently pointed to."
+      },
+      "DayCost": {
+        "properties": {
+          "day": {
+            "type": "string",
+            "title": "Day"
+          },
+          "input": {
+            "type": "number",
+            "title": "Input"
+          },
+          "output": {
+            "type": "number",
+            "title": "Output"
+          },
+          "cache_write": {
+            "type": "number",
+            "title": "Cache Write"
+          },
+          "cache_read": {
+            "type": "number",
+            "title": "Cache Read"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "day",
+          "input",
+          "output",
+          "cache_write",
+          "cache_read"
+        ],
+        "title": "DayCost"
+      },
+      "DiffStat": {
+        "properties": {
+          "files": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Files"
+          },
+          "linesAdded": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Linesadded"
+          },
+          "linesRemoved": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Linesremoved"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "files",
+          "linesAdded",
+          "linesRemoved"
+        ],
+        "title": "DiffStat"
+      },
+      "Draft": {
+        "properties": {
+          "workflowId": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*$",
+            "title": "Workflowid"
+          },
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/DraftFile"
+            },
+            "type": "array",
+            "title": "Files"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updatedat"
+          },
+          "baseReleaseId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Basereleaseid"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "workflowId",
+          "files",
+          "updatedAt"
+        ],
+        "title": "Draft"
+      },
+      "DraftFile": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "pattern": "^(?!/)(?!.*\\.\\./)[A-Za-z0-9_./-]+$",
+            "title": "Path"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "path",
+          "content"
+        ],
+        "title": "DraftFile"
+      },
+      "DraftUpdate": {
+        "properties": {
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/DraftFile"
+            },
+            "type": "array",
+            "title": "Files"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "files"
+        ],
+        "title": "DraftUpdate"
+      },
+      "Error": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "Error"
+      },
+      "ErrorPayload": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "retryable": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retryable"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "ErrorPayload"
+      },
+      "ErrorResponse": {
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/Error"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "title": "ErrorResponse"
+      },
+      "EventBatch": {
+        "properties": {
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/RunEvent"
+            },
+            "type": "array",
+            "maxItems": 500,
+            "minItems": 1,
+            "title": "Events"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "events"
+        ],
+        "title": "EventBatch",
+        "description": "Ingest batch. Every event must carry runId equal to the path id and a seq; the hub stores each (runId, seq) once and counts re-sent ones as duplicates (offline queue replay is safe)."
+      },
+      "EventBatchResult": {
+        "properties": {
+          "accepted": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Accepted"
+          },
+          "duplicates": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Duplicates"
+          },
+          "lastSeq": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lastseq"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "accepted",
+          "duplicates"
+        ],
+        "title": "EventBatchResult"
+      },
+      "EventPage": {
+        "properties": {
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/RunEvent"
+            },
+            "type": "array",
+            "title": "Events"
+          },
+          "lastSeq": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lastseq"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "events"
+        ],
+        "title": "EventPage",
+        "description": "Polling fallback for the SSE stream: events with seq > after."
+      },
+      "GateCheck": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "tests",
+              "property_tests",
+              "secret_scan",
+              "security_scan",
+              "lint",
+              "typecheck",
+              "other"
+            ],
+            "title": "Kind"
+          },
+          "passed": {
+            "type": "boolean",
+            "title": "Passed"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          },
+          "findings": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Findings"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "kind",
+          "passed"
+        ],
+        "title": "GateCheck"
+      },
+      "GateResultPayload": {
+        "properties": {
+          "passed": {
+            "type": "boolean",
+            "title": "Passed"
+          },
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/GateCheck"
+            },
+            "type": "array",
+            "title": "Checks"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "passed",
+          "checks"
+        ],
+        "title": "GateResultPayload"
+      },
+      "GraphEdge": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "target": {
+            "type": "string",
+            "title": "Target"
+          },
+          "conditional": {
+            "type": "boolean",
+            "title": "Conditional"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "source",
+          "target",
+          "conditional"
+        ],
+        "title": "GraphEdge"
+      },
+      "GraphJSON": {
+        "properties": {
+          "workflowId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9-]*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workflowid"
+          },
+          "release": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9-]*@[0-9]+\\.[0-9]+\\.[0-9]+([-+][0-9A-Za-z.-]+)?$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Release"
+          },
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/GraphNode"
+            },
+            "type": "array",
+            "title": "Nodes"
+          },
+          "edges": {
+            "items": {
+              "$ref": "#/components/schemas/GraphEdge"
+            },
+            "type": "array",
+            "title": "Edges"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "nodes",
+          "edges"
+        ],
+        "title": "GraphJSON",
+        "description": "Normalized LangGraph get_graph() output, read-only; produced by `jigworks graph` (runner) and by the hub's Sandbox validation. Rendered with React Flow."
+      },
+      "GraphNode": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "start",
+              "end",
+              "step",
+              "interrupt"
+            ],
+            "title": "Kind"
+          },
+          "weight": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "kind"
+        ],
+        "title": "GraphNode"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HealthResponse": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true,
+            "title": "Ok"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ok"
+        ],
+        "title": "HealthResponse"
+      },
+      "HumanDelta": {
+        "properties": {
+          "runId": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Runid"
+          },
+          "release": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*@[0-9]+\\.[0-9]+\\.[0-9]+([-+][0-9A-Za-z.-]+)?$",
+            "title": "Release"
+          },
+          "digest": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "title": "Digest"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "worked_first_time",
+              "corrected_by_prompt",
+              "edited_by_hand",
+              "rejected"
+            ],
+            "title": "Outcome"
+          },
+          "followUpPrompts": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Followupprompts"
+          },
+          "files": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Files"
+          },
+          "linesAdded": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Linesadded"
+          },
+          "linesRemoved": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Linesremoved"
+          },
+          "firstResultCommit": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9a-f]{7,40}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Firstresultcommit"
+          },
+          "mergedCommit": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9a-f]{7,40}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mergedcommit"
+          },
+          "diffUrl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Diffurl"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "pr_merge_webhook",
+                  "local_push",
+                  "sample"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "capturedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capturedat"
+          },
+          "sample": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sample"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "runId",
+          "release",
+          "digest",
+          "outcome",
+          "followUpPrompts",
+          "files",
+          "linesAdded",
+          "linesRemoved"
+        ],
+        "title": "HumanDelta",
+        "description": "PLANNED, not built (design.md \u00a78 Human delta). What the human changed after the first result of a session. The hub shows sample data (sample=true) in the Planned outcomes panel."
+      },
+      "Inputs": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "string",
+              "text",
+              "path",
+              "boolean",
+              "integer"
+            ],
+            "title": "Type"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "required": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Required"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type"
+        ],
+        "title": "Inputs"
+      },
+      "InterruptPayload": {
+        "properties": {
+          "interruptId": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Interruptid"
+          },
+          "stage": {
+            "type": "string",
+            "enum": [
+              "plan",
+              "pr"
+            ],
+            "title": "Stage"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "plan": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan"
+          },
+          "diffStat": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DiffStat"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "commit": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9a-f]{7,40}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Commit"
+          },
+          "artifacts": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/Artifact"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifacts"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "interruptId",
+          "stage"
+        ],
+        "title": "InterruptPayload",
+        "description": "LangGraph interrupt waiting for the human (design.md \u00a77)."
+      },
+      "ModelAssignment": {
+        "properties": {
+          "default": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Default"
+          },
+          "nodes": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/NodesAdditionalProperty"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nodes"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "default"
+        ],
+        "title": "ModelAssignment",
+        "description": "Models are set by the workflow release (`[models]` in workflow.toml), never picked in VS Code."
+      },
+      "NodeId": {
+        "type": "string",
+        "minLength": 1,
+        "title": "NodeId"
+      },
+      "NodesAdditionalProperty": {
+        "type": "string",
+        "minLength": 1
+      },
+      "OutcomeReport": {
+        "properties": {
+          "planned": {
+            "type": "boolean",
+            "const": true,
+            "title": "Planned"
+          },
+          "sample": {
+            "type": "boolean",
+            "title": "Sample"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/Row"
+            },
+            "type": "array",
+            "title": "Rows"
+          },
+          "deltas": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/HumanDelta"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deltas"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "planned",
+          "sample",
+          "rows"
+        ],
+        "title": "OutcomeReport",
+        "description": "PLANNED human-delta outcomes. The hub returns sample data (sample=true) and the UI labels the panel Planned."
+      },
+      "Overview": {
+        "properties": {
+          "runs": {
+            "type": "integer",
+            "title": "Runs"
+          },
+          "costUsd": {
+            "type": "number",
+            "title": "Costusd"
+          },
+          "costPerRunUsd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Costperrunusd"
+          },
+          "gateRuns": {
+            "type": "integer",
+            "title": "Gateruns"
+          },
+          "gatePassFirstTry": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gatepassfirsttry"
+          },
+          "medianTimeToPrSec": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mediantimetoprsec"
+          },
+          "medianHumanWaitSec": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Medianhumanwaitsec"
+          },
+          "from": {
+            "type": "string",
+            "format": "date-time",
+            "title": "From"
+          },
+          "to": {
+            "type": "string",
+            "format": "date-time",
+            "title": "To"
+          },
+          "costLabel": {
+            "type": "string",
+            "title": "Costlabel"
+          },
+          "previousRuns": {
+            "type": "integer",
+            "title": "Previousruns"
+          },
+          "running": {
+            "type": "integer",
+            "title": "Running"
+          },
+          "waitingHuman": {
+            "type": "integer",
+            "title": "Waitinghuman"
+          },
+          "pausedUsageLimit": {
+            "type": "integer",
+            "title": "Pausedusagelimit"
+          },
+          "oldestWaitingSince": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oldestwaitingsince"
+          },
+          "costByDay": {
+            "items": {
+              "$ref": "#/components/schemas/DayCost"
+            },
+            "type": "array",
+            "title": "Costbyday"
+          },
+          "workflows": {
+            "items": {
+              "$ref": "#/components/schemas/WorkflowStats"
+            },
+            "type": "array",
+            "title": "Workflows"
+          },
+          "releases": {
+            "items": {
+              "$ref": "#/components/schemas/ReleaseStats"
+            },
+            "type": "array",
+            "title": "Releases"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "runs",
+          "costUsd",
+          "gateRuns",
+          "from",
+          "to",
+          "costLabel",
+          "previousRuns",
+          "running",
+          "waitingHuman",
+          "pausedUsageLimit",
+          "costByDay",
+          "workflows",
+          "releases"
+        ],
+        "title": "Overview"
+      },
+      "Permissions": {
+        "properties": {
+          "allowedTools": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allowedtools"
+          },
+          "network": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Network"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Permissions",
+        "description": "Proposal (design.md \u00a711.2): agent permissions declared per release."
+      },
+      "PriceEntry": {
+        "properties": {
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "tokenType": {
+            "type": "string",
+            "enum": [
+              "input",
+              "output",
+              "cache_write",
+              "cache_read"
+            ],
+            "title": "Tokentype"
+          },
+          "pricePerMtok": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Pricepermtok"
+          },
+          "validFrom": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Validfrom"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "model",
+          "tokenType",
+          "pricePerMtok",
+          "validFrom"
+        ],
+        "title": "PriceEntry",
+        "description": "Price list with validity (design.md \u00a78). Cost = \u03a3 tokens \u00d7 price of the entry valid at the call time."
+      },
+      "PublishRequest": {
+        "properties": {
+          "version": {
+            "type": "string",
+            "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+([-+][0-9A-Za-z.-]+)?$",
+            "title": "Version"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "channel": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "stable",
+                  "beta"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Channel"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "version"
+        ],
+        "title": "PublishRequest"
+      },
+      "Release": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "workflowId": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*$",
+            "title": "Workflowid"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "release": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9-]*@[0-9]+\\.[0-9]+\\.[0-9]+([-+][0-9A-Za-z.-]+)?$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Release"
+          },
+          "digest": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "title": "Digest"
+          },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Publishedat"
+          },
+          "publishedBy": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[^@\\s]+@[^@\\s]+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Publishedby"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "manifest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WorkflowManifest"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "bundleBytes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bundlebytes"
+          },
+          "channels": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "stable",
+                    "beta"
+                  ]
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Channels"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "workflowId",
+          "version",
+          "digest",
+          "publishedAt"
+        ],
+        "title": "Release",
+        "description": "Immutable published release (design.md \u00a76)."
+      },
+      "ReleaseComparison": {
+        "properties": {
+          "workflowId": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*$",
+            "title": "Workflowid"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/ReleaseComparisonRow"
+            },
+            "type": "array",
+            "title": "Rows"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "workflowId",
+          "rows"
+        ],
+        "title": "ReleaseComparison",
+        "description": "Version comparison (design.md \u00a711.3)."
+      },
+      "ReleaseComparisonRow": {
+        "properties": {
+          "release": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*@[0-9]+\\.[0-9]+\\.[0-9]+([-+][0-9A-Za-z.-]+)?$",
+            "title": "Release"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "runs": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Runs"
+          },
+          "succeeded": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Succeeded"
+          },
+          "failed": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Failed"
+          },
+          "rejected": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Rejected"
+          },
+          "successRate": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Successrate"
+          },
+          "avgFixLoops": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Avgfixloops"
+          },
+          "avgFollowUpPrompts": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avgfollowupprompts"
+          },
+          "avgCostUsd": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Avgcostusd"
+          },
+          "avgDurationSec": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avgdurationsec"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "release",
+          "version",
+          "runs",
+          "succeeded",
+          "failed",
+          "rejected",
+          "avgFixLoops",
+          "avgCostUsd"
+        ],
+        "title": "ReleaseComparisonRow"
+      },
+      "ReleaseList": {
+        "properties": {
+          "releases": {
+            "items": {
+              "$ref": "#/components/schemas/Release"
+            },
+            "type": "array",
+            "title": "Releases"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "releases"
+        ],
+        "title": "ReleaseList"
+      },
+      "ReleaseStats": {
+        "properties": {
+          "runs": {
+            "type": "integer",
+            "title": "Runs"
+          },
+          "costUsd": {
+            "type": "number",
+            "title": "Costusd"
+          },
+          "costPerRunUsd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Costperrunusd"
+          },
+          "gateRuns": {
+            "type": "integer",
+            "title": "Gateruns"
+          },
+          "gatePassFirstTry": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gatepassfirsttry"
+          },
+          "medianTimeToPrSec": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mediantimetoprsec"
+          },
+          "medianHumanWaitSec": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Medianhumanwaitsec"
+          },
+          "release": {
+            "type": "string",
+            "title": "Release"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "runs",
+          "costUsd",
+          "gateRuns",
+          "release"
+        ],
+        "title": "ReleaseStats"
+      },
+      "ReviewDecisionPayload": {
+        "properties": {
+          "interruptId": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Interruptid"
+          },
+          "stage": {
+            "type": "string",
+            "enum": [
+              "plan",
+              "pr"
+            ],
+            "title": "Stage"
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "approve",
+              "request_changes",
+              "reject"
+            ],
+            "title": "Decision"
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment"
+          },
+          "approverEmail": {
+            "type": "string",
+            "pattern": "^[^@\\s]+@[^@\\s]+$",
+            "title": "Approveremail"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "interruptId",
+          "stage",
+          "decision",
+          "approverEmail"
+        ],
+        "title": "ReviewDecisionPayload"
+      },
+      "Row": {
+        "properties": {
+          "release": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*@[0-9]+\\.[0-9]+\\.[0-9]+([-+][0-9A-Za-z.-]+)?$",
+            "title": "Release"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "worked_first_time",
+              "corrected_by_prompt",
+              "edited_by_hand",
+              "rejected"
+            ],
+            "title": "Outcome"
+          },
+          "sessions": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Sessions"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "release",
+          "outcome",
+          "sessions"
+        ],
+        "title": "Row"
+      },
+      "RunCreate": {
+        "properties": {
+          "runId": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Runid"
+          },
+          "workflowId": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*$",
+            "title": "Workflowid"
+          },
+          "releaseId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Releaseid"
+          },
+          "release": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*@[0-9]+\\.[0-9]+\\.[0-9]+([-+][0-9A-Za-z.-]+)?$",
+            "title": "Release"
+          },
+          "digest": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "title": "Digest"
+          },
+          "authorEmail": {
+            "type": "string",
+            "pattern": "^[^@\\s]+@[^@\\s]+$",
+            "title": "Authoremail"
+          },
+          "models": {
+            "$ref": "#/components/schemas/ModelAssignment"
+          },
+          "adapter": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "claude",
+                  "codex",
+                  "fake"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Adapter"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "stepsPlanned": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stepsplanned"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Startedat"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "runId",
+          "workflowId",
+          "release",
+          "digest",
+          "authorEmail",
+          "models",
+          "startedAt"
+        ],
+        "title": "RunCreate",
+        "description": "Register a run and its pinned release. Idempotent on runId."
+      },
+      "RunDetail": {
+        "properties": {
+          "summary": {
+            "$ref": "#/components/schemas/RunSummary"
+          },
+          "audit": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AuditRecord"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "graph": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GraphJSON"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "summary"
+        ],
+        "title": "RunDetail"
+      },
+      "RunEvent": {
+        "properties": {
+          "runId": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Runid"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "run_started",
+                  "node_status",
+                  "interrupt",
+                  "review_decision",
+                  "agent_output",
+                  "gate_result",
+                  "usage",
+                  "usage_limit",
+                  "error",
+                  "run_finished"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind",
+            "default": "node_status"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "At"
+          },
+          "seq": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seq"
+          },
+          "eventId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eventid"
+          },
+          "release": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9-]*@[0-9]+\\.[0-9]+\\.[0-9]+([-+][0-9A-Za-z.-]+)?$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Release"
+          },
+          "digest": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^sha256:[0-9a-f]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Digest"
+          },
+          "node": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Node"
+          },
+          "attempt": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempt"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "pending",
+                  "running",
+                  "waiting_human",
+                  "succeeded",
+                  "failed",
+                  "skipped",
+                  "cancelled"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "runStatus": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "running",
+                  "waiting_human",
+                  "paused_usage_limit",
+                  "succeeded",
+                  "failed",
+                  "rejected",
+                  "cancelled"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Runstatus"
+          },
+          "progress": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Progress"
+          },
+          "step": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Step"
+          },
+          "stepsPlanned": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stepsplanned"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "snapshot": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Snapshot"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "runStarted": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RunStartedPayload"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "interrupt": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InterruptPayload"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reviewDecision": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReviewDecisionPayload"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "agentOutput": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentOutputPayload"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "gateResult": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GateResultPayload"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "usage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UsageRecord"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "usageLimit": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UsageLimitPayload"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ErrorPayload"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RunSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "runId",
+          "at"
+        ],
+        "title": "RunEvent",
+        "description": "One event of a run (design.md \u00a78). `kind` defaults to node_status, so the design example validates as-is. The payload object matching `kind` is required (see allOf). The runner sends seq (monotonic per run, from 0) on every event; the hub deduplicates on (runId, seq)."
+      },
+      "RunList": {
+        "properties": {
+          "runs": {
+            "items": {
+              "$ref": "#/components/schemas/RunSummary"
+            },
+            "type": "array",
+            "title": "Runs"
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nextcursor"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "runs"
+        ],
+        "title": "RunList"
+      },
+      "RunStartedPayload": {
+        "properties": {
+          "workflowId": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*$",
+            "title": "Workflowid"
+          },
+          "release": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*@[0-9]+\\.[0-9]+\\.[0-9]+([-+][0-9A-Za-z.-]+)?$",
+            "title": "Release"
+          },
+          "releaseId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Releaseid"
+          },
+          "digest": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "title": "Digest"
+          },
+          "authorEmail": {
+            "type": "string",
+            "pattern": "^[^@\\s]+@[^@\\s]+$",
+            "title": "Authoremail"
+          },
+          "models": {
+            "$ref": "#/components/schemas/ModelAssignment"
+          },
+          "adapter": {
+            "type": "string",
+            "enum": [
+              "claude",
+              "codex",
+              "fake"
+            ],
+            "title": "Adapter"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "plannedPath": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/NodeId"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plannedpath"
+          },
+          "repo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repo"
+          },
+          "branch": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Branch"
+          },
+          "runnerVersion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Runnerversion"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "workflowId",
+          "release",
+          "digest",
+          "authorEmail",
+          "models",
+          "adapter"
+        ],
+        "title": "RunStartedPayload"
+      },
+      "RunSummary": {
+        "properties": {
+          "runId": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Runid"
+          },
+          "workflowId": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*$",
+            "title": "Workflowid"
+          },
+          "release": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*@[0-9]+\\.[0-9]+\\.[0-9]+([-+][0-9A-Za-z.-]+)?$",
+            "title": "Release"
+          },
+          "releaseId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Releaseid"
+          },
+          "digest": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "title": "Digest"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "running",
+              "waiting_human",
+              "paused_usage_limit",
+              "succeeded",
+              "failed",
+              "rejected",
+              "cancelled"
+            ],
+            "title": "Status"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "authorEmail": {
+            "type": "string",
+            "pattern": "^[^@\\s]+@[^@\\s]+$",
+            "title": "Authoremail"
+          },
+          "approverEmail": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[^@\\s]+@[^@\\s]+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approveremail"
+          },
+          "approvedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approvedat"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Startedat"
+          },
+          "updatedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updatedat"
+          },
+          "finishedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finishedat"
+          },
+          "models": {
+            "$ref": "#/components/schemas/ModelAssignment"
+          },
+          "adapter": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "claude",
+                  "codex",
+                  "fake"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Adapter"
+          },
+          "currentNode": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currentnode"
+          },
+          "progress": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Progress"
+          },
+          "step": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Step"
+          },
+          "stepsPlanned": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stepsplanned"
+          },
+          "firstResultCommit": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9a-f]{7,40}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Firstresultcommit"
+          },
+          "finalCommit": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9a-f]{7,40}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finalcommit"
+          },
+          "followUpPrompts": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Followupprompts"
+          },
+          "fixLoops": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fixloops"
+          },
+          "prUrl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prurl"
+          },
+          "branch": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Branch"
+          },
+          "changedFiles": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Changedfiles"
+          },
+          "usage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UsageTotals"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "costUsd": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Costusd"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "runId",
+          "workflowId",
+          "release",
+          "digest",
+          "status",
+          "authorEmail",
+          "startedAt",
+          "models",
+          "followUpPrompts"
+        ],
+        "title": "RunSummary",
+        "description": "Current state of a run. Sent by the runner in run_finished; returned by the hub (which adds costUsd, computed from the price table at read time)."
+      },
+      "SessionRequest": {
+        "properties": {
+          "password": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Password"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "password"
+        ],
+        "title": "SessionRequest"
+      },
+      "Snapshot": {
+        "properties": {
+          "commit": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{7,40}$",
+            "title": "Commit"
+          },
+          "changedFiles": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Changedfiles"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "commit"
+        ],
+        "title": "Snapshot",
+        "description": "Git snapshot taken after a node (design.md \u00a79: a git commit per node)."
+      },
+      "ToolCall": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "input": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "ToolCall"
+      },
+      "UsageLimitPayload": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "allowed",
+              "allowed_warning",
+              "rejected"
+            ],
+            "title": "Status"
+          },
+          "rateLimitType": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ratelimittype"
+          },
+          "resetsAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resetsat"
+          },
+          "paused": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paused"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "UsageLimitPayload",
+        "description": "From the stream-json `rate_limit_event` (docs/spikes/claude-stream-json.md \u00a75). Emitted when status is not `allowed`."
+      },
+      "UsageRecord": {
+        "properties": {
+          "runId": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Runid"
+          },
+          "node": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Node"
+          },
+          "attempt": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Attempt"
+          },
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Model"
+          },
+          "adapter": {
+            "type": "string",
+            "enum": [
+              "claude",
+              "codex",
+              "fake"
+            ],
+            "title": "Adapter"
+          },
+          "input": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Input"
+          },
+          "output": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Output"
+          },
+          "cache_write": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Cache Write"
+          },
+          "cache_read": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Cache Read"
+          },
+          "sessionId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sessionid"
+          },
+          "cliCostUsd": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clicostusd"
+          },
+          "at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "runId",
+          "node",
+          "attempt",
+          "model",
+          "adapter",
+          "input",
+          "output",
+          "cache_write",
+          "cache_read"
+        ],
+        "title": "UsageRecord",
+        "description": "Raw tokens of one agent call for one model (design.md \u00a78). Claude adapter: one record per key of result.modelUsage of the final stream-json `result` event (docs/spikes/claude-stream-json.md \u00a78). Cost is computed at read time from PriceEntry; cliCostUsd is a cross-check only."
+      },
+      "UsageReport": {
+        "properties": {
+          "groupBy": {
+            "type": "string",
+            "enum": [
+              "release",
+              "model",
+              "node",
+              "day"
+            ],
+            "title": "Groupby"
+          },
+          "workflowId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9-]*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workflowid"
+          },
+          "from": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From"
+          },
+          "to": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To"
+          },
+          "costLabel": {
+            "type": "string",
+            "const": "API equivalent",
+            "title": "Costlabel"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/UsageReportRow"
+            },
+            "type": "array",
+            "title": "Rows"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/UsageReportRow"
+          },
+          "prices": {
+            "items": {
+              "$ref": "#/components/schemas/PriceEntry"
+            },
+            "type": "array",
+            "title": "Prices"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "groupBy",
+          "costLabel",
+          "rows",
+          "totals",
+          "prices"
+        ],
+        "title": "UsageReport",
+        "description": "Cost is labelled API equivalent: on a subscription nobody pays per token (design.md \u00a78)."
+      },
+      "UsageReportRow": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "runs": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Runs"
+          },
+          "input": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Input"
+          },
+          "output": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Output"
+          },
+          "cache_write": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Cache Write"
+          },
+          "cache_read": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Cache Read"
+          },
+          "costUsd": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Costusd"
+          },
+          "cliCostUsd": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clicostusd"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "key",
+          "runs",
+          "input",
+          "output",
+          "cache_write",
+          "cache_read",
+          "costUsd"
+        ],
+        "title": "UsageReportRow"
+      },
+      "UsageTotals": {
+        "properties": {
+          "input": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Input"
+          },
+          "output": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Output"
+          },
+          "cache_write": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Cache Write"
+          },
+          "cache_read": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Cache Read"
+          },
+          "cliCostUsd": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clicostusd"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "input",
+          "output",
+          "cache_write",
+          "cache_read"
+        ],
+        "title": "UsageTotals"
+      },
+      "ValidationCheck": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "enum": [
+              "manifest",
+              "syntax",
+              "imports",
+              "compile",
+              "graph"
+            ],
+            "title": "Name"
+          },
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "file": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File"
+          },
+          "line": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Line"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "ok"
+        ],
+        "title": "ValidationCheck"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "ValidationResult": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationCheck"
+            },
+            "type": "array",
+            "title": "Checks"
+          },
+          "graph": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GraphJSON"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "durationMs": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Durationms"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ok",
+          "checks"
+        ],
+        "title": "ValidationResult",
+        "description": "Result of validating the draft in isolation (Vercel Sandbox). graph is present when compile succeeded; the editor's Graph toggle renders it."
+      },
+      "WeightsAdditionalProperty": {
+        "type": "number",
+        "minimum": 0.0
+      },
+      "WorkflowList": {
+        "properties": {
+          "workflows": {
+            "items": {
+              "$ref": "#/components/schemas/WorkflowSummary"
+            },
+            "type": "array",
+            "title": "Workflows"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "workflows"
+        ],
+        "title": "WorkflowList"
+      },
+      "WorkflowManifest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*$",
+            "title": "Name"
+          },
+          "version": {
+            "type": "string",
+            "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+([-+][0-9A-Za-z.-]+)?$",
+            "title": "Version"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "entrypoint": {
+            "type": "string",
+            "title": "Entrypoint"
+          },
+          "minRunnerVersion": {
+            "type": "string",
+            "title": "Minrunnerversion"
+          },
+          "inputs": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/Inputs"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inputs"
+          },
+          "models": {
+            "$ref": "#/components/schemas/ModelAssignment"
+          },
+          "weights": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/WeightsAdditionalProperty"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weights"
+          },
+          "plannedPath": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/NodeId"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plannedpath"
+          },
+          "interruptNodes": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/NodeId"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interruptnodes"
+          },
+          "permissions": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Permissions"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "version",
+          "entrypoint",
+          "minRunnerVersion",
+          "models"
+        ],
+        "title": "WorkflowManifest",
+        "description": "workflow.toml of a workflow package, parsed (design.md \u00a75)."
+      },
+      "WorkflowStats": {
+        "properties": {
+          "runs": {
+            "type": "integer",
+            "title": "Runs"
+          },
+          "costUsd": {
+            "type": "number",
+            "title": "Costusd"
+          },
+          "costPerRunUsd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Costperrunusd"
+          },
+          "gateRuns": {
+            "type": "integer",
+            "title": "Gateruns"
+          },
+          "gatePassFirstTry": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gatepassfirsttry"
+          },
+          "medianTimeToPrSec": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mediantimetoprsec"
+          },
+          "medianHumanWaitSec": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Medianhumanwaitsec"
+          },
+          "workflowId": {
+            "type": "string",
+            "title": "Workflowid"
+          },
+          "running": {
+            "type": "integer",
+            "title": "Running"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "runs",
+          "costUsd",
+          "gateRuns",
+          "workflowId",
+          "running"
+        ],
+        "title": "WorkflowStats"
+      },
+      "WorkflowSummary": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*$",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "ownerEmail": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[^@\\s]+@[^@\\s]+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owneremail"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updatedat"
+          },
+          "latestVersion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latestversion"
+          },
+          "channels": {
+            "$ref": "#/components/schemas/Channels"
+          },
+          "hasUnpublishedDraft": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hasunpublisheddraft"
+          },
+          "runs7d": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Runs7D"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "hub",
+                  "github"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "updatedAt",
+          "channels"
+        ],
+        "title": "WorkflowSummary"
+      }
+    },
+    "securitySchemes": {
+      "hubKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Jigworks-Key"
+      },
+      "hubSession": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "jigworks_session"
+      }
+    }
+  },
+  "security": [
+    {
+      "hubKey": []
+    },
+    {
+      "hubSession": []
+    }
+  ]
+}

@@ -255,7 +255,7 @@ START → plan → [human approve plan] → write_tests (different agent, from t
 
 ```
 jigworks/
-  AGENTS.md            # agent instructions; mandatory Playwright check of visuals (390 px + 1440 px)
+  AGENTS.md            # agent instructions; mandatory Playwright check of visuals (1440 px)
   CLAUDE.md            # pointer to AGENTS.md
   LICENSE.md           # FSL-1.1-ALv2
   BUILD_LOG.md         # time and what was delegated/reviewed/hand-written/what went wrong

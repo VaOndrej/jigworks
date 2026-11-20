@@ -1,0 +1,231 @@
+{
+  "nodes": [
+    {
+      "id": "__start__",
+      "type": "runnable",
+      "data": {
+        "id": [
+          "langgraph",
+          "_internal",
+          "_runnable",
+          "RunnableCallable"
+        ],
+        "name": "__start__"
+      }
+    },
+    {
+      "id": "plan",
+      "type": "runnable",
+      "data": {
+        "id": [
+          "langgraph",
+          "_internal",
+          "_runnable",
+          "RunnableCallable"
+        ],
+        "name": "plan"
+      }
+    },
+    {
+      "id": "approve_plan",
+      "type": "runnable",
+      "data": {
+        "id": [
+          "langgraph",
+          "_internal",
+          "_runnable",
+          "RunnableCallable"
+        ],
+        "name": "approve_plan"
+      }
+    },
+    {
+      "id": "write_tests",
+      "type": "runnable",
+      "data": {
+        "id": [
+          "langgraph",
+          "_internal",
+          "_runnable",
+          "RunnableCallable"
+        ],
+        "name": "write_tests"
+      }
+    },
+    {
+      "id": "implement",
+      "type": "runnable",
+      "data": {
+        "id": [
+          "langgraph",
+          "_internal",
+          "_runnable",
+          "RunnableCallable"
+        ],
+        "name": "implement"
+      }
+    },
+    {
+      "id": "review",
+      "type": "runnable",
+      "data": {
+        "id": [
+          "langgraph",
+          "_internal",
+          "_runnable",
+          "RunnableCallable"
+        ],
+        "name": "review"
+      }
+    },
+    {
+      "id": "fix",
+      "type": "runnable",
+      "data": {
+        "id": [
+          "langgraph",
+          "_internal",
+          "_runnable",
+          "RunnableCallable"
+        ],
+        "name": "fix"
+      }
+    },
+    {
+      "id": "gate",
+      "type": "runnable",
+      "data": {
+        "id": [
+          "langgraph",
+          "_internal",
+          "_runnable",
+          "RunnableCallable"
+        ],
+        "name": "gate"
+      }
+    },
+    {
+      "id": "approve_pr",
+      "type": "runnable",
+      "data": {
+        "id": [
+          "langgraph",
+          "_internal",
+          "_runnable",
+          "RunnableCallable"
+        ],
+        "name": "approve_pr"
+      }
+    },
+    {
+      "id": "open_pr",
+      "type": "runnable",
+      "data": {
+        "id": [
+          "langgraph",
+          "_internal",
+          "_runnable",
+          "RunnableCallable"
+        ],
+        "name": "open_pr"
+      }
+    },
+    {
+      "id": "summary",
+      "type": "runnable",
+      "data": {
+        "id": [
+          "langgraph",
+          "_internal",
+          "_runnable",
+          "RunnableCallable"
+        ],
+        "name": "summary"
+      }
+    },
+    {
+      "id": "__end__"
+    }
+  ],
+  "edges": [
+    {
+      "source": "__start__",
+      "target": "plan"
+    },
+    {
+      "source": "approve_plan",
+      "target": "__end__",
+      "conditional": true
+    },
+    {
+      "source": "approve_plan",
+      "target": "write_tests",
+      "conditional": true
+    },
+    {
+      "source": "approve_pr",
+      "target": "__end__",
+      "conditional": true
+    },
+    {
+      "source": "approve_pr",
+      "target": "fix",
+      "conditional": true
+    },
+    {
+      "source": "approve_pr",
+      "target": "open_pr",
+      "conditional": true
+    },
+    {
+      "source": "fix",
+      "target": "gate",
+      "conditional": true
+    },
+    {
+      "source": "fix",
+      "target": "review",
+      "conditional": true
+    },
+    {
+      "source": "gate",
+      "target": "approve_pr",
+      "conditional": true
+    },
+    {
+      "source": "gate",
+      "target": "fix",
+      "conditional": true
+    },
+    {
+      "source": "implement",
+      "target": "review"
+    },
+    {
+      "source": "open_pr",
+      "target": "summary"
+    },
+    {
+      "source": "plan",
+      "target": "approve_plan"
+    },
+    {
+      "source": "review",
+      "target": "fix",
+      "conditional": true
+    },
+    {
+      "source": "review",
+      "target": "gate",
+      "conditional": true
+    },
+    {
+      "source": "write_tests",
+      "target": "implement"
+    },
+    {
+      "source": "summary",
+      "target": "__end__"
+    }
+  ]
+}

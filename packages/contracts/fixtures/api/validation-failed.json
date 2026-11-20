@@ -1,0 +1,17 @@
+{
+  "ok": false,
+  "durationMs": 830,
+  "checks": [
+    {
+      "name": "manifest",
+      "ok": true
+    },
+    {
+      "name": "syntax",
+      "ok": false,
+      "file": "steps/nodes.py",
+      "line": 12,
+      "message": "SyntaxError: expected ':'"
+    }
+  ]
+}

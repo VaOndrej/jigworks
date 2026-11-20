@@ -1,0 +1,9 @@
+[project]
+name = "jigworks-workflow-feature-development"
+version = "0.0.0"
+description = "The feature-development LangGraph workflow package (built in T05)."
+requires-python = ">=3.12"
+dependencies = []
+
+[tool.uv]
+package = false

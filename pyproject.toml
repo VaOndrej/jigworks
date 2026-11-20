@@ -1,0 +1,46 @@
+[project]
+name = "jigworks"
+version = "0.0.0"
+description = "Jigworks monorepo root (uv workspace)."
+requires-python = ">=3.12"
+dependencies = [
+  "jigworks-runner",
+  "jigworks-hub-api",
+  "jigworks-sample-repo",
+  "jigworks-workflow-feature-development",
+  "jigworks-contracts",
+]
+
+[dependency-groups]
+dev = [
+  "pytest>=8",
+  "httpx>=0.27",
+  "datamodel-code-generator>=0.26",
+  "fastapi>=0.115",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = [
+  "runner",
+  "apps/hub-api",
+  "sample-repo",
+  "workflows/feature-development",
+  "packages/contracts",
+]
+
+[tool.uv.sources]
+jigworks-runner = { workspace = true }
+jigworks-hub-api = { workspace = true }
+jigworks-sample-repo = { workspace = true }
+jigworks-workflow-feature-development = { workspace = true }
+jigworks-contracts = { workspace = true }
+
+[tool.pytest.ini_options]
+addopts = "--import-mode=importlib"
+testpaths = ["runner", "apps/hub-api", "sample-repo", "workflows", "packages/contracts"]
+markers = [
+  "live: runs a real `claude -p` call; opt-in with JIGWORKS_LIVE=1",
+]

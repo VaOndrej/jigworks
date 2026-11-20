@@ -1,0 +1,35 @@
+name = "feature-development"
+version = "1.3.0"
+description = "Plan, tests from the spec, implement, independent review, gate, human approval, PR."
+entrypoint = "graph:build_graph"
+minRunnerVersion = "0.1.0"
+plannedPath = ["plan", "approve_plan", "write_tests", "implement", "review", "gate", "approve_pr", "open_pr", "summary"]
+interruptNodes = ["approve_plan", "approve_pr"]
+
+[inputs.prompt]
+type = "text"
+description = "What to build."
+required = true
+
+[models]
+default = "claude-sonnet-5"
+
+[models.nodes]
+write_tests = "claude-haiku-4-5-20251001"
+summary = "claude-haiku-4-5-20251001"
+
+[weights]
+plan = 10
+approve_plan = 2
+write_tests = 15
+implement = 30
+review = 10
+fix = 0
+gate = 10
+approve_pr = 3
+open_pr = 5
+summary = 5
+
+[permissions]
+allowedTools = ["Read", "Edit", "Write", "Bash(pytest:*)", "Bash(git diff:*)", "Bash(gitleaks:*)", "Bash(bandit:*)"]
+network = false

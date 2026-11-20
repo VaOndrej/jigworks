@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# During the parallel build, refuse commits that touch the other agent's paths.
+set -euo pipefail
+root="$(git rev-parse --show-toplevel)"
+# shellcheck source=../scripts/ownership.sh
+source "$root/scripts/ownership.sh"
+agent="$(detect_agent "$root")"
+if [[ -n "$agent" ]]; then
+  exec "$root/scripts/check-ownership.sh" "$agent"
+fi

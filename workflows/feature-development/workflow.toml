@@ -1,0 +1,38 @@
+name = "feature-development"
+version = "1.4.0"
+description = "Plan, tests from the spec by a separate agent, implement, independent review, gate (tests, property tests, secret and security scan), human approval, PR."
+entrypoint = "graph:build_graph"
+minRunnerVersion = "0.1.0"
+plannedPath = ["plan", "approve_plan", "write_tests", "implement", "review", "gate", "approve_pr", "open_pr", "summary"]
+interruptNodes = ["approve_plan", "approve_pr"]
+
+[inputs.prompt]
+type = "text"
+description = "What to build."
+required = true
+
+# Models are set by the release, never in VS Code (design.md §7).
+[models]
+default = "claude-sonnet-5"
+
+[models.nodes]
+write_tests = "claude-haiku-4-5-20251001"
+summary = "claude-haiku-4-5-20251001"
+
+# Fallback progress weights (design.md §7). fix has no planned weight.
+[weights]
+plan = 10
+approve_plan = 2
+write_tests = 15
+implement = 30
+review = 10
+fix = 0
+gate = 10
+approve_pr = 3
+open_pr = 5
+summary = 5
+
+# Proposal (design.md §11.2). Union of what the nodes may use; each node narrows it in steps/nodes.py.
+[permissions]
+allowedTools = ["Read", "Glob", "Grep", "Edit", "Write", "Bash(git diff:*)", "Bash(git log:*)", "Bash(python -m pytest:*)", "Bash(uv run pytest:*)"]
+network = false

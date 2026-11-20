@@ -1,0 +1,20 @@
+# Local Postgres for the hub (design.md §3; Neon is used only in Preview and Production).
+# Credentials are local-only defaults, not secrets.
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: jigworks
+      POSTGRES_PASSWORD: jigworks
+      POSTGRES_DB: jigworks
+    ports:
+      - "54329:5432"
+    volumes:
+      - jigworks-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jigworks -d jigworks"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+volumes:
+  jigworks-db:

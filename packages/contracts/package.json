@@ -1,0 +1,43 @@
+{
+  "name": "@jigworks/contracts",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "generate": "node scripts/gen-ts.mjs",
+    "build": "node scripts/gen-ts.mjs && tsc -p tsconfig.json && tsc -p tsconfig.cjs.json && node -e \"require('fs').writeFileSync('dist/cjs/package.json', JSON.stringify({type:'commonjs'}))\" && node --test test/",
+    "test": "pnpm run build"
+  },
+  "description": "Frozen Jigworks contracts: JSON Schema, generated TS types, validators, OpenAPI and fixtures.",
+  "main": "./dist/cjs/index.js",
+  "module": "./dist/esm/index.js",
+  "types": "./dist/esm/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/esm/index.d.ts",
+        "default": "./dist/esm/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/index.d.ts",
+        "default": "./dist/cjs/index.js"
+      }
+    },
+    "./schema.json": "./schema/jigworks.schema.json",
+    "./openapi.json": "./openapi.json"
+  },
+  "files": [
+    "dist",
+    "schema",
+    "openapi.json",
+    "fixtures"
+  ],
+  "dependencies": {
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1"
+  },
+  "devDependencies": {
+    "json-schema-to-typescript": "^16.0.0",
+    "typescript": "^7.0.2"
+  }
+}

@@ -1,0 +1,15 @@
+name = "tiny"
+version = "0.1.0"
+description = "Test workflow for the extension: one agent step, one human review, done."
+entrypoint = "graph:build_graph"
+minRunnerVersion = "0.1.0"
+plannedPath = ["work", "review", "finish"]
+interruptNodes = ["review"]
+
+[models]
+default = "claude-haiku-4-5-20251001"
+
+[weights]
+work = 6
+review = 1
+finish = 3

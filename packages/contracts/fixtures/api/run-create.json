@@ -1,0 +1,19 @@
+{
+  "runId": "run_fd_0001",
+  "workflowId": "feature-development",
+  "releaseId": "rel_fd_1_3_0",
+  "release": "feature-development@1.3.0",
+  "digest": "sha256:e941f267e18b97560bcb4292047781b0844c70f6fea282c8c2a1c14733854c30",
+  "authorEmail": "alice@example.com",
+  "models": {
+    "default": "claude-sonnet-5",
+    "nodes": {
+      "write_tests": "claude-haiku-4-5-20251001",
+      "summary": "claude-haiku-4-5-20251001"
+    }
+  },
+  "adapter": "claude",
+  "title": "Add percentage discounts per order line",
+  "startedAt": "2026-11-18T09:30:00Z",
+  "stepsPlanned": 9
+}

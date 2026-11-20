@@ -1,0 +1,6 @@
+{
+  "work": [
+    { "text": "Wrote notes.txt.", "files": { "notes.txt": "first try\n" }, "sleep": 0.5 },
+    { "text": "Addressed the review comment.", "files": { "notes.txt": "second try\n" } }
+  ]
+}

@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# Blocks pushes to main, branch deletions and non-fast-forward (force) pushes.
+# stdin lines: <local ref> <local sha> <remote ref> <remote sha>
+set -euo pipefail
+zero="0000000000000000000000000000000000000000"
+status=0
+root="$(git rev-parse --show-toplevel)"
+# shellcheck source=../scripts/ownership.sh
+source "$root/scripts/ownership.sh"
+agent="$(detect_agent "$root")"
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [[ -z "${remote_ref:-}" ]] && continue
+  if [[ "$remote_ref" == "refs/heads/main" || "$remote_ref" == "refs/heads/master" ]]; then
+    echo "pre-push: pushing to ${remote_ref#refs/heads/} is not allowed; the human merges into main." >&2
+    status=1; continue
+  fi
+  if [[ "$local_sha" == "$zero" ]]; then
+    echo "pre-push: deleting remote branch ${remote_ref} is not allowed." >&2
+    status=1; continue
+  fi
+  if [[ "$remote_sha" != "$zero" ]]; then
+    if ! git cat-file -e "${remote_sha}^{commit}" 2>/dev/null; then
+      echo "pre-push: remote ${remote_ref} has commits you do not have; run git pull --rebase first." >&2
+      status=1; continue
+    fi
+    if ! git merge-base --is-ancestor "$remote_sha" "$local_sha"; then
+      echo "pre-push: non-fast-forward push to ${remote_ref} (force push) is not allowed." >&2
+      status=1; continue
+    fi
+  fi
+  if [[ -n "$agent" && "$remote_sha" != "$zero" ]]; then
+    "$root/scripts/check-ownership.sh" "$agent" --range "${remote_sha}..${local_sha}" || status=1
+  fi
+done
+exit $status

@@ -1,0 +1,168 @@
+{
+  "name": "vscode",
+  "displayName": "Jigworks",
+  "description": "Run published Jigworks workflows from VS Code.",
+  "version": "0.1.0",
+  "private": true,
+  "publisher": "jigworks",
+  "license": "SEE LICENSE IN LICENSE.md",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/VaOndrej/jigworks"
+  },
+  "engines": {
+    "vscode": "^1.100.0"
+  },
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "jigworks",
+          "title": "Jigworks",
+          "icon": "media/jigworks.svg"
+        }
+      ]
+    },
+    "views": {
+      "jigworks": [
+        {
+          "type": "webview",
+          "id": "jigworks.sidebar",
+          "name": "Jigworks"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "jigworks.newSession",
+        "title": "Jigworks: New session"
+      },
+      {
+        "command": "jigworks.importWorkflow",
+        "title": "Jigworks: Import workflow from file"
+      },
+      {
+        "command": "jigworks.syncWorkflows",
+        "title": "Jigworks: Sync workflows from the hub"
+      },
+      {
+        "command": "jigworks.setHubPassword",
+        "title": "Jigworks: Set hub password"
+      },
+      {
+        "command": "jigworks.refresh",
+        "title": "Jigworks: Refresh"
+      },
+      {
+        "command": "jigworks.preflight",
+        "title": "Jigworks: Check Claude Code login"
+      },
+      {
+        "command": "jigworks.openSession",
+        "title": "Jigworks: Open session"
+      },
+      {
+        "command": "jigworks.approve",
+        "title": "Jigworks: Approve"
+      },
+      {
+        "command": "jigworks.requestChanges",
+        "title": "Jigworks: Request changes"
+      },
+      {
+        "command": "jigworks.reject",
+        "title": "Jigworks: Reject"
+      },
+      {
+        "command": "jigworks.resume",
+        "title": "Jigworks: Resume session"
+      }
+    ],
+    "configuration": {
+      "title": "Jigworks",
+      "properties": {
+        "jigworks.runnerCommand": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "uv",
+            "run",
+            "jigworks"
+          ],
+          "description": "Command that runs the Jigworks runner CLI, started in the workspace folder."
+        },
+        "jigworks.claudePath": {
+          "type": "string",
+          "default": "claude",
+          "description": "Claude Code CLI used by the runner and by the login preflight."
+        },
+        "jigworks.repoPath": {
+          "type": "string",
+          "default": "sample-repo",
+          "description": "Path in the workspace the agents may change (relative to the workspace folder)."
+        },
+        "jigworks.home": {
+          "type": "string",
+          "default": "",
+          "description": "Runner state directory (default: <repo>/.jigworks)."
+        },
+        "jigworks.adapter": {
+          "type": "string",
+          "enum": [
+            "claude",
+            "fake"
+          ],
+          "default": "claude",
+          "description": "Agent adapter. `fake` replays a scripted agent (tests, demos without tokens)."
+        },
+        "jigworks.fakeScript": {
+          "type": "string",
+          "default": "",
+          "description": "JSON script for the fake adapter (relative to the workspace folder)."
+        },
+        "jigworks.runArgs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Extra arguments for `jigworks run`."
+        },
+        "jigworks.hubUrl": {
+          "type": "string",
+          "default": "",
+          "description": "Jigworks hub URL. The hub password is kept in VS Code's secret storage (command “Jigworks: Set hub password”), never in settings."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "compile": "tsc -p . && node build.mjs",
+    "test": "tsc -p . && node build.mjs && node out/test/runTest.js",
+    "test:ui": "node build.mjs --standalone && playwright test -c ../../e2e/local/playwright.config.ts",
+    "package": "tsc -p . && node build.mjs --production && pnpm dlx @vscode/vsce@3.6.2 package --no-dependencies -o jigworks.vsix"
+  },
+  "devDependencies": {
+    "@jigworks/contracts": "workspace:*",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^26.6.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@types/vscode": "~1.100.0",
+    "@vscode/test-electron": "^3.1.0",
+    "esbuild-wasm": "0.28.2",
+    "mocha": "^12.0.3",
+    "typescript": "^7.0.2"
+  },
+  "dependencies": {
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  }
+}
