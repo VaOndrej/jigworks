@@ -59,6 +59,16 @@
               }
             }
           },
+          "429": {
+            "description": "Too many wrong hub passwords from this IP; see Retry-After.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {

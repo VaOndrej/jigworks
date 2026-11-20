@@ -110,3 +110,9 @@ CREATE TABLE IF NOT EXISTS human_deltas (  -- PLANNED: sample data only
   release text NOT NULL,
   body    jsonb NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS auth_failures (  -- failed hub password attempts, for the rate limit
+  ip text NOT NULL,
+  at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS auth_failures_ip_at ON auth_failures (ip, at);
