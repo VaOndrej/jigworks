@@ -12,11 +12,16 @@ import r2 from "../../../packages/contracts/fixtures/runs/run_fd_0002-fix-loops-
 import r5 from "../../../packages/contracts/fixtures/runs/run_fd_0005-waiting-for-review.jsonl";
 import r6 from "../../../packages/contracts/fixtures/runs/run_fd_0006-paused-usage-limit.jsonl";
 import r7 from "../../../packages/contracts/fixtures/runs/run_fd_0007-running-implement.jsonl";
+import md1 from "../test-fixtures/runs/run_md_0001-markdown-questions.jsonl";
+import md2 from "../test-fixtures/runs/run_md_0002-changes-requested.jsonl";
+import md3 from "../test-fixtures/runs/run_md_0003-running-write-tests.jsonl";
+import md4 from "../test-fixtures/runs/run_md_0004-brainstorm-round-1.jsonl";
+import { foldEvents } from "../src/shared/session";
+import { tabChrome } from "../src/shared/tabTitle";
 import type { HostState, ToHost, ToWebview, WorkflowInfo } from "../src/shared/messages";
 import type { HostApi } from "./host";
 import { useHostState, useSessions } from "./host";
 import { NewSession } from "./NewSession";
-import { ProgressLabel } from "./parts";
 import { RunView } from "./RunView";
 import { Sidebar } from "./Sidebar";
 import "./styles.css";
@@ -25,7 +30,7 @@ import "./standalone.css";
 const parse = (text: string): RunEvent[] => text.split("\n").filter((l) => l.trim()).map((l) => JSON.parse(l) as RunEvent);
 
 const RUNS: Record<string, RunEvent[]> = Object.fromEntries(
-  [r7, r5, r2, r6, r1].map(parse).map((events) => [events[0].runId, events]),
+  [r7, r5, r2, r6, r1, md1, md2, md3, md4].map(parse).map((events) => [events[0].runId, events]),
 );
 
 const FD: WorkflowInfo = {
@@ -50,6 +55,8 @@ const params = new URLSearchParams(location.search);
 const screen = params.get("screen") ?? "session";
 const runParam = params.get("run") ?? "run_fd_0007";
 const visibleRuns = (params.get("runs") ?? "run_fd_0007,run_fd_0005,run_fd_0002").split(",");
+// ?now=<ISO> freezes the clock (elapsed timers in screenshots); ?alive=0 reports the runner PID gone.
+if (params.get("now")) window.__JIGWORKS_NOW__ = params.get("now")!;
 
 const state: HostState = {
   workflows: params.get("local") === "changed"
@@ -57,7 +64,8 @@ const state: HostState = {
     : [FD, OLDER],
   selectedWorkflow: FD.key,
   sessions: Object.fromEntries(visibleRuns.filter((r) => RUNS[r]).map((r) => [r, RUNS[r]])),
-  running: ["run_fd_0007"],
+  running: ["run_fd_0007", "run_md_0002", "run_md_0003"],
+  liveness: params.get("alive") === "0" ? { [runParam]: { alive: false, checkedAt: "2026-11-20T14:00:00Z" } } : {},
   preflight: { ok: true, authMethod: "claude.ai", subscriptionType: "max" },
   activeRun: screen === "session" ? runParam : undefined,
   hub: (
@@ -70,10 +78,37 @@ const state: HostState = {
 if (screen === "session" && RUNS[runParam]) state.sessions[runParam] = RUNS[runParam];
 
 const listeners: string[] = [];
+const decides: ToHost[] = [];
 const mock: HostApi = {
   postMessage(msg: ToHost) {
     listeners.push(msg.type);
     const send = (m: ToWebview) => window.postMessage(m, "*");
+    if (msg.type === "decide") {
+      decides.push(msg);
+      // ?replay=round2: play the runner's answer to Request changes: the gate closes, the step
+      // reruns and stops at the same gate again (the next brainstorming round).
+      const events = state.sessions[msg.runId];
+      if (params.get("replay") === "round2" && msg.decision === "request_changes" && events) {
+        const s = foldEvents(msg.runId, events);
+        const gate = s.interrupt!;
+        const attempt = (s.nodes[gate.node]?.attempt ?? 1) + 1;
+        const step = gate.node.replace(/^approve_/, "");
+        let seq = s.lastSeq;
+        const at = "2026-11-20T11:05:00Z";
+        const base = { runId: msg.runId, at, release: s.release };
+        const more = [
+          { ...base, seq: ++seq, kind: "review_decision", node: gate.node, attempt: attempt - 1, runStatus: "running", reviewDecision: { interruptId: gate.interruptId, stage: gate.stage, decision: "request_changes", approverEmail: "va.ondrej@example.com", comment: msg.comment } },
+          { ...base, seq: ++seq, kind: "node_status", node: gate.node, attempt: attempt - 1, status: "succeeded" },
+          { ...base, seq: ++seq, kind: "node_status", node: step, attempt, status: "running" },
+          { ...base, seq: ++seq, kind: "node_status", node: step, attempt, status: "succeeded" },
+          { ...base, seq: ++seq, kind: "node_status", node: gate.node, attempt, status: "running" },
+          { ...base, seq: ++seq, kind: "node_status", node: gate.node, attempt, status: "waiting_human", runStatus: "waiting_human" },
+          { ...base, seq: ++seq, kind: "interrupt", node: gate.node, attempt, interrupt: { interruptId: `${gate.interruptId}_r${attempt}`, stage: gate.stage, message: `Brainstorming, round ${attempt}: two more questions.`, plan: "QUESTIONS:\n\n1. **Fees:** a flat 0.1 % per fill?\n2. **Timeframes:** 1m to 1d?" } },
+        ] as unknown as RunEvent[];
+        state.sessions[msg.runId] = [...events, ...more];
+        setTimeout(() => more.forEach((event) => send({ type: "event", runId: msg.runId, event })), 150);
+      }
+    }
     if (msg.type === "ready") send({ type: "state", state });
     if (msg.type === "selectWorkflow") {
       state.selectedWorkflow = msg.key;
@@ -85,6 +120,7 @@ const mock: HostApi = {
 };
 window.__JIGWORKS_HOST__ = mock;
 (window as unknown as { __messages: string[] }).__messages = listeners;
+(window as unknown as { __decides: ToHost[] }).__decides = decides;
 
 function Frame() {
   const hostState = useHostState(screen === "new" ? "new" : "session", runParam);
@@ -108,8 +144,10 @@ function Frame() {
         <div className="vs-editor">
           <div className="vs-tabs">
             {sessions.filter((s) => s.status === "running" || s.status === "waiting_human" || s.runId === runParam).map((s) => (
-              <div key={s.runId} className={`vs-tab${screen === "session" && s.runId === runParam ? " on" : ""}`}>
-                {s.title.length > 26 ? `${s.title.slice(0, 26)}…` : s.title} <ProgressLabel s={s} />
+              <div key={s.runId} className={`vs-tab${screen === "session" && s.runId === runParam ? " on" : ""}`} data-run={s.runId}>
+                {/* The same title and icon the extension sets on the real WebviewPanel (tabChrome). */}
+                <img className="vs-tab-icon" src={`../../media/state-${tabChrome(s).icon}.svg`} alt="" width={14} height={14} />
+                {tabChrome(s).title}
               </div>
             ))}
             {screen === "new" && <div className="vs-tab on new">New session</div>}

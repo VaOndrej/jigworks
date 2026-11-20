@@ -2,7 +2,8 @@
 // node highlighted with a NOW marker (design.md §7). Read-only, from the GraphJSON the runner
 // returns for the release; falls back to the planned path when no graph is known.
 import type { GraphJSON } from "@jigworks/contracts";
-import type { SessionView } from "../src/shared/session";
+import { elapsed, type Liveness } from "../src/shared/activity";
+import { nodeDone, type SessionView } from "../src/shared/session";
 import { label } from "./parts";
 
 const W = 96;
@@ -44,15 +45,28 @@ export function layout(graph: GraphJSON | undefined, plannedPath: string[], inte
   return { placed, planned, width, edges };
 }
 
-function nodeState(s: SessionView, id: string, interrupt: boolean) {
+function who(email: string | undefined, at: string | undefined): string {
+  return [email?.split("@")[0], at?.slice(11, 16)].filter(Boolean).join(", ");
+}
+
+export function nodeState(s: SessionView, id: string, interrupt: boolean, now = 0, live: Liveness = "working") {
   const n = s.nodes[id];
   const current = s.currentNode === id && s.status !== "waiting_human";
   const waiting = s.interrupt?.node === id || (n?.status === "waiting_human" && s.status === "waiting_human");
   if (waiting) return { cls: "needs", sub: "needs you" };
-  if (current) return { cls: "now", sub: `running${(s.currentAttempt ?? 1) > 1 ? ` · try ${s.currentAttempt}` : ""}` };
+  if (current) {
+    const tries = (s.currentAttempt ?? 1) > 1 ? ` · try ${s.currentAttempt}` : "";
+    if (s.status !== "running") return { cls: "now", sub: `${s.status.replace(/_/g, " ")}${tries}` };
+    if (live === "stopped") return { cls: "now stopped", sub: `stopped${tries}` };
+    const clock = now ? ` · ${elapsed(n?.startedAt, now)}` : "";
+    return { cls: "now alive", sub: `running${clock}${tries}`, dot: true };
+  }
   if (!n || n.status === "pending") return { cls: interrupt ? "todo human" : "todo", sub: "" };
+  // The runner finishes a gate as `succeeded` even when changes were requested; the decision says.
+  if (interrupt && n.decision === "request_changes") return { cls: "changes", sub: `↺ changes · ${who(n.approvedBy, n.decidedAt ?? n.at)}` };
+  if (interrupt && n.decision === "reject") return { cls: "failed", sub: `✗ rejected · ${who(n.approvedBy, n.decidedAt ?? n.at)}` };
   if (n.status === "succeeded") {
-    if (interrupt && n.approvedBy) return { cls: "done", sub: `✓ ${n.approvedBy.split("@")[0]}, ${n.at.slice(11, 16)}` };
+    if (interrupt && n.approvedBy) return { cls: "done", sub: `✓ ${who(n.approvedBy, n.decidedAt ?? n.at)}` };
     return { cls: "done", sub: id === "fix" ? `✓ ${s.fixLoops} loop${s.fixLoops === 1 ? "" : "s"}` : "✓ done" };
   }
   if (n.status === "failed") return { cls: "failed", sub: interrupt ? "✗ rejected" : `✗ failed${n.attempt > 1 ? ` · try ${n.attempt}` : ""}` };
@@ -60,13 +74,14 @@ function nodeState(s: SessionView, id: string, interrupt: boolean) {
   return { cls: "todo", sub: n.status };
 }
 
-export function Graph({ s, graph, interruptNodes }: { s: SessionView; graph?: GraphJSON; interruptNodes: string[] }) {
+export function Graph({ s, graph, interruptNodes, now: clock = 0, live = "working" }: { s: SessionView; graph?: GraphJSON; interruptNodes: string[]; now?: number; live?: Liveness }) {
   const { placed, planned, width } = layout(graph, s.plannedPath, interruptNodes);
   const nowId = s.status === "waiting_human" ? s.interrupt?.node : s.currentNode;
   const now = nowId ? placed.get(nowId) : undefined;
   const fix = placed.get("fix");
   const height = fix ? BELOW + 44 : TOP + H + 20;
-  const doneIdx = planned.reduce((acc, id, i) => (s.nodes[id]?.status === "succeeded" ? i : acc), -1);
+  const doneIdx = planned.reduce((acc, id, i) => (nodeDone(s, id) ? i : acc), -1);
+  const anyChanges = planned.some((id) => s.nodes[id]?.decision === "request_changes");
 
   return (
     <section className="card graph-card" aria-label="Where in the graph">
@@ -75,6 +90,7 @@ export function Graph({ s, graph, interruptNodes }: { s: SessionView; graph?: Gr
         <span className="legend"><span className="sw sw-green" />done / approved</span>
         <span className="legend"><span className="sw sw-blue" />now</span>
         <span className="legend"><span className="sw sw-amber" />needs you</span>
+        {anyChanges && <span className="legend"><span className="sw sw-changes" />changes requested</span>}
       </div>
       <div className="graph" style={{ width, height }}>
         <svg className="edges" width={width} height={height} aria-hidden="true">
@@ -104,7 +120,7 @@ export function Graph({ s, graph, interruptNodes }: { s: SessionView; graph?: Gr
           </>
         )}
         {[...placed.values()].map((p) => {
-          const st = nodeState(s, p.id, p.interrupt);
+          const st = nodeState(s, p.id, p.interrupt, clock, live);
           return (
             <div
               key={p.id}
@@ -113,7 +129,12 @@ export function Graph({ s, graph, interruptNodes }: { s: SessionView; graph?: Gr
               style={{ left: p.x, top: p.y, width: p.w, height: p.h }}
             >
               <span className="mono">{p.id === "fix" ? "fix" : label(p.id)}</span>
-              {st.sub && <span className="gsub">{st.sub}{p.id === "fix" && s.fixLoops ? " · max 3" : ""}</span>}
+              {st.sub && (
+                <span className="gsub">
+                  {"dot" in st && st.dot && <span className="live-dot" aria-hidden="true" />}
+                  {st.sub}{p.id === "fix" && s.fixLoops ? " · max 3" : ""}
+                </span>
+              )}
             </div>
           );
         })}

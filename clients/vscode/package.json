@@ -91,6 +91,10 @@
         "title": "Jigworks: Reject"
       },
       {
+        "command": "jigworks.revealWaiting",
+        "title": "Jigworks: Show the session waiting for you"
+      },
+      {
         "command": "jigworks.resume",
         "title": "Jigworks: Resume session"
       }
@@ -168,6 +172,7 @@
     "build": "node build.mjs",
     "compile": "tsc -p . && node build.mjs",
     "test": "tsc -p . && node build.mjs && node out/test/runTest.js",
+    "test:unit": "tsc -p . && mocha --ui tdd out/test/suite/units.test.js",
     "test:ui": "node build.mjs --standalone && playwright test -c ../../e2e/local/playwright.config.ts",
     "package": "tsc -p . && node build.mjs --production && pnpm dlx @vscode/vsce@3.6.2 package --no-dependencies -o jigworks.vsix"
   },
@@ -185,6 +190,8 @@
   },
   "dependencies": {
     "react": "19.3.1",
-    "react-dom": "19.3.1"
+    "react-dom": "19.3.1",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1"
   }
 }
