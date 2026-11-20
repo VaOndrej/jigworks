@@ -428,3 +428,16 @@ def test_committed_openapi_is_generated_from_this_app(client):
     spec = client.get("/api/openapi.json").json()
     committed = json.loads((FIX.parent / "openapi.json").read_text())
     assert spec == committed, "regenerate: uv run python apps/hub-api/scripts/export_openapi.py"
+
+
+def test_prices_added_after_the_first_seed_reach_an_existing_hub(fresh_db):
+    """The seed runs once per database, but the price list grows (Opus/Sonnet/Haiku 5.5 came after
+    the production hub was seeded): every start adds missing price rows, so runs are not $0."""
+    from hub_api.db import connect, forget_ready
+
+    with connect() as conn:
+        conn.execute("DELETE FROM prices WHERE model LIKE %s", ("%-5-5",))
+    forget_ready()  # a new process (cold start after a deploy)
+    with connect() as conn:
+        models = {r["model"] for r in conn.execute("SELECT DISTINCT model FROM prices").fetchall()}
+    assert {"claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5"} <= models

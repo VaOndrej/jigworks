@@ -43,13 +43,14 @@ def ensure_ready(url: str) -> None:
     with _ready_lock:
         if url in _ready:
             return
-        from .seed import seed_if_empty  # noqa: PLC0415 (import cycle)
+        from .seed import seed_if_empty, sync_prices  # noqa: PLC0415 (import cycle)
 
         with psycopg.connect(url, row_factory=dict_row) as conn:
             conn.execute(UTC)
             conn.execute("SELECT pg_advisory_xact_lock(4242001)")
             conn.execute(schema_sql())
             seed_if_empty(conn)
+            sync_prices(conn)
         _ready.add(url)
 
 

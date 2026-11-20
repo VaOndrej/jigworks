@@ -94,5 +94,29 @@
     "tokenType": "cache_read",
     "pricePerMtok": 0.1,
     "validFrom": "2026-01-01T00:00:00Z"
+  },
+  {
+    "model": "claude-haiku-5-5",
+    "tokenType": "input",
+    "pricePerMtok": 0.1,
+    "validFrom": "2026-01-01T00:00:00Z"
+  },
+  {
+    "model": "claude-haiku-5-5",
+    "tokenType": "output",
+    "pricePerMtok": 0.5,
+    "validFrom": "2026-01-01T00:00:00Z"
+  },
+  {
+    "model": "claude-haiku-5-5",
+    "tokenType": "cache_write",
+    "pricePerMtok": 0.2,
+    "validFrom": "2026-01-01T00:00:00Z"
+  },
+  {
+    "model": "claude-haiku-5-5",
+    "tokenType": "cache_read",
+    "pricePerMtok": 0.005,
+    "validFrom": "2026-01-01T00:00:00Z"
   }
 ]
