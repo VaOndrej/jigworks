@@ -23,7 +23,11 @@ Time is tracked in two columns: **human** (my own time: deciding, directing, rev
 | Prompting and brainstorming the workflow improvements (T18, T19, A/B idea) | 1 h | — |
 | Release skills as a Claude Code plugin, PR conflicts (T19) | 2 min | ~30 min |
 | Brainstorming route, structured context (T20, feature-development 1.6.0) | 3 min | ~1 h |
-| **Total** | **4 h 35 min** | **~12 h 10 min** |
+| Extension: collapsible live view, Markdown for agent text | 2 min | ~25 min |
+| Brainstorming the extension improvements (T21) | 10 min | — |
+| Extension: gate input, honest gate states, session tabs, live run (T21) | — | ~1 h |
+| Brainstorming the demo application | 10 min | — |
+| **Total** | **4 h 57 min** | **~13 h 35 min** |
 
 ## Entries
 
@@ -393,3 +397,61 @@ Two Claude Code sessions (Opus 5.5) in their own worktrees, pushing to `feature/
   now off the planned path (like `fix`) and ends in the normal plan.
 - Found that a larger build would hit the runner's fixed 40-turn limit per agent call, and that
   the gate only detects a test setup in the scope root; added `--max-turns` and told the agents.
+
+### 2026-11-20 — Extension: collapsible live view, Markdown for agent text (human 2 min, agent ~25 min)
+
+**What I delegated**
+- A "Hide live view" toggle in the run view: progress, graph and agent output collapse into a
+  one-line strip (% · node · step), the decision card takes the full width, and the choice is
+  remembered (webview `localStorage`).
+- Markdown rendering (`react-markdown` + `remark-gfm`) for the interrupt message, the plan or
+  brainstorming questions, and the agent's text blocks: headings, bold, lists, code, tables,
+  task lists. Raw HTML is not rendered and links are not followed.
+- A synthetic fixture `clients/vscode/test-fixtures/runs/run_md_0001-markdown-questions.jsonl`
+  and two Playwright tests with 1440 px screenshots.
+
+**What I reviewed / decided myself**
+- That the workflow prompts stay as they are: the agents already write Markdown (`###`, `**`,
+  numbered lists); only the extension rendered it as plain text.
+
+**What went wrong / changed course**
+- Nothing notable. The live view stays open by default; it does not collapse on its own when
+  a decision is waiting.
+
+### 2026-11-20 — Brainstorming: extension improvements and the demo application (human 20 min)
+
+**What I did**
+- 10 min brainstorming the extension improvements that became T21: what I saw while using the
+  extension on a real run (lost answers at the gate, a gate that looked approved, tabs that say
+  nothing, a step that looks frozen), written up as the T21 brief.
+- 10 min brainstorming the demo application built with the workflow in `demo/`.
+
+### 2026-11-20 — T21: gate input, honest gate states, session tabs, a run that looks alive (human: in the brainstorming above, agent ~1 h)
+
+**What I delegated**
+- Gate input: Enter sends the typed text as Request changes, Shift+Enter is a newline, Approve is
+  disabled while there is text, one decision per gate (buttons locked until the state changes),
+  and every new gate (keyed on node + interrupt seq) starts with an empty field.
+- Graph fold: a gate the runner finishes as `succeeded` after a `request_changes` is shown as
+  "↺ changes", not ✓; a new attempt of the gate clears the old decision; the progress card's
+  "your approval ≈ %" marker uses the same `nodeDone()`.
+- Session tabs: `tabChrome()` (word-boundary title, gate name / current action / done / failed)
+  and five state icons under `clients/vscode/media/`; the status bar opens the session that waits.
+- Live run: Now card (latest action in plain words, last 5 actions, files / tool calls / output
+  tokens for the step), elapsed timer and a calm pulse on the running node, shimmer on the
+  running segment, and a 10 s PID check of `.jigworks/runs/<runId>/lock` in the extension host.
+- 22 unit tests (`pnpm --filter vscode test:unit`), 5 new Playwright tests, 3 synthetic fixtures.
+
+**What I reviewed / decided myself**
+- The rules: text typed at a gate never approves; silence is normal, so no alarms, only
+  "Agent stopped" when the runner PID is definitely gone.
+
+**What went wrong / changed course**
+- Found that the runner records a `request_changes` gate as `succeeded`; fixed in the extension's
+  fold only (contracts are frozen), so the hub's own views may still need the same rule.
+- Tab tooltips are not possible: `WebviewPanel` has only `title` and `iconPath`.
+- **Proposal (runner, not done):** pass `--include-partial-messages` to `claude -p` in
+  `runner/jigworks_runner/adapters/claude.py` so text streams while the model writes. A real
+  `write_tests` call emitted nothing for 5.5 min because `stream-json` sends a `tool_use` only
+  when the whole block is generated. It needs a new delta event kind (or a throttled
+  `agent_output` text block), so it is a contract change.
