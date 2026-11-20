@@ -8,7 +8,9 @@ import { RunnerBridge } from "./runner/bridge";
 import { checkClaude } from "./runner/preflight";
 import { WorkflowRegistry } from "./workflows";
 import type { HostState, Preflight, ToHost, ToWebview, ViewKind, WorkflowInfo } from "./shared/messages";
-import { foldEvents } from "./shared/session";
+import { foldEvents, type SessionView } from "./shared/session";
+import type { Liveness } from "./shared/messages";
+import { tabChrome, type TabIcon } from "./shared/tabTitle";
 import { visibleSelection, visibleWorkflows } from "./shared/visible";
 
 export interface JigworksApi {
@@ -22,6 +24,8 @@ export interface JigworksApi {
   /** runIds that raised an interrupt notification (tests). */
   notified(): string[];
   statusText(): string;
+  /** Title and icon state of each open session tab (tests). */
+  panelChrome(): Record<string, { title: string; icon?: string }>;
 }
 
 function config() {
@@ -37,6 +41,9 @@ class Host {
   readonly registry: WorkflowRegistry;
   private views = new Set<vscode.Webview>();
   private sessionPanels = new Map<string, vscode.WebviewPanel>();
+  /** Icon state last set per panel, so iconPath changes only when the state does. */
+  private panelIcons = new Map<string, TabIcon>();
+  readonly liveness = new Map<string, Liveness>();
   private newPanel?: vscode.WebviewPanel;
   private status: vscode.StatusBarItem;
   selected?: string;
@@ -59,7 +66,7 @@ class Host {
     });
     this.registry = new WorkflowRegistry(this.bridge);
     this.status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 10);
-    this.status.command = "jigworks.newSession";
+    this.status.command = "jigworks.revealWaiting";
     ctx.subscriptions.push(this.status, { dispose: () => this.bridge.dispose() });
 
     this.bridge.on("event", (runId: string, event: RunEvent) => {
@@ -154,6 +161,7 @@ class Host {
       preflight: this.preflightResult,
       repoLabel: config().get<string>("repoPath", "."),
       hub: this.hubStatus(),
+      liveness: Object.fromEntries(this.liveness),
     };
   }
 
@@ -166,16 +174,77 @@ class Host {
     this.refreshChrome();
   }
 
+  private views_(): SessionView[] {
+    return Object.entries(this.bridge.snapshot()).map(([id, ev]) => foldEvents(id, ev));
+  }
+
   private refreshChrome(): void {
-    const views = Object.entries(this.bridge.snapshot()).map(([id, ev]) => foldEvents(id, ev));
+    const views = this.views_();
     const running = views.filter((s) => s.status === "running").length;
     const waiting = views.filter((s) => s.status === "waiting_human").length;
     this.status.text = `$(rocket) Jigworks: ${running} running · ${waiting} waiting for you`;
+    this.status.tooltip = waiting ? "Open the session that is waiting for you" : "New Jigworks session";
     this.status.show();
     for (const [runId, panel] of this.sessionPanels) {
       const s = views.find((v) => v.runId === runId);
-      if (s) panel.title = `${s.title.slice(0, 28)} · ${s.status === "waiting_human" ? "Review" : `${Math.round(s.progress)} %`}`;
+      if (!s) continue;
+      const chrome = tabChrome(s);
+      if (panel.title !== chrome.title) panel.title = chrome.title;
+      if (this.panelIcons.get(runId) !== chrome.icon) {
+        this.panelIcons.set(runId, chrome.icon);
+        const icon = vscode.Uri.joinPath(this.ctx.extensionUri, "media", `state-${chrome.icon}.svg`);
+        panel.iconPath = { light: icon, dark: icon };
+      }
     }
+  }
+
+  /** Status bar click: the first session waiting for you, else a new session. */
+  revealWaiting(): void {
+    const waiting = this.views_()
+      .filter((s) => s.status === "waiting_human")
+      .sort((a, b) => (a.updatedAt ?? "").localeCompare(b.updatedAt ?? ""))[0];
+    if (waiting) this.openSession(waiting.runId);
+    else this.openNew();
+  }
+
+  /** Read the runner PID from `<home>/runs/<runId>/lock` and check that the process exists.
+   *  undefined = no lock / unreadable / no PID: unknown, never reported as a failure. */
+  pidAlive(runId: string): boolean | undefined {
+    let pid: number;
+    try {
+      pid = Number.parseInt(fs.readFileSync(path.join(this.home(), "runs", runId, "lock"), "utf8").trim(), 10);
+    } catch {
+      return undefined;
+    }
+    if (!Number.isInteger(pid) || pid <= 0) return undefined;
+    try {
+      process.kill(pid, 0);
+      return true;
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code;
+      if (code === "ESRCH") return false;
+      return true; // EPERM: the process exists, it is just not ours
+    }
+  }
+
+  /** One pass of the liveness check over the running sessions; posts only what changed. */
+  checkLiveness(): void {
+    const checkedAt = new Date().toISOString();
+    const runningIds = new Set(this.views_().filter((s) => s.status === "running").map((s) => s.runId));
+    for (const runId of [...this.liveness.keys()]) if (!runningIds.has(runId)) this.liveness.delete(runId);
+    for (const runId of runningIds) {
+      const alive = this.pidAlive(runId);
+      const prev = this.liveness.get(runId);
+      this.liveness.set(runId, { alive, checkedAt });
+      if (!prev || prev.alive !== alive) this.post({ type: "liveness", runId, alive, checkedAt });
+    }
+  }
+
+  /** A single timer for the whole extension (10 s), disposed with the extension. */
+  startLiveness(): vscode.Disposable {
+    this.checkLiveness();
+    const timer = setInterval(() => this.checkLiveness(), 10_000);
+    return { dispose: () => clearInterval(timer) };
   }
 
   html(webview: vscode.Webview, view: ViewKind, runId?: string): string {
@@ -318,7 +387,7 @@ class Host {
       retainContextWhenHidden: true,
     });
     const d = this.attach(panel.webview, "session", runId);
-    panel.onDidDispose(() => { d.dispose(); this.sessionPanels.delete(runId); });
+    panel.onDidDispose(() => { d.dispose(); this.sessionPanels.delete(runId); this.panelIcons.delete(runId); });
     this.sessionPanels.set(runId, panel);
     this.refreshChrome();
   }
@@ -329,6 +398,10 @@ class Host {
 
   statusText(): string {
     return this.status.text;
+  }
+
+  panelChrome(): Record<string, { title: string; icon?: string }> {
+    return Object.fromEntries([...this.sessionPanels].map(([id, p]) => [id, { title: p.title, icon: this.panelIcons.get(id) }]));
   }
 
   private static SECRET = "jigworks.hubPassword";
@@ -538,6 +611,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Jigwor
     }),
     vscode.commands.registerCommand("jigworks.newSession", () => host.openNew()),
     vscode.commands.registerCommand("jigworks.openSession", (runId: string) => host.openSession(runId)),
+    vscode.commands.registerCommand("jigworks.revealWaiting", () => host.revealWaiting()),
     vscode.commands.registerCommand("jigworks.approve", (runId: string) => host.onMessage({ type: "decide", runId, decision: "approve" })),
     vscode.commands.registerCommand("jigworks.reject", (runId: string) => host.onMessage({ type: "decide", runId, decision: "reject" })),
     vscode.commands.registerCommand("jigworks.requestChanges", async (runId: string, comment?: string) => {
@@ -567,6 +641,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Jigwor
     }),
   );
   context.subscriptions.push(host.watchWorkspaceWorkflows());
+  context.subscriptions.push(host.startLiveness());
   await host.init();
 
   return {
@@ -579,6 +654,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Jigwor
     panels: () => host.panels(),
     notified: () => [...host.notified],
     statusText: () => host.statusText(),
+    panelChrome: () => host.panelChrome(),
   };
 }
 

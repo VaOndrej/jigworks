@@ -37,6 +37,13 @@ export interface HubStatus {
   message?: string;
 }
 
+/** Runner process check for a running session: `alive` is undefined when the lock is missing or
+ *  unreadable (never treated as a failure). */
+export interface Liveness {
+  alive?: boolean;
+  checkedAt: string;
+}
+
 export interface HostState {
   workflows: WorkflowInfo[];
   selectedWorkflow?: string;
@@ -46,6 +53,7 @@ export interface HostState {
   activeRun?: string;
   repoLabel?: string;
   hub?: HubStatus;
+  liveness?: Record<string, Liveness>;
 }
 
 export type ToHost =
@@ -68,6 +76,7 @@ export type ToWebview =
   | { type: "state"; state: HostState }
   | { type: "event"; runId: string; event: RunEvent }
   | { type: "attached"; paths: string[] }
+  | { type: "liveness"; runId: string; alive?: boolean; checkedAt: string }
   | { type: "error"; message: string };
 
 export type ViewKind = "sidebar" | "new" | "session";

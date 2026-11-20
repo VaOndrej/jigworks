@@ -108,6 +108,10 @@ suite("Jigworks extension", () => {
     assert.deepEqual(a.notified().filter((id) => id === runA || id === runB).sort(), [runA, runB].sort());
     assert.match(a.statusText(), /0 running · 2 waiting for you/);
 
+    // T21: the real WebviewPanel gets a state title and the amber icon while it waits for you.
+    a.openSession(runA);
+    assert.deepEqual(a.panelChrome()[runA], { title: "Task A: write notes · your turn", icon: "waiting" });
+
     // A: approve → finished. B: request changes → work again → review → approve.
     await vscode.commands.executeCommand("jigworks.approve", runA);
     await vscode.commands.executeCommand("jigworks.requestChanges", runB, "Say it twice.");
@@ -131,6 +135,8 @@ suite("Jigworks extension", () => {
     a.openSession(runA);
     a.openSession(runB);
     assert.deepEqual(a.panels().sort(), [runA, runB].sort());
+    assert.deepEqual(a.panelChrome()[runA], { title: "Task A: write notes · done", icon: "done" });
+    assert.deepEqual(a.panelChrome()[runB], { title: "Task B: write notes · done", icon: "done" });
   });
 
   test("import a workflow .zip: valid bundle accepted, tampered bundle refused", async () => {
