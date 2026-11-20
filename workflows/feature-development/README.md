@@ -29,6 +29,7 @@ START → plan ⇄ [approve_plan]           (questions / request changes → pla
 | `steps/gate.py` | the gate: scope, protected tests, setup, the repo's tests, property tests (when configured), secret scan, bandit |
 | `steps/secrets.py` | built-in secret rules (used when `gitleaks` is not installed) |
 | `steps/runtime.py` | the interface the runner injects; the package never imports the runner |
+| `plugin/` | the release's skills, loaded by every agent call (`--plugin-dir`) |
 | `prompts/*.md` | the phase prompts (`$prompt`, `$plan`, `$scope`, … are filled in by the nodes) |
 | `requirements.lock` | pinned runtime dependencies (one venv per release digest) |
 | `tests/` | fake-adapter tests of every path (not part of the release bundle) |
@@ -73,10 +74,13 @@ START → plan ⇄ [approve_plan]           (questions / request changes → pla
   run fails. `write_tests`, `implement` and `review` get the approved plan plus the planning
   conversation. Plan discussion is not counted as a follow-up prompt.
 
-- **Skills.** Every node runs `claude -p --setting-sources project`, so the target repo's own
-  `.claude/skills/` and `CLAUDE.md` apply, the same for everyone who runs the release; personal
-  skills and settings in `~/.claude` do not (verified with a project skill, no extra tool
-  permission needed). Skills bundled with the release itself are planned, not built.
+- **Skills ship with the release.** `plugin/` is a Claude Code plugin (`.claude-plugin/plugin.json`
+  + `skills/*/SKILL.md`); the runner passes it to every agent call as
+  `claude -p --plugin-dir <package>/plugin`, so the skills are versioned and covered by the
+  release digest, and every developer's run uses the same ones. The prompts name the skill each
+  node uses (`clarify-before-planning`, `tests-from-the-spec`, `independent-review`). The target
+  repo's own `.claude/skills/` and `CLAUDE.md` apply too (`--setting-sources project`); personal
+  skills and settings in `~/.claude` never do.
 
 ## Using it in another repo
 

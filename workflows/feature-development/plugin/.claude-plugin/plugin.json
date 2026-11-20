@@ -1,0 +1,5 @@
+{
+  "name": "feature-development",
+  "description": "Skills shipped with the feature-development workflow release. Every agent call of a run loads them, for everyone who runs the release.",
+  "license": "FSL-1.1-ALv2"
+}

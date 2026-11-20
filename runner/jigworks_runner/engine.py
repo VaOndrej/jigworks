@@ -132,6 +132,7 @@ class RunRuntime:
         options = AgentOptions(
             model=self.run.package.model_for(node),
             effort=self.run.package.effort_for(node),
+            plugin_dirs=self.run.package.plugin_dirs(),
             allowed_tools=tuple(allowed),
             disallowed_tools=tuple(self.options.get("disallowed_tools", DENIED_TOOLS)),
             resume_session_id=resume,

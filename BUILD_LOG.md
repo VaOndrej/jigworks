@@ -21,7 +21,8 @@ Time is tracked in two columns: **human** (my own time: deciding, directing, rev
 | Plan agreed with the human (T18, feature-development 1.5.0) | 3 min | ~40 min |
 | Project-agnostic workflow, Opus 5.5 / Sonnet 5.5 (T19) | 5 min | ~1 h 15 min |
 | Prompting and brainstorming the workflow improvements (T18, T19, A/B idea) | 1 h | — |
-| **Total** | **4 h 30 min** | **~10 h 40 min** |
+| Release skills as a Claude Code plugin, PR conflicts (T19) | 2 min | ~30 min |
+| **Total** | **4 h 32 min** | **~11 h 10 min** |
 
 ## Entries
 
@@ -341,4 +342,29 @@ Two Claude Code sessions (Opus 5.5) in their own worktrees, pushing to `feature/
   extension's `repoPath` default and the runner's ignore-all `.jigworks/.gitignore`.
 - The production hub seeds prices once, so it will price Opus 5.5 / Sonnet 5.5 at 0 until the
   prices are added there.
+
+### 2026-11-20 — Prompting and brainstorming the workflow improvements (human 1 h)
+
+**What I reviewed / decided myself**
+- Prompting the agent through T18 and T19 and brainstorming what the workflow still needs:
+  the plan agreed before any code, a project-agnostic gate, the latest models, skills that ship
+  with the release, and an A/B comparison against a plain Opus 5.5 session.
+
+### 2026-11-20 — Release skills, PR conflicts (human 2 min, agent ~30 min)
+
+**What I delegated**
+- Skills ship with the workflow release: `plugin/` in the package is a Claude Code plugin, and
+  the runner passes it to every agent call (`claude -p --plugin-dir`). Three skills
+  (`clarify-before-planning`, `tests-from-the-spec`, `independent-review`), named in the
+  prompts. Red-first tests for the adapter flag and for every call getting the plugin; a real
+  `claude -p` check that the plugin's skills load.
+- Merged `main` into the T18 branch and the T18 branch into the T19 branch; the only conflicts
+  were the build-log table and entries.
+
+**What I reviewed / decided myself**
+- That the workflow has to bring its own skills.
+
+**What went wrong / changed course**
+- The first idea, copying skills into the worktree's `.claude/skills/`, would have shown up in
+  the diff and the gate's scope check; `--plugin-dir` loads them for the session only.
 

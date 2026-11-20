@@ -17,7 +17,7 @@ import pytest
 
 from jigworks_runner.adapters.fake import FakeAdapter, FakeStep
 from jigworks_runner.engine import RunStateError, WorkflowRun
-from jigworks_runner.package import load_package
+from jigworks_runner.package import bundle_files, load_package
 
 ROOT = Path(__file__).resolve().parents[3]
 PACKAGE_DIR = ROOT / "workflows" / "feature-development"
@@ -164,6 +164,20 @@ def test_models_come_from_the_release(repo):
     assert efforts["review"] == "medium" and efforts["implement"] is None
     declared = set(run.package.allowed_tools())
     assert all(set(c.options.allowed_tools) <= declared for c in agent.calls)
+
+
+def test_every_agent_gets_the_skills_of_the_release(repo):
+    run, agent = new_run(repo, script())
+    approve_all(run, run.start("Add describe(order)"))
+    plugin = PACKAGE_DIR / "plugin"
+    assert all(c.options.plugin_dirs == (str(plugin),) for c in agent.calls)
+    files = bundle_files(PACKAGE_DIR)
+    assert json.loads(files["plugin/.claude-plugin/plugin.json"])["name"] == "feature-development"
+    skills = [p for p in files if p.startswith("plugin/skills/") and p.endswith("/SKILL.md")]
+    assert len(skills) >= 3
+    for path in skills:
+        head = files[path].decode().split("---")[1]
+        assert "name:" in head and "description:" in head, path
 
 
 def test_tests_and_review_run_in_separate_sessions(repo):

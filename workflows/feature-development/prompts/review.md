@@ -10,6 +10,8 @@ $plan
 
 ## What to review
 
+Use the `feature-development:independent-review` skill.
+
 Run `git diff $base` to see the whole change (only $scope may change). Check:
 
 1. Does the change do what the specification and plan say, and nothing unrelated?

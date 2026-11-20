@@ -27,9 +27,10 @@ latest ones (design.md §9, v0.9).
 - [x] Agents may run the repo's test and install commands (pnpm/npm/yarn/uv/go/cargo).
 - [x] Extension `jigworks.repoPath` defaults to the workspace root; this repo's `.vscode/settings.json` keeps the demo on `sample-repo`.
 - [x] The runner's `.jigworks/.gitignore` lets `gate.toml` through.
+- [x] Skills ship with the release: `plugin/` (Claude Code plugin) loaded by every agent call via `--plugin-dir`; three skills (`clarify-before-planning`, `tests-from-the-spec`, `independent-review`), named in the prompts.
 - [x] Prices for `claude-opus-5-5` and `claude-sonnet-5-5` in the price table.
 - [ ] Production hub: redeploy (schema change) and add the new prices before publishing 1.5.0 (human).
-- [ ] `claude update` to 2.1.280+ before a real run (the installed 2.1.197 rejects Opus 5.5).
+- [x] Claude Code updated to 2.1.329 (`claude update`); Opus 5.5 at effort `medium` verified live.
 - [ ] A/B eval against a plain Opus 5.5 session (design.md §11, question 7).
 
 ## Evidence
@@ -64,7 +65,13 @@ PASS bandit | no changed Python files
 ```
 
 Real `claude -p` (Claude Code 2.1.197):
+- `--plugin-dir workflows/feature-development/plugin`: the init event lists
+  `feature-development:clarify-before-planning`, `…:independent-review`, `…:tests-from-the-spec`,
+  and the agent names all three.
 - `--model claude-sonnet-5-5`: succeeds; a project skill in `.claude/skills/` is used with
   `--setting-sources project` and only `Read Glob Grep` allowed (no `Skill` permission needed).
 - `--model claude-opus-5-5 --effort medium`: `is_error: true`, "Claude Code 2.1.197 does not
-  support this model; version 2.1.280 or newer is required". Not verified on a newer CLI.
+  support this model; version 2.1.280 or newer is required".
+
+After `claude update` (2.1.329): `--model claude-opus-5-5 --effort medium --plugin-dir …/plugin`
+succeeds, init reports `model: claude-opus-5-5` and the three release skills.

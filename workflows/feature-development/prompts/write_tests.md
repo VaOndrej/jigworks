@@ -11,6 +11,8 @@ $plan
 
 ## Rules
 
+- Use the `feature-development:tests-from-the-spec` skill.
+
 - Only add or change test files in $scope. Do not touch production code, and do not implement
   the feature.
 - The gate runs: $tests. Write tests it picks up. If the repo has no test setup yet, set up the
