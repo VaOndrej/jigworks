@@ -61,6 +61,7 @@
 - `result.usage` covers the main conversation model only. `result.modelUsage` additionally includes background calls (e.g. a haiku call of ~530 input tokens on the Bash run: `result.usage.input_tokens` 18 vs `modelUsage[haiku].inputTokens` 550). (observed)
 - `total_cost_usd == Σ modelUsage[*].costUSD` exactly. (observed, asserted)
 - `total_cost_usd` covers **this invocation only**, not the whole resumed session (resume-1 $0.0145, resume-2 $0.0015). (observed)
+- **Changed in CLI 2.1.329** (measured 2026-11-20, T25): on a `--resume` call `result.modelUsage` and `total_cost_usd` are the **running total of the whole session**, while `result.usage` is still this call only (4th call of a Haiku session: `result.usage` in 2 / out 6 / cache_write 73 / cache_read 281468; `modelUsage` 1188 / 39 / 494061 / 431236 = the 3rd call's totals plus those). The runner turns it into this call's usage (`jigworks_contracts.usage`).
 - Cache writes are 1-hour cache (`ephemeral_1h_input_tokens`), which Anthropic prices at 2× base input, not 1.25× like the 5-minute cache. (observed type; price is documented pricing, not verified here)
 - Even "reply ok" costs ~$0.014–0.024 on haiku: the Claude Code system prompt is ~18 k cached + 7–10 k cache-write tokens. Cache tokens dominate, as design.md §8 assumed. (observed)
 

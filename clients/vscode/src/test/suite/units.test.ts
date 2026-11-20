@@ -5,6 +5,10 @@ import type { RunEvent } from "@jigworks/contracts";
 import { describeLine, describeTool, elapsed, livenessState, recentActions, stepCounters } from "../../shared/activity";
 import { foldEvents, nodeDone, type AgentLine, type SessionView } from "../../shared/session";
 import { shortTitle, tabChrome, tabIcon } from "../../shared/tabTitle";
+import { apiCost } from "../../shared/cost";
+import type { PriceEntry } from "@jigworks/contracts";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 const R = "run_t21";
 let seq = 0;
@@ -194,6 +198,29 @@ suite("T21 units", () => {
       ]);
       assert.deepEqual(stepCounters(s), { files: 2, toolCalls: 4, outputTokens: 1200 });
       assert.deepEqual(recentActions(s, 3).map((a) => a.text), ["Running tests", "Editing t.py", "Editing a.py"]);
+    });
+  });
+
+  suite("usage of a resumed session (T25)", () => {
+    // run_20261120122836_6ab988: the fixer session recorded with running totals by the old runner,
+    // then one per-call record from a T25 runner.
+    const usage = (attempt: number, i: number, o: number, cw: number, cr: number, cost: number) =>
+      ev("usage", { node: "fix", attempt, usage: { runId: R, node: "fix", attempt, model: "claude-sonnet-5-5", adapter: "claude", input: i, output: o, cache_write: cw, cache_read: cr, sessionId: "924d95b6", cliCostUsd: cost, at: "2026-11-20T15:30:00Z" } });
+
+    test("running totals are counted once, later per-call records as they are", () => {
+      const s = foldEvents(R, [
+        ...started(),
+        usage(1, 228, 207699, 691789, 25527388, 7.3973408),
+        usage(2, 240, 213688, 705496, 27827461, 7.7420901),
+        usage(3, 246, 215863, 713785, 29007035, 7.9149655),
+        usage(4, 4, 621, 2577, 405961, 0.0571),
+      ]);
+      assert.equal(s.usage.output, 215863 + 621);
+      assert.ok(Math.abs(s.usage.cliCostUsd - (7.9149655 + 0.0571)) < 1e-6);
+      assert.deepEqual(s.usageRecords.map((u) => u.output), [207699, 5989, 2175, 621]);
+      const prices = JSON.parse(readFileSync(resolve(__dirname, "../../../../../packages/contracts/fixtures/prices.json"), "utf8")) as PriceEntry[];
+      const cost = apiCost(prices, s.usageRecords).usd;
+      assert.ok(Math.abs(cost - s.usage.cliCostUsd) / s.usage.cliCostUsd < 0.01, `price table ${cost} vs CLI ${s.usage.cliCostUsd}`);
     });
   });
 });

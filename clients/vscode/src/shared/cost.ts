@@ -37,3 +37,45 @@ export function formatTokens(n: number): string {
   if (n >= 1_000) return `${Math.round(n / 1_000)}k`;
   return String(n);
 }
+
+// --- per-call usage of resumed sessions (mirrors packages/contracts/jigworks_contracts/usage.py) ---
+// Claude CLI 2.1.329 reports a `--resume` call's modelUsage as the session's running total, and
+// runners before T25 recorded it per call: summing those records counts every earlier call again
+// ($168 shown for a ~$23 run). The leading records of a session and model where no field shrinks
+// and the output grows are running totals (each adds its difference); after the first record that
+// breaks this, records are already per call (runners from T25 on).
+
+const USAGE_FIELDS = ["input", "output", "cache_write", "cache_read", "cliCostUsd"] as const;
+
+/** Per (session, model): the last running total while still in the leading run, or "per-call". */
+export type UsageSeries = Record<string, UsageRecord | "per-call">;
+
+const v = (r: UsageRecord, f: (typeof USAGE_FIELDS)[number]): number => (r[f] as number | null | undefined) ?? 0;
+
+function covers(later: UsageRecord, earlier: UsageRecord): boolean {
+  return USAGE_FIELDS.every((f) => v(later, f) >= v(earlier, f)) && v(later, "output") > v(earlier, "output");
+}
+
+/** The usage of this record's own call; `series` is updated in place (keep it per run). */
+export function perCall(series: UsageSeries, r: UsageRecord): UsageRecord {
+  if (!r.sessionId) return r;
+  const key = `${r.sessionId}\u0000${r.model}`;
+  const last = series[key];
+  if (last === undefined) {
+    series[key] = r;
+    return r;
+  }
+  if (last === "per-call") return r;
+  if (!covers(r, last)) {
+    series[key] = "per-call";
+    return r;
+  }
+  series[key] = r;
+  const out: UsageRecord = { ...r };
+  for (const f of USAGE_FIELDS) {
+    if (r[f] === undefined || r[f] === null) continue;
+    const d = (r[f] as number) - v(last, f);
+    (out as unknown as Record<string, unknown>)[f] = f === "cliCostUsd" ? Math.round(d * 1e10) / 1e10 : Math.round(d);
+  }
+  return out;
+}

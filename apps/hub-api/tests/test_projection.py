@@ -61,3 +61,22 @@ def test_gate_first_try():
     assert by_id["run_fd_0001"] is True
     assert by_id["run_fd_0004"] is False
     assert by_id["run_fd_0003"] is None  # rejected at the plan, never reached the gate
+
+
+def test_a_resumed_run_is_live_again():
+    """A run that ended `failed` and was resumed (`jigworks resume`) is running again: the old
+    run_finished summary must not override the later status (run_20261120122836_6ab988)."""
+    events = events_of(FIX / "runs" / "run_fd_0003-rejected-at-plan.jsonl")
+    last = events[-1]
+    assert last["kind"] == "run_finished"
+    base = {k: last[k] for k in ("runId", "release")}
+    events += [
+        {**base, "seq": last["seq"] + 1, "kind": "node_status", "at": "2026-11-20T15:21:10Z",
+         "node": "review", "attempt": 11, "status": "running", "runStatus": "running"},
+    ]
+    summary, audit = project(run_create_from_started(events[0]), events)
+    assert summary["status"] == "running"
+    assert summary["currentNode"] == "review"
+    assert "finishedAt" not in summary
+    assert c.validate("RunSummary", summary) == []
+    assert c.validate("AuditRecord", audit) == []

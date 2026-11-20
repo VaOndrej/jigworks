@@ -47,12 +47,18 @@ def seed_if_empty(conn: psycopg.Connection) -> bool:
     return True
 
 
-def seed(conn: psycopg.Connection) -> None:
+def sync_prices(conn: psycopg.Connection) -> None:
+    """Add price rows the database does not have yet. Runs on every start, not only on the first
+    seed: the price list grows with new models, and a run on an unpriced model costs $0."""
     for p in _json("prices.json"):
         conn.execute(
             "INSERT INTO prices (model, token_type, price_per_mtok, valid_from) VALUES (%s, %s, %s, %s) ON CONFLICT DO NOTHING",
             (p["model"], p["tokenType"], p["pricePerMtok"], p["validFrom"]),
         )
+
+
+def seed(conn: psycopg.Connection) -> None:
+    sync_prices(conn)
 
     for wf in _json("api/workflow-list.json")["workflows"]:
         conn.execute(

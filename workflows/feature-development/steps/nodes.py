@@ -47,6 +47,8 @@ VERDICT = re.compile(r"^\s*VERDICT:\s*(PASS|FAIL)\b", re.IGNORECASE | re.MULTILI
 FINDING = re.compile(r"^\s*[-*]?\s*\**\[?F(\d+)\]?\**[:.)]?\s+(.*)$", re.MULTILINE)
 BULLET = re.compile(r"^\s*[-*]\s+\S", re.MULTILINE)
 REVIEW_QUESTION = re.compile(r"^\s*(?:[-*]\s*)?\**QUESTION\**:\s*(.+)$", re.IGNORECASE | re.MULTILINE)
+# What the fixer cannot do itself (a denied download, an approval, a decision): the human is asked at once.
+FIXER_NEEDS = re.compile(r"^\s*(?:[-*]\s*)?\**NEEDS HUMAN\**:\s*(.+)$", re.IGNORECASE | re.MULTILINE)
 
 
 class AgentFailed(RuntimeError):
@@ -174,6 +176,10 @@ def review_questions(text: str) -> list[str]:
     return [q.strip() for q in REVIEW_QUESTION.findall(text or "")]
 
 
+def fixer_needs(text: str) -> list[str]:
+    return [n.strip() for n in FIXER_NEEDS.findall(text or "")]
+
+
 def gate_problems(result: dict) -> int:
     return sum(int(c.get("findings") or 1) for c in result.get("checks", []) if not c.get("passed"))
 
@@ -216,8 +222,14 @@ def shortstat(cwd: Path, since: str | None) -> str:
     except (subprocess.CalledProcessError, OSError):
         return ""
     rows = [ln.split("\t") for ln in out.splitlines() if ln.strip()]
+    try:
+        new = subprocess.run(["git", "ls-files", "--others", "--exclude-standard"], cwd=cwd, capture_output=True,
+                             text=True, check=True).stdout.split("\n")
+    except (subprocess.CalledProcessError, OSError):
+        new = []
+    rows += [["-", "-", f] for f in new if f.strip()]  # git diff does not list untracked files
     if not rows:
-        return "no changes"
+        return NO_CHANGES
     added = sum(int(r[0]) for r in rows if r[0].isdigit())
     removed = sum(int(r[1]) for r in rows if r[1].isdigit())
     return f"{len(rows)} file{'s' if len(rows) != 1 else ''}, +{added} −{removed}"
@@ -230,9 +242,12 @@ def head(cwd: Path) -> str | None:
         return None
 
 
+NO_CHANGES = "no changes"
 CHECK_NAMES = {"review": "independent review", "gate": "gate"}
 WHY = {
     "questions": "The reviewer has questions only you can answer. Answer them in the comment field.",
+    "needs_human": "The fixer is blocked on something only you can do (see below). Do it, then Continue.",
+    "no_changes": "The last fix changed nothing; another round would cost tokens without progress.",
     "stalled": f"The last {STALL_ROUNDS} fixes did not lower the number of open problems.",
     "limit": "The fixes reached their cap.",
 }
@@ -247,6 +262,11 @@ def fix_report(state: dict) -> str:
     questions = state.get("review_questions") or []
     if questions:
         parts.append("## Questions from the reviewer\n\n" + "\n".join(f"{i}. {q}" for i, q in enumerate(questions, 1)))
+    needs = state.get("fixer_requests") or []
+    if needs:
+        parts.append("## What the fixer needs from you\n\n" + "\n".join(f"{i}. {n}" for i, n in enumerate(needs, 1)))
+    if reason in ("needs_human", "no_changes") and state.get("implement_summary"):
+        parts.append("## The fixer's last reply\n\n" + state["implement_summary"])
     rows = ["| # | Step | Result | What happened |", "|---|---|---|---|"]
     n = 0
     for h in history:
@@ -449,10 +469,15 @@ def fix(state: dict, rt: Runtime) -> dict:
     before = head(Path(rt.cwd))
     text = prompt("fix", problem=problem, context=context, note=note, scope=scope_text(rt), tests=tests_text(rt))
     reply = call(rt, "fix", text, WRITE, resume=session)
+    changed = shortstat(Path(rt.cwd), before)
     history = [*(state.get("fix_history") or []), {"kind": "fix", "reason": reason, "summary": first_line(reply.text),
-                                                    "changed": shortstat(Path(rt.cwd), before)}]
+                                                    "changed": changed}]
+    needs = fixer_needs(reply.text)
+    # A fixer that is blocked or changed nothing goes straight to the human: another review
+    # round would only re-find the same problems (and a new reviewer words them differently).
+    escalate = "needs_human" if needs else ("no_changes" if changed == NO_CHANGES else "")
     update: dict[str, Any] = {"fix_loops": loops + 1, "implement_summary": reply.text.strip(), "fix_history": history,
-                              "fix_note": ""}
+                              "fix_note": "", "fixer_requests": needs, "escalation": escalate}
     if reply.session_id:
         update["implement_session"] = reply.session_id
     return update
@@ -489,6 +514,10 @@ def approve_fix(state: dict, rt: Runtime) -> dict:
                    "or Reject to stop the run.",
         "limit": f"{loops} fixes so far: the cap is reached. Approve to continue ({EXTRA_FIXES} more fixes), "
                  "type a hint for the fixer and press Enter, or Reject to stop the run.",
+        "needs_human": "The fixer is blocked on something only you can do. Do it, then type what you did and "
+                       "press Enter (the fixer reads it first), or Reject to stop the run.",
+        "no_changes": "The last fix changed nothing. Type a hint for the fixer and press Enter, Approve to let it "
+                      "try again, or Reject to stop the run.",
     }.get(reason, "Approve to continue fixing, type a hint and press Enter, or Reject to stop.")
     answer = rt.ask_human("approve_fix", "plan", message, plan=fix_report(state))
     decision = answer["decision"]
@@ -508,6 +537,7 @@ def approve_fix(state: dict, rt: Runtime) -> dict:
         "fix_history": history,
         "fix_stall_from": len(history),
         "fix_note": comment,
+        "fixer_requests": [],
         STATUS_KEY: "succeeded",
     }
     if comment and reason == "questions":

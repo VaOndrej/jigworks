@@ -69,6 +69,14 @@ def edit(path: str, old: str, new: str):
     return apply
 
 
+def touch(path: str = "sample-repo/sample_repo/notes.py"):
+    """A fixer that changes something every round (a fixer that changes nothing goes to the human)."""
+    def apply(cwd: Path) -> None:
+        p = cwd / path
+        p.write_text(p.read_text() + "# fix round\n")
+    return apply
+
+
 def script(**overrides) -> dict:
     base = {
         "triage": [FakeStep("ROUTE: QUICK\nREASON: one small function.")],
@@ -76,7 +84,7 @@ def script(**overrides) -> dict:
         "write_tests": [FakeStep("added test_describe_order", files={"sample-repo/tests/test_notes.py": FEATURE_TEST})],
         "implement": [FakeStep("implemented describe", files={"sample-repo/sample_repo/notes.py": FEATURE})],
         "review": [FakeStep("Looks right.\nVERDICT: PASS")],
-        "fix": [FakeStep("fixed")],
+        "fix": [FakeStep("fixed", edit=touch())],
         "summary": [FakeStep("Added describe(order); gate green.")],
     }
     base.update(overrides)
@@ -244,7 +252,7 @@ def failing_review(*open_counts: int) -> list[FakeStep]:
 
 def test_fixes_go_on_by_themselves_while_the_findings_shrink(repo):
     run, agent = new_run(repo, script(review=[*failing_review(4, 3, 2, 1), FakeStep("- F1 FIXED\nVERDICT: PASS")],
-                                      fix=[FakeStep("fixed one more")]))
+                                      fix=[FakeStep("fixed one more", edit=touch())]))
     out = run.start("Add describe(order)")
     assert out.interrupt["node"] == "approve_plan"
     out = run.decide("approve", APPROVER)
@@ -255,7 +263,7 @@ def test_fixes_go_on_by_themselves_while_the_findings_shrink(repo):
 
 
 def test_stalled_fixes_ask_the_human_with_a_round_by_round_report(repo):
-    run, agent = new_run(repo, script(review=failing_review(3, 2, 2, 2), fix=[FakeStep("tightened the limit check")]))
+    run, agent = new_run(repo, script(review=failing_review(3, 2, 2, 2), fix=[FakeStep("tightened the limit check", edit=touch())]))
     run.start("Add describe(order)")
     out = run.decide("approve", APPROVER)
     assert out.status == "waiting_human" and out.interrupt["node"] == "approve_fix"
@@ -307,6 +315,50 @@ def test_a_reviewer_question_goes_to_the_human_before_any_fix(repo):
     assert "USD." in fix_call.prompt
     rereview = [c for c in agent.calls if c.node == "review"][-1]
     assert "Human:\nUSD." in rereview.prompt, "the reviewer sees the human's answer too"
+    assert out.interrupt["node"] == "approve_pr"
+    check_stream(run)
+
+
+def test_a_blocked_fixer_asks_the_human_at_once(repo):
+    """The real run_20261120122836_6ab988: the fixer could not download a library (denied) and
+    said so in prose for 5 rounds while new reviewers found 3 to 14 different problems."""
+    blocked = ("I made no changes this round.\n"
+               "NEEDS HUMAN: vendor the chart library: curl -sSLO https://example.com/lib.js\n"
+               "NEEDS HUMAN: approve the load-test gap")
+    run, agent = new_run(repo, script(review=[*failing_review(2), FakeStep("- F1 FIXED\n- F2 FIXED\nVERDICT: PASS")],
+                                      fix=[FakeStep(blocked), FakeStep("used the vendored file", edit=touch())]))
+    run.start("Add describe(order)")
+    out = run.decide("approve", APPROVER)
+    assert out.interrupt["node"] == "approve_fix"
+    assert [c.node for c in agent.calls].count("review") == 1, "no second review after a blocked fix"
+    report = out.interrupt["plan"]
+    assert "## What the fixer needs from you" in report
+    assert "1. vendor the chart library: curl -sSLO https://example.com/lib.js" in report
+    assert "2. approve the load-test gap" in report
+    assert "## The fixer's last reply" in report and "blocked on something only you can do" in report
+    out = run.decide("request_changes", APPROVER, comment="Vendored lib.js; the load-test gap is approved.")
+    assert "Vendored lib.js" in [c for c in agent.calls if c.node == "fix"][-1].prompt
+    assert out.interrupt["node"] == "approve_pr"
+    check_stream(run)
+
+
+def test_a_fix_that_changes_nothing_asks_the_human(repo):
+    run, agent = new_run(repo, script(review=failing_review(3, 3), fix=[FakeStep("I made no changes this round.")]))
+    run.start("Add describe(order)")
+    out = run.decide("approve", APPROVER)
+    assert out.interrupt["node"] == "approve_fix"
+    assert [c.node for c in agent.calls].count("fix") == 1
+    assert "The last fix changed nothing" in out.interrupt["plan"]
+    assert "(no changes)" in out.interrupt["plan"]
+    check_stream(run)
+
+
+def test_a_fix_that_only_adds_a_file_is_a_change(repo):
+    run, agent = new_run(repo, script(review=[*failing_review(1), FakeStep("- F1 FIXED\nVERDICT: PASS")],
+                                      fix=[FakeStep("added the missing module",
+                                                    files={"sample-repo/sample_repo/extra.py": "X = 1\n"})]))
+    run.start("Add describe(order)")
+    out = run.decide("approve", APPROVER)
     assert out.interrupt["node"] == "approve_pr"
     check_stream(run)
 
@@ -711,6 +763,45 @@ def test_implement_cannot_add_pytest_configuration(repo):
     first = next(e for e in events(run) if e["kind"] == "gate_result")["gateResult"]
     guard = next(c for c in first["checks"] if c["name"] == "protected tests")
     assert not guard["passed"] and "sample-repo/conftest.py" in guard["summary"]
+
+
+def test_implement_may_create_an_invariants_file_but_not_change_one(repo):
+    """run_20261120122836_6ab988: the plan gave INVARIANTS.md to the implementer and a test from
+    write_tests requires it, but the gate called any INVARIANTS.md "changed after write_tests", so
+    no fix could pass. A new one is the implementer's; an existing one stays read-only."""
+    new_doc = "# Invariants\n\n1. Filled never exceeds the order quantity.\n"
+    steps = script(implement=[FakeStep("implemented", files={"sample-repo/sample_repo/notes.py": FEATURE,
+                                                             "sample-repo/sample_repo/INVARIANTS.md": new_doc})])
+    run, _ = new_run(repo, steps)
+    out = approve_all(run, run.start("Add describe(order)"))
+    assert out.status == "succeeded"
+    gate = next(e for e in events(run) if e["kind"] == "gate_result")["gateResult"]
+    assert next(c for c in gate["checks"] if c["name"] == "protected tests")["passed"]
+
+
+def test_implement_cannot_change_the_existing_invariants_file(repo):
+    steps = script(implement=[FakeStep("implemented", files={"sample-repo/sample_repo/notes.py": FEATURE},
+                                       edit=lambda cwd: (cwd / "sample-repo/INVARIANTS.md").write_text("# none\n"))],
+                   fix=[FakeStep("I made no changes this round.")])
+    run, _ = new_run(repo, steps)
+    approve_all(run, run.start("Add describe(order)"))
+    gate = next(e for e in events(run) if e["kind"] == "gate_result")["gateResult"]
+    guard = next(c for c in gate["checks"] if c["name"] == "protected tests")
+    assert not guard["passed"] and "sample-repo/INVARIANTS.md" in guard["summary"]
+
+
+def test_security_findings_in_the_read_only_tests_do_not_block_the_fixer(repo):
+    """run_20261120122836_6ab988: bandit B108 (a /tmp path) in a test from write_tests failed the
+    gate on every round, and implement/fix may not edit that test. Reported, not counted."""
+    tmp_test = FEATURE_TEST + '\n\ndef test_path():\n    assert "/tmp/x.sqlite3".endswith(".sqlite3")\n'
+    steps = script(write_tests=[FakeStep("added tests", files={"sample-repo/tests/test_notes.py": tmp_test})])
+    run, _ = new_run(repo, steps)
+    out = approve_all(run, run.start("Add describe(order)"))
+    assert out.status == "succeeded"
+    gate = next(e for e in events(run) if e["kind"] == "gate_result")["gateResult"]
+    bandit = next(c for c in gate["checks"] if c["kind"] == "security_scan")
+    assert bandit["passed"]
+    assert "B108" in bandit["summary"] and "read-only" in bandit["summary"]
 
 
 def test_open_pr_pushes_demo_branch(repo):
