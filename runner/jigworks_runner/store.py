@@ -43,12 +43,16 @@ def default_home(repo_root: Path) -> Path:
     return Path(env).resolve() if env else repo_root / ".jigworks"
 
 
+OLD_IGNORE = "# Jigworks local run state; never committed.\n*\n"
+
+
 def ensure_home(home: Path) -> Path:
     (home / "runs").mkdir(parents=True, exist_ok=True)
     (home / "worktrees").mkdir(parents=True, exist_ok=True)
+    # Run state is never committed; the repo's gate config (.jigworks/gate.toml) is.
     ignore = home / ".gitignore"
-    if not ignore.exists():
-        ignore.write_text("# Jigworks local run state; never committed.\n*\n")
+    if not ignore.exists() or ignore.read_text() == OLD_IGNORE:
+        ignore.write_text(OLD_IGNORE + "!gate.toml\n")
     return home
 
 

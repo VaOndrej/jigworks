@@ -1,6 +1,6 @@
 # Jigworks — joint brainstorming and architecture design
 
-- **Version:** 0.8 (plan agreed with the human before any code)
+- **Version:** 0.9 (project-agnostic workflow, latest models)
 - **Last updated:** 20 Nov 2026
 - **Status:** working design, not a finished technical specification
 - **Context:** take-home case study "Design Your Software Factory" (AI Engineer, FTMO & OANDA); recommended time ~4 h, live demo + backup recording, repo incl. agent instructions, prompts, tests, evals and build log; public/synthetic data only.
@@ -236,7 +236,7 @@ START → plan ⇄ [human approve plan]   (questions / request changes → plan 
       → write_tests (different agent, from the plan and the planning conversation)
       → implement → review (independent agent)
             review FAIL → fix → review          (iteration limit)
-            review PASS → gate (tests + invariant property tests)
+            review PASS → gate (the repo's own tests + property tests where configured)
             gate FAIL → fix → gate
             gate PASS → [human review] → open PR → summary → END
             review: request changes → fix → gate → [human review]   (follow-up prompt, counted in the human delta)
@@ -244,6 +244,10 @@ START → plan ⇄ [human approve plan]   (questions / request changes → plan 
 
 - Steps are ordinary Python functions via `add_node`; loops via `add_conditional_edges`; LangGraph checkpoints + a git commit per node (hash in the graph state).
 - Acceptance: the runner goes through at least one fix loop and the extension shows the progress and the approval.
+- **Project-agnostic** (v0.9): the repo is the one the run starts in, and the scope is the folder it starts from; the prompt narrows the work, the approved plan names the files. The gate runs the repo's own tests, from `.jigworks/gate.toml` (read from the base commit) or detected (pytest, package.json `test`, go, cargo). `sample-repo/` is one such repo with its own gate config, not a special case.
+- **Models:** Opus 5.5 for plan, write_tests and review (review at effort `medium`), Sonnet 5.5 for implement, fix and summary; effort is set per node by the release (`[effort]`), like the models.
+- **Skills:** each node sees the target repo's project skills and `CLAUDE.md` (`--setting-sources project`), never the personal ones of whoever runs it, so a release behaves the same for everyone. Skills shipped inside a release are planned.
+- **Goal:** more consistent and better results than a plain Opus 5.5 session with skills on the same task; to be measured with an A/B eval (open question 7).
 
 ## 10. Deferred
 
@@ -259,6 +263,7 @@ START → plan ⇄ [human approve plan]   (questions / request changes → plan 
 4. Granularity of `stream-json` telemetry — verify in spike B.
 5. Pro account billing for `claude -p` — verify the current terms.
 6. Human delta: capture point (PR-merge webhook vs local push), matching squashed or rebased merges to `ai_final_commit`, and retention of stored diffs.
+7. A/B evaluation of a workflow release against a plain agent session (or another release) on the same tasks: variants, a simulated human for the planning questions, hidden tests next to an LLM judge, repetitions and budget.
 
 ## 12. Repo structure (plan)
 
@@ -285,6 +290,7 @@ Tooling: pnpm workspace (TS), uv workspace (Python).
 
 ## 13. Decision history
 
+- **v0.9 (20 Nov 2026):** `feature-development` is project-agnostic (§9): repo = where the run starts, gate runs the repo's own tests (`.jigworks/gate.toml` or detection), `sample-repo/` gets its own gate config, the extension's `repoPath` defaults to the workspace root. Models Opus 5.5 / Sonnet 5.5, reasoning effort per node in the release (`[effort]`, contract `WorkflowManifest.effort`). Project skills apply, personal ones do not (T19).
 - **v0.8 (20 Nov 2026):** the plan is agreed with the human before any code, in every workflow (§5): request changes at the plan re-plans in the planner's session, the planner may ask questions, the planning conversation goes to the later agents, and plan discussion does not count as a follow-up prompt. `feature-development` 1.5.0 (T18).
 - **v0.7 (19 Nov 2026):** human delta loop added to the architecture (§4, §8; not built); its baseline is the first result of a session, and follow-up prompts count as corrections like hand edits. Request changes added to the human review. Models are set by the workflow release, not in VS Code. Editor: Code/Graph toggle, new file/folder, GitHub source shown as planned, no AI edit box. Hub tabs: "Runs & analytics" merged into one, the HR tab renamed "Non-coding teams". VS Code extension: parallel sessions, prompt in the middle, run view with graph position and % of plan (§7). Tickets live in `tickets/`.
 - **v0.6 (19 Nov 2026):** project named Jigworks, license FSL-1.1-ALv2. Web Hub = writing Python + read-only `get_graph()` graph (visual editing dropped). Distribution via Hub API + `.zip` import fallback. Own analytics (tokens × price list with validity). Hosting on Vercel Services + Neon. Target audience is developers, HR only as a text tab. Governance elements (audit, independent review, human approval) moved into the core because of the case study brief. Prototype scope: runner → extension → minimal Hub.

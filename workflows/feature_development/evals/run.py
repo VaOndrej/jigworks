@@ -84,7 +84,7 @@ def run_task(task: dict[str, Any], adapter: str, prices: PriceTable) -> dict[str
         agent = FakeAdapter(script_of(task)) if adapter == "fake" else ClaudeAdapter()
         run = WorkflowRun(
             load_package(PACKAGE_DIR), run_id=f"eval_{task['id'].replace('-', '_')}", cwd=repo, agent=agent,
-            author_email="evals@example.com", pr_opener=default_pr_opener(remote=str(remote), base="main"),
+            author_email="evals@example.com", options={"gate": {"scope": ["sample-repo/"]}}, pr_opener=default_pr_opener(remote=str(remote), base="main"),
         )
         outcome = run.start(task["prompt"], title=task["title"])
         decisions = 0

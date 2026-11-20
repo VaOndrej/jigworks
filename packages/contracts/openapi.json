@@ -2315,6 +2315,53 @@
         ],
         "title": "DraftUpdate"
       },
+      "EffortAssignment": {
+        "properties": {
+          "default": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default"
+          },
+          "nodes": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string",
+                  "enum": [
+                    "low",
+                    "medium",
+                    "high",
+                    "xhigh",
+                    "max"
+                  ]
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nodes"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "EffortAssignment",
+        "description": "Reasoning effort per node, set by the release like the models. A node without one uses the CLI default."
+      },
       "Error": {
         "properties": {
           "code": {
@@ -5257,6 +5304,16 @@
           },
           "models": {
             "$ref": "#/components/schemas/ModelAssignment"
+          },
+          "effort": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EffortAssignment"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "weights": {
             "anyOf": [

@@ -18,7 +18,8 @@ Time is tracked in two columns: **human** (my own time: deciding, directing, rev
 | Hub sample-data reset, worktree cleanup | 2 min | ~20 min |
 | Hub validation: relative imports | 1 min | ~10 min |
 | Plan agreed with the human (T18, feature-development 1.5.0) | 3 min | ~40 min |
-| **Total** | **3 h 24 min** | **~9 h 10 min** |
+| Project-agnostic workflow, Opus 5.5 / Sonnet 5.5 (T19) | 5 min | ~1 h 15 min |
+| **Total** | **3 h 29 min** | **~10 h 25 min** |
 
 ## Entries
 
@@ -286,4 +287,37 @@ Two Claude Code sessions (Opus 5.5) in their own worktrees, pushing to `feature/
 - The first run of the round-limit test hung (no limit yet, so the loop never ended) and was
   stopped by hand; the limit made it pass.
 - Only the fake adapter is verified; a real `claude -p` questions round has not been run.
+
+### 2026-11-20 — Project-agnostic feature-development, latest models (human 5 min, agent ~1 h 15 min)
+
+**What I delegated**
+- T19: the gate no longer assumes `sample-repo/`. The repo is where the run starts; the gate
+  reads `.jigworks/gate.toml` from the base commit or detects the test command (pytest,
+  package.json `test`, go, cargo), protects what write_tests wrote plus the test script and the
+  gate config, and fails with a hint when a repo has no tests. `sample-repo/` got its own gate
+  config with the old settings. Prompts lost their sample-repo and Python wording and now get
+  the gate's real test commands.
+- Models Opus 5.5 (plan, write_tests, review at effort `medium`) and Sonnet 5.5 (implement,
+  fix, summary). Reasoning effort is a new per-node release setting (`[effort]`), which needed
+  a contract change (`WorkflowManifest.effort`), regenerated types and `openapi.json`.
+- The extension's `repoPath` defaults to the workspace root; the runner's `.jigworks/.gitignore`
+  no longer hides a committed `gate.toml`; prices for the new models.
+- Ten new tests on Python and Node repos that are not sample-repo, red first; a CLI run of the
+  release on a separate Node repo through `uv run --project`.
+
+**What I reviewed / decided myself**
+- The workflow must be project-agnostic and later support skills; how the gate finds tests
+  (detection + optional config), effort as a release field, which nodes get Opus.
+
+**What I wrote by hand**
+- Nothing.
+
+**What went wrong / changed course**
+- The installed Claude Code (2.1.197) rejects Opus 5.5 ("2.1.280 or newer is required"). It
+  still reports `subtype: success` with `is_error: true`; the adapter already treats that as a
+  failure, so a run fails with the CLI's message instead of planning on an error text.
+- Found two more sample-repo couplings outside the workflow while testing another repo: the
+  extension's `repoPath` default and the runner's ignore-all `.jigworks/.gitignore`.
+- The production hub seeds prices once, so it will price Opus 5.5 / Sonnet 5.5 at 0 until the
+  prices are added there.
 

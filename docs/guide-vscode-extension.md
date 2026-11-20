@@ -30,7 +30,9 @@ Then in VS Code, run **Developer: Reload Window**.
 
 Open `~/Development/jigworks` as the workspace folder. The extension starts the runner there
 (`uv run jigworks`), finds the workflow packages in `workflows/`, and lets the agents change only
-`sample-repo/` (setting `jigworks.repoPath`).
+`sample-repo/`: this repo's `.vscode/settings.json` sets `jigworks.repoPath` to `sample-repo`.
+In any other repo the default is the workspace root; to run the workflow there, see
+"Using it in another repo" in `workflows/feature-development/README.md`.
 
 The last step of the workflow (`open_pr`) pushes the branch `demo/<runId>` to the PR remote.
 The default remote is `origin`, which is the **public** GitHub repo; with a GitHub remote the step

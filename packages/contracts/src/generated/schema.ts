@@ -132,6 +132,34 @@ export const schema = {
         "beta"
       ]
     },
+    "ReasoningEffort": {
+      "type": "string",
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "description": "Reasoning effort of an agent call (`claude -p --effort`)."
+    },
+    "EffortAssignment": {
+      "type": "object",
+      "description": "Reasoning effort per node, set by the release like the models. A node without one uses the CLI default.",
+      "additionalProperties": false,
+      "properties": {
+        "default": {
+          "$ref": "#/$defs/ReasoningEffort"
+        },
+        "nodes": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/ReasoningEffort"
+          },
+          "description": "Per-node override: node name → effort."
+        }
+      }
+    },
     "ModelAssignment": {
       "type": "object",
       "description": "Models are set by the workflow release (`[models]` in workflow.toml), never picked in VS Code.",
@@ -1331,6 +1359,9 @@ export const schema = {
         },
         "models": {
           "$ref": "#/$defs/ModelAssignment"
+        },
+        "effort": {
+          "$ref": "#/$defs/EffortAssignment"
         },
         "weights": {
           "type": "object",

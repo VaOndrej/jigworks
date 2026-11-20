@@ -1,0 +1,4 @@
+{
+  // The demo works on sample-repo/; in any other repo the default is the workspace root.
+  "jigworks.repoPath": "sample-repo"
+}

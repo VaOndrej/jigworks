@@ -113,6 +113,13 @@ export type TokenType = "input" | "output" | "cache_write" | "cache_read";
  */
 export type ChannelName = "stable" | "beta";
 /**
+ * Reasoning effort of an agent call (`claude -p --effort`).
+ *
+ * This interface was referenced by `JigworksContracts`'s JSON-Schema
+ * via the `definition` "ReasoningEffort".
+ */
+export type ReasoningEffort = "low" | "medium" | "high" | "xhigh" | "max";
+/**
  * One event of a run (design.md §8). `kind` defaults to node_status, so the design example validates as-is. The payload object matching `kind` is required (see allOf). The runner sends seq (monotonic per run, from 0) on every event; the hub deduplicates on (runId, seq).
  *
  * This interface was referenced by `JigworksContracts`'s JSON-Schema
@@ -160,6 +167,21 @@ export type RunEvent = {
  */
 export interface JigworksContracts {
   [k: string]: unknown;
+}
+/**
+ * Reasoning effort per node, set by the release like the models. A node without one uses the CLI default.
+ *
+ * This interface was referenced by `JigworksContracts`'s JSON-Schema
+ * via the `definition` "EffortAssignment".
+ */
+export interface EffortAssignment {
+  default?: ReasoningEffort;
+  /**
+   * Per-node override: node name → effort.
+   */
+  nodes?: {
+    [k: string]: ReasoningEffort;
+  };
 }
 /**
  * Models are set by the workflow release (`[models]` in workflow.toml), never picked in VS Code.
@@ -586,6 +608,7 @@ export interface WorkflowManifest {
     };
   };
   models: ModelAssignment;
+  effort?: EffortAssignment;
   /**
    * Fallback progress weight per node (design.md §7).
    */

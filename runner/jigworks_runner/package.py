@@ -66,6 +66,10 @@ class WorkflowPackage:
         models = self.manifest["models"]
         return models.get("nodes", {}).get(node) or models["default"]
 
+    def effort_for(self, node: str) -> str | None:
+        effort = self.manifest.get("effort") or {}
+        return effort.get("nodes", {}).get(node) or effort.get("default")
+
     def allowed_tools(self) -> list[str] | None:
         perms = self.manifest.get("permissions") or {}
         return list(perms["allowedTools"]) if "allowedTools" in perms else None

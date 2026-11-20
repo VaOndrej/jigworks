@@ -20,7 +20,14 @@ APPROVED_OPEN_QUESTIONS = ("The human approved without answering your questions.
                            "explicitly at the top, then write the plan.")
 
 READ_ONLY = ("Read", "Glob", "Grep", "Bash(git diff:*)", "Bash(git log:*)")
-WRITE = ("Read", "Glob", "Grep", "Edit", "Write", "Bash(python -m pytest:*)", "Bash(uv run pytest:*)")
+# The repo's own test and install commands, so the agent can run what the gate runs.
+WRITE = (
+    "Read", "Glob", "Grep", "Edit", "Write",
+    "Bash(python -m pytest:*)", "Bash(uv run pytest:*)", "Bash(uv add:*)", "Bash(uv sync:*)",
+    "Bash(pnpm test:*)", "Bash(pnpm install:*)", "Bash(pnpm add:*)",
+    "Bash(npm test:*)", "Bash(npm install:*)", "Bash(yarn test:*)", "Bash(yarn add:*)",
+    "Bash(go test:*)", "Bash(cargo test:*)",
+)
 
 VERDICT = re.compile(r"^\s*VERDICT:\s*(PASS|FAIL)\b", re.IGNORECASE | re.MULTILINE)
 
@@ -34,7 +41,19 @@ def prompt(name: str, **values: Any) -> str:
 
 
 def scope_text(rt: Runtime) -> str:
-    return ", ".join(rt.options.get("gate", {}).get("scope", gate_checks.DEFAULTS["scope"]))
+    return gate_checks.scope_label(rt.options.get("gate", {}).get("scope", gate_checks.DEFAULTS["scope"]))
+
+
+def tests_text(rt: Runtime) -> str:
+    """The test commands the gate will run, for the prompts (detected now, on the current tree)."""
+    try:
+        cfg = gate_checks.settings(Path(rt.cwd), rt.base_commit, rt.options.get("gate"))
+    except Exception:  # noqa: BLE001 - only prompt text; the gate itself reports real errors
+        return "the repo's test command"
+    cmds = gate_checks._commands(cfg.get("tests")) + gate_checks._commands(cfg.get("property_tests"))
+    if not cmds:
+        return "no test command found yet (write_tests sets one up)"
+    return ", ".join(f"`{' '.join(c)}`" for c in cmds)
 
 
 def call(rt: Runtime, node: str, text: str, tools: tuple[str, ...], resume: str | None = None):
@@ -71,9 +90,9 @@ def plan(state: dict, rt: Runtime) -> dict:
     session, feedback = state.get("plan_session"), state.get("plan_feedback")
     if session and feedback:
         # Another planning round: the same session, so the planner remembers the conversation.
-        reply = call(rt, "plan", prompt("replan", comment=feedback, scope=scope_text(rt)), READ_ONLY, resume=session)
+        reply = call(rt, "plan", prompt("replan", comment=feedback, scope=scope_text(rt), tests=tests_text(rt)), READ_ONLY, resume=session)
     else:
-        reply = call(rt, "plan", prompt("plan", prompt=state["prompt"], scope=scope_text(rt)), READ_ONLY)
+        reply = call(rt, "plan", prompt("plan", prompt=state["prompt"], scope=scope_text(rt), tests=tests_text(rt)), READ_ONLY)
     return {"plan": reply.text.strip(), "plan_session": reply.session_id or session or "", "plan_feedback": "",
             "plan_rounds": rounds + 1}
 
@@ -106,14 +125,14 @@ def approve_plan(state: dict, rt: Runtime) -> dict:
 @step("write_tests")
 def write_tests(state: dict, rt: Runtime) -> dict:
     # A separate agent session that sees only the spec (prompt + plan), never the implementation.
-    text = prompt("write_tests", prompt=state["prompt"], plan=spec(state), scope=scope_text(rt))
+    text = prompt("write_tests", prompt=state["prompt"], plan=spec(state), scope=scope_text(rt), tests=tests_text(rt))
     reply = call(rt, "write_tests", text, WRITE)
     return {"tests_summary": reply.text.strip()}
 
 
 @step("implement")
 def implement(state: dict, rt: Runtime) -> dict:
-    text = prompt("implement", prompt=state["prompt"], plan=spec(state), scope=scope_text(rt))
+    text = prompt("implement", prompt=state["prompt"], plan=spec(state), scope=scope_text(rt), tests=tests_text(rt))
     reply = call(rt, "implement", text, WRITE)
     return {"implement_session": reply.session_id or ""}
 
@@ -121,7 +140,7 @@ def implement(state: dict, rt: Runtime) -> dict:
 @step("review")
 def review(state: dict, rt: Runtime) -> dict:
     # Independent: a new session that did not write the code.
-    text = prompt("review", prompt=state["prompt"], plan=spec(state), base=rt.base_commit, scope=scope_text(rt))
+    text = prompt("review", prompt=state["prompt"], plan=spec(state), base=rt.base_commit, scope=scope_text(rt), tests=tests_text(rt))
     reply = call(rt, "review", text, READ_ONLY)
     passed = verdict(reply.text)
     return {
@@ -150,7 +169,7 @@ def fix(state: dict, rt: Runtime) -> dict:
         problem = "The gate failed:\n\n" + state.get("gate_report", "")
     else:
         problem = "The independent review failed:\n\n" + state.get("review_findings", "")
-    text = prompt("fix", problem=problem, scope=scope_text(rt))
+    text = prompt("fix", problem=problem, scope=scope_text(rt), tests=tests_text(rt))
     # Resume the implementer's session: it has the context of its own change.
     reply = call(rt, "fix", text, WRITE, resume=state.get("implement_session") or None)
     update: dict[str, Any] = {"fix_loops": loops + 1}
