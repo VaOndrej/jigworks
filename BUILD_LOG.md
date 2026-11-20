@@ -27,7 +27,9 @@ Time is tracked in two columns: **human** (my own time: deciding, directing, rev
 | Brainstorming the extension improvements (T21) | 10 min | — |
 | Extension: gate input, honest gate states, session tabs, live run (T21) | — | ~1 h |
 | Brainstorming the demo application | 10 min | — |
-| **Total** | **4 h 57 min** | **~13 h 35 min** |
+| Fix loops that ask the human, resume after the limit, release skills (T22, T23 ticket) | 5 min | ~1 h 10 min |
+| Demo application review, case-study reply, time reconciliation | 28 min | — |
+| **Total** | **5 h 30 min** | **~14 h 45 min** |
 
 ## Entries
 
@@ -455,3 +457,36 @@ Two Claude Code sessions (Opus 5.5) in their own worktrees, pushing to `feature/
   `write_tests` call emitted nothing for 5.5 min because `stream-json` sends a `tool_use` only
   when the whole block is generated. It needs a new delta event kind (or a throttled
   `agent_output` text block), so it is a contract change.
+
+### 2026-11-20 — T22: fix loops that ask the human instead of failing (human 5 min, agent ~1 h 10 min)
+
+**What I delegated**
+- The whole change to one Claude Code session: the `approve_fix` interrupt with the round-by-round report and stall detection in `feature-development` 1.7.0, re-review by finding ID, `jigworks resume --more-fixes` for runs that already failed at the limit, the extension cards and Activity trend, tests, fixtures and screenshots.
+- A subagent adapted generic engineering skills from the MIT-licensed Matt Pocock skills and Superpowers into the release plugin (with attribution); no Shopify or client material.
+
+**What I reviewed / decided myself**
+- Answered one grilling round: the run must never just fail at the limit; Continue with a round-by-round view of what changed; fixes go on while they make progress; every finding must be fixed, and a finding that needs the human must be shown clearly; large projects are split into tickets with their own criteria and a review every few tickets (T23, not built yet).
+
+**What I wrote by hand**
+- Nothing.
+
+**What went wrong / changed course**
+- The trigger was a real run: 1.6.0 stopped at "fix loop limit reached (3 fixes)" after ~$28 of tokens with no way on. Its pinned release cannot learn the new behaviour, so the runner continues it by forking the LangGraph checkpoint before the last fix and raising `max_fix_loops`; a dry run on a copy of that run with the fake adapter proved the fork and showed that the real gate would fail next (2 failing tests, edits to INVARIANTS.md/README, bandit B108).
+- The workflow test suite hung: the `approve_all` test helper approved every interrupt, and approving `approve_fix` grants more fixes, so a test whose fixer never fixes looped forever. The helper now stops at `approve_fix`; it cost ~30 min of waiting before I looked at the process tree instead of the progress dots.
+- The first round table had five columns and wrapped letter by letter in the side panel; cut to four columns and no word breaks in table cells.
+
+### 2026-11-20 — Demo review, case-study reply, time reconciliation (human 28 min)
+
+**What I did**
+- Reviewed the demo application (`demo/btc-paper-trader`) and the run that built it, drafted the
+  reply e-mail to the case-study brief with Claude Code, and reconciled the time totals so the
+  e-mail and this log state the same numbers: 5 h 30 min human, ~14 h 45 min agent.
+
+**What I delegated**
+- Reading the repo and the brief and drafting the e-mail (not committed: it is not part of the repo).
+
+**What went wrong / changed course**
+- The e-mail draft first stated 6 h human / 13 h agent, which did not match this log; the log is
+  the source of truth. This entry is booked at 28 min (my estimate was ~30 min) so the total is
+  exactly 5 h 30 min.
+

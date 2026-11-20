@@ -234,15 +234,18 @@ Every run: who started it, release + digest, model, steps, changed files (git sn
 ```
 START → plan ⇄ [human approve plan]   (questions / request changes → plan again, same session)
       → write_tests (different agent, from the plan and the planning conversation)
-      → implement → review (independent agent)
-            review FAIL → fix → review          (iteration limit)
+      → implement → review (independent agent; after a fix it re-checks the earlier findings by ID)
+            review FAIL → fix → review          (on its own while the open findings shrink)
             review PASS → gate (the repo's own tests + property tests where configured)
             gate FAIL → fix → gate
+            no progress in 2 fixes, the fix cap (8), or a reviewer QUESTION → [human: fixes]
+                  continue (+3 fixes, optional note or answers) → fix · stop → END
             gate PASS → [human review] → open PR → summary → END
             review: request changes → fix → gate → [human review]   (follow-up prompt, counted in the human delta)
 ```
 
 - Steps are ordinary Python functions via `add_node`; loops via `add_conditional_edges`; LangGraph checkpoints + a git commit per node (hash in the graph state).
+- **A fix loop never just fails** (1.7.0, T22): the human sees every round (what the review or gate found, what the fixer changed, the trend of open problems) and decides. Runs of older releases that ended at the fix loop limit continue from their checkpoint with `jigworks resume <runId> --more-fixes N`, or Continue fixing in the extension.
 - Acceptance: the runner goes through at least one fix loop and the extension shows the progress and the approval.
 - **Project-agnostic** (v0.9): the repo is the one the run starts in, and the scope is the folder it starts from; the prompt narrows the work, the approved plan names the files. The gate runs the repo's own tests, from `.jigworks/gate.toml` (read from the base commit) or detected (pytest, package.json `test`, go, cargo). `sample-repo/` is one such repo with its own gate config, not a special case.
 - **Models:** Opus 5.5 for plan, write_tests and review (review at effort `medium`), Sonnet 5.5 for implement, fix and summary; effort is set per node by the release (`[effort]`), like the models.
