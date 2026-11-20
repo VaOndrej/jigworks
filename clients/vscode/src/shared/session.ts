@@ -14,8 +14,12 @@ export interface NodeState {
   status: NodeStatus;
   attempt: number;
   at: string;
+  /** When the current attempt started running (the `at` of its `running` status). */
+  startedAt?: string;
   approvedBy?: string;
+  /** Latest human decision on this gate's current attempt; cleared when the gate runs again. */
   decision?: string;
+  decidedAt?: string;
 }
 
 export interface AgentLine {
@@ -24,6 +28,11 @@ export interface AgentLine {
   attempt: number;
   kind: "text" | "tool" | "result" | "denied" | "thinking";
   text: string;
+  /** Event time, so "x s ago" is computed from the run, not from the render. */
+  at: string;
+  /** tool_use only: the tool name and its main argument (path, command, pattern). */
+  tool?: string;
+  arg?: string;
   isError?: boolean;
 }
 
@@ -51,7 +60,8 @@ export interface SessionView {
   nodes: Record<string, NodeState>;
   fixLoops: number;
   followUps: number;
-  interrupt?: InterruptPayload & { node: string };
+  /** The open gate; `seq` is the interrupt event's seq, unique per round. */
+  interrupt?: InterruptPayload & { node: string; seq: number };
   lastGate?: GateResultPayload;
   usage: { input: number; output: number; cache_write: number; cache_read: number; cliCostUsd: number };
   usageRecords: UsageRecord[];
@@ -63,6 +73,8 @@ export interface SessionView {
   usageLimit?: { status: string; resetsAt?: string };
   startedAt?: string;
   updatedAt?: string;
+  /** Time of the latest agent_output / usage event (the agent's last sign of life). */
+  lastActivityAt?: string;
   authorEmail?: string;
   lastSeq: number;
 }
@@ -136,7 +148,17 @@ export function applyEvent(s: SessionView, e: RunEvent): SessionView {
     case "node_status": {
       const status = e.status!;
       const prev = s.nodes[node];
-      s.nodes[node] = { ...prev, id: node, status, attempt, at: e.at };
+      const again = status === "running" || status === "waiting_human";
+      s.nodes[node] = {
+        ...prev,
+        id: node,
+        status,
+        attempt,
+        at: e.at,
+        // A new attempt of a gate starts undecided: an older request_changes must not linger.
+        ...(again ? { approvedBy: undefined, decision: undefined, decidedAt: undefined } : {}),
+        ...(status === "running" ? { startedAt: e.at } : {}),
+      };
       if (status === "running" || status === "waiting_human") {
         s.currentNode = node;
         s.currentAttempt = attempt;
@@ -152,13 +174,13 @@ export function applyEvent(s: SessionView, e: RunEvent): SessionView {
       break;
     }
     case "interrupt":
-      s.interrupt = { ...e.interrupt!, node };
+      s.interrupt = { ...e.interrupt!, node, seq };
       break;
     case "review_decision": {
       const d = e.reviewDecision!;
       if (d.decision === "request_changes") s.followUps += 1;
       const n = s.nodes[node];
-      if (n) s.nodes[node] = { ...n, approvedBy: d.approverEmail, decision: d.decision };
+      if (n) s.nodes[node] = { ...n, approvedBy: d.approverEmail, decision: d.decision, decidedAt: e.at };
       s.interrupt = undefined;
       const verb = d.decision === "approve" ? "approved" : d.decision === "reject" ? "rejected" : "requested changes";
       push(s.activity, { seq, at: e.at, text: `${time(e.at)} ${d.approverEmail} ${verb} (${d.stage})${d.comment ? `: ${d.comment}` : ""}`, tone: "human" }, MAX_ACTIVITY);
@@ -176,21 +198,25 @@ export function applyEvent(s: SessionView, e: RunEvent): SessionView {
     }
     case "agent_output": {
       const o = e.agentOutput!;
+      const at = e.at;
+      s.lastActivityAt = at;
       let line: AgentLine | undefined;
-      if (o.block === "text" && o.text) line = { seq, node, attempt, kind: "text", text: o.text };
-      else if (o.block === "thinking" && o.text) line = { seq, node, attempt, kind: "thinking", text: o.text };
+      if (o.block === "text" && o.text) line = { seq, node, attempt, at, kind: "text", text: o.text };
+      else if (o.block === "thinking" && o.text) line = { seq, node, attempt, at, kind: "thinking", text: o.text };
       else if (o.block === "tool_use" && o.tool) {
         const input = o.tool.input ?? {};
-        const arg = (input["command"] ?? input["file_path"] ?? input["pattern"] ?? input["path"] ?? "") as string;
-        line = { seq, node, attempt, kind: o.denied ? "denied" : "tool", text: `${o.tool.name}${arg ? ` ${arg}` : ""}` };
+        const raw = input["command"] ?? input["file_path"] ?? input["notebook_path"] ?? input["pattern"] ?? input["path"] ?? input["url"] ?? input["query"] ?? "";
+        const arg = typeof raw === "string" ? raw : "";
+        line = { seq, node, attempt, at, kind: o.denied ? "denied" : "tool", text: `${o.tool.name}${arg ? ` ${arg}` : ""}`, tool: o.tool.name, arg };
       } else if (o.block === "tool_result") {
-        line = { seq, node, attempt, kind: "result", text: (o.text ?? "").split("\n").slice(0, 3).join("\n"), isError: o.isError };
+        line = { seq, node, attempt, at, kind: "result", text: (o.text ?? "").split("\n").slice(0, 3).join("\n"), isError: o.isError };
       }
       if (line) push(s.output, line, MAX_OUTPUT);
       break;
     }
     case "usage": {
       const u = e.usage!;
+      s.lastActivityAt = e.at;
       s.usageRecords.push(u);
       s.usage.input += u.input;
       s.usage.output += u.output;
@@ -229,6 +255,13 @@ export function modelFor(s: SessionView, node: string): string {
 }
 
 export const TERMINAL: RunStatus[] = ["succeeded", "failed", "rejected", "cancelled"];
+
+/** A step counts as done only when it succeeded and, for a gate, was not sent back with
+ *  Request changes (the runner finishes such a gate as `succeeded`, then reruns the step). */
+export function nodeDone(s: SessionView, id: string): boolean {
+  const n = s.nodes[id];
+  return n?.status === "succeeded" && n.decision !== "request_changes" && n.decision !== "reject";
+}
 
 export function needsYou(s: SessionView): boolean {
   return s.status === "waiting_human";
