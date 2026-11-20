@@ -152,8 +152,8 @@ def test_cli_run_approve_in_a_fresh_worktree(env):
     assert audit["authorEmail"] == AUTHOR and audit["approverEmail"] == AUTHOR and audit["approvedAt"]
     assert audit["digest"].startswith("sha256:") and audit["status"] == "succeeded"
     assert any(s.get("gate") for s in audit["steps"]) and all(s.get("commit") for s in audit["steps"])
-    assert {s.get("model") for s in audit["steps"] if s["node"] == "write_tests"} == {"claude-haiku-4-5-20251001"}
-    assert {s.get("model") for s in audit["steps"] if s["node"] == "plan"} == {"claude-sonnet-5"}
+    assert {s.get("model") for s in audit["steps"] if s["node"] == "write_tests"} == {"claude-opus-5-5"}
+    assert {s.get("model") for s in audit["steps"] if s["node"] == "plan"} == {"claude-opus-5-5"}
     assert "model" not in next(s for s in audit["steps"] if s["node"] == "gate"), "no agent, no model"
     assert audit["changedFiles"] == ["sample-repo/tests/test_notes.py", "sample-repo/sample_repo/notes.py"]
     assert audit["prUrl"].endswith("#demo/run_cli_a")
@@ -343,3 +343,18 @@ def test_cli_graph_prints_graph_json(env):
     out = jw(env, "graph", str(WORKFLOW))
     graph = json.loads(out.stdout)
     assert contracts.validate("GraphJSON", graph) == [] and graph["release"] == "feature-development@1.5.0"
+
+
+def test_runner_home_ignores_run_state_but_not_the_gate_config(tmp_path):
+    from jigworks_runner.store import ensure_home
+
+    home = tmp_path / ".jigworks"
+    home.mkdir()
+    (home / ".gitignore").write_text("# Jigworks local run state; never committed.\n*\n")  # written by older runners
+    ensure_home(home)
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    (home / "gate.toml").write_text("tests = 'pytest'\n")
+    (home / "runs" / "r.json").write_text("{}")
+    ignored = subprocess.run(["git", "check-ignore", ".jigworks/gate.toml", ".jigworks/runs/r.json"],
+                             cwd=tmp_path, capture_output=True, text=True).stdout.split()
+    assert ignored == [".jigworks/runs/r.json"]

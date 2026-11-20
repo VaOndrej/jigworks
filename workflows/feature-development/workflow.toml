@@ -12,12 +12,18 @@ description = "What to build."
 required = true
 
 # Models are set by the release, never in VS Code (design.md §7).
+# Opus for planning, the tests from the spec and the review; Sonnet for the implementation.
 [models]
-default = "claude-sonnet-5"
+default = "claude-sonnet-5-5"
 
 [models.nodes]
-write_tests = "claude-haiku-4-5-20251001"
-summary = "claude-haiku-4-5-20251001"
+plan = "claude-opus-5-5"
+write_tests = "claude-opus-5-5"
+review = "claude-opus-5-5"
+
+# Reasoning effort per node (claude -p --effort); nodes without one use the CLI default.
+[effort.nodes]
+review = "medium"
 
 # Fallback progress weights (design.md §7). fix has no planned weight.
 [weights]
@@ -34,5 +40,11 @@ summary = 5
 
 # Proposal (design.md §11.2). Union of what the nodes may use; each node narrows it in steps/nodes.py.
 [permissions]
-allowedTools = ["Read", "Glob", "Grep", "Edit", "Write", "Bash(git diff:*)", "Bash(git log:*)", "Bash(python -m pytest:*)", "Bash(uv run pytest:*)"]
+allowedTools = [
+  "Read", "Glob", "Grep", "Edit", "Write", "Bash(git diff:*)", "Bash(git log:*)",
+  "Bash(python -m pytest:*)", "Bash(uv run pytest:*)", "Bash(uv add:*)", "Bash(uv sync:*)",
+  "Bash(pnpm test:*)", "Bash(pnpm install:*)", "Bash(pnpm add:*)",
+  "Bash(npm test:*)", "Bash(npm install:*)", "Bash(yarn test:*)", "Bash(yarn add:*)",
+  "Bash(go test:*)", "Bash(cargo test:*)",
+]
 network = false

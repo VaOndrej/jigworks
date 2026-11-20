@@ -31,6 +31,10 @@ def build_command(prompt: str, options: AgentOptions, claude_bin: str = "claude"
     cmd = [claude_bin, "-p", prompt, "--output-format", "stream-json", "--verbose", "--model", options.model]
     if options.setting_sources is not None:
         cmd += ["--setting-sources", options.setting_sources]
+    for plugin in options.plugin_dirs:
+        cmd += ["--plugin-dir", plugin]
+    if options.effort:
+        cmd += ["--effort", options.effort]
     if options.max_turns is not None:
         cmd += ["--max-turns", str(options.max_turns)]
     if options.resume_session_id:

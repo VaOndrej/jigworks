@@ -42,6 +42,7 @@ T00 comes first because the adapter, the contracts and the cost analytics all de
 | T16 | [Extension run view: graph + % of plan](../tickets/prototype/T16-extension-run-view.md) | milestone-2 | M | yes | T06, T09 |
 | T17 | [Second workflow `bugfix-with-repro`](../tickets/prototype/T17-bugfix-workflow.md) | milestone-1 | M | no | T05 |
 | T18 | [Plan agreed with the human (`feature-development` 1.5.0)](../tickets/prototype/T18-plan-clarification-loop.md) | milestone-1 | S | no | T05 |
+| T19 | [Project-agnostic `feature-development`, latest models](../tickets/prototype/T19-project-agnostic-workflow.md) | milestone-1 | M | no | T18 |
 | T10 | [.zip import fallback](../tickets/prototype/T10-extension-zip-import.md) | milestone-2 | S | no | T09 |
 | | **— CUT LINE —** | | | | |
 | T11 | [Vercel setup (dashboard steps)](../tickets/prototype/T11-vercel-setup.md) | milestone-3 | S | no | T01 |

@@ -11,10 +11,11 @@ $plan
 
 ## Rules
 
-- Only change files under `$scope`. Do not edit or delete the tests that were written for
+- Only change files in $scope. You may add dependencies. Do not edit or delete the tests that were written for
   this change; if a test looks wrong, say so in your reply instead.
-- Keep every invariant in `INVARIANTS.md`. A change that breaks one fails the gate.
+- Keep every invariant in `INVARIANTS.md` if the repo has one. A change that breaks one fails the gate.
 - Keep the change small: what the plan says, nothing more.
-- Run the tests (`python -m pytest $scope/tests -q`) before you finish.
+- Run the tests the gate runs ($tests) before you finish. Do not change the test script or the
+  test configuration.
 - No secrets, credentials or tokens in code, tests or comments, not even fake-looking ones.
 - Reply with a short summary of what you changed and the test result.

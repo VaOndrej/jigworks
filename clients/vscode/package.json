@@ -117,8 +117,8 @@
         },
         "jigworks.repoPath": {
           "type": "string",
-          "default": "sample-repo",
-          "description": "Path in the workspace the agents may change (relative to the workspace folder)."
+          "default": ".",
+          "description": "Folder the run works in, relative to the workspace folder: the whole repo by default. The gate runs the tests found there (or named in its .jigworks/gate.toml), and the agents may change only files inside it."
         },
         "jigworks.home": {
           "type": "string",

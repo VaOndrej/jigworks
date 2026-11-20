@@ -11,7 +11,7 @@ def test_eval_overfill_bait_is_caught_and_invariants_hold():
                 if t["id"] == "02-amend-quantity")
     row = run.run_task(task, "fake", run.PriceTable.from_file(run.PRICES))
     assert row["brokenAfterImplement"] is True, "the scripted implementer breaks I1 (control)"
-    assert "hypothesis invariants" in row["caughtBy"]
+    assert any("property tests" in c for c in row["caughtBy"])
     assert row["outcome"] == "succeeded" and row["gatePassed"] and row["invariantsHold"]
     assert row["fixIterations"] == 1
     md = run.report([row], "fake", "feature-development@1.4.0", "sha256:x")

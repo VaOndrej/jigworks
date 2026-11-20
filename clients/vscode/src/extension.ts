@@ -152,7 +152,7 @@ class Host {
       sessions: this.bridge.snapshot(),
       running: this.bridge.running(),
       preflight: this.preflightResult,
-      repoLabel: config().get<string>("repoPath", "sample-repo"),
+      repoLabel: config().get<string>("repoPath", "."),
       hub: this.hubStatus(),
     };
   }
@@ -284,7 +284,7 @@ class Host {
       runId,
       title: prompt.split("\n")[0].slice(0, 200),
       workflowDir: wf.path,
-      repoPath: path.resolve(root, config().get<string>("repoPath", "sample-repo")),
+      repoPath: path.resolve(root, config().get<string>("repoPath", ".")),
       prompt: fullPrompt,
       adapter,
       fakeScript: fakeScript ? path.resolve(root, fakeScript) : undefined,

@@ -17,7 +17,7 @@ import pytest
 
 from jigworks_runner.adapters.fake import FakeAdapter, FakeStep
 from jigworks_runner.engine import RunStateError, WorkflowRun
-from jigworks_runner.package import load_package
+from jigworks_runner.package import bundle_files, load_package
 
 ROOT = Path(__file__).resolve().parents[3]
 PACKAGE_DIR = ROOT / "workflows" / "feature-development"
@@ -84,6 +84,7 @@ def script(**overrides) -> dict:
 
 def new_run(repo: Path, steps: dict, run_id: str = "run_t05", **options) -> tuple[WorkflowRun, FakeAdapter]:
     agent = FakeAdapter(steps)
+    options = {"gate": {"scope": ["sample-repo/"]}, **options}  # like `jigworks run --repo sample-repo`
     run = WorkflowRun(load_package(PACKAGE_DIR), run_id=run_id, cwd=repo, agent=agent, author_email=AUTHOR,
                       options=options, branch=f"jigworks/{run_id}", repo="jigworks")
     return run, agent
@@ -156,11 +157,27 @@ def test_models_come_from_the_release(repo):
     approve_all(run, run.start("Add describe(order)"))
     models = {c.node: c.options.model for c in agent.calls}
     assert models == {
-        "plan": "claude-sonnet-5", "write_tests": "claude-haiku-4-5-20251001", "implement": "claude-sonnet-5",
-        "review": "claude-sonnet-5", "summary": "claude-haiku-4-5-20251001",
+        "plan": "claude-opus-5-5", "write_tests": "claude-opus-5-5", "implement": "claude-sonnet-5-5",
+        "review": "claude-opus-5-5", "summary": "claude-sonnet-5-5",
     }
+    efforts = {c.node: c.options.effort for c in agent.calls}
+    assert efforts["review"] == "medium" and efforts["implement"] is None
     declared = set(run.package.allowed_tools())
     assert all(set(c.options.allowed_tools) <= declared for c in agent.calls)
+
+
+def test_every_agent_gets_the_skills_of_the_release(repo):
+    run, agent = new_run(repo, script())
+    approve_all(run, run.start("Add describe(order)"))
+    plugin = PACKAGE_DIR / "plugin"
+    assert all(c.options.plugin_dirs == (str(plugin),) for c in agent.calls)
+    files = bundle_files(PACKAGE_DIR)
+    assert json.loads(files["plugin/.claude-plugin/plugin.json"])["name"] == "feature-development"
+    skills = [p for p in files if p.startswith("plugin/skills/") and p.endswith("/SKILL.md")]
+    assert len(skills) >= 3
+    for path in skills:
+        head = files[path].decode().split("---")[1]
+        assert "name:" in head and "description:" in head, path
 
 
 def test_tests_and_review_run_in_separate_sessions(repo):
@@ -210,7 +227,7 @@ def test_gate_fail_on_broken_invariant_then_fix_then_pass(repo):
     i = trace.index(("gate", "failed"))
     assert trace[i + 1] == ("fix", "succeeded") and trace[i + 2] == ("gate", "succeeded")
     fix_call = next(c for c in agent.calls if c.node == "fix")
-    assert "hypothesis invariants" in fix_call.prompt
+    assert "property tests" in fix_call.prompt
     check_stream(run)
 
 

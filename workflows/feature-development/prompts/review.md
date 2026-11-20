@@ -10,11 +10,13 @@ $plan
 
 ## What to review
 
-Run `git diff $base` to see the whole change (only `$scope` may change). Check:
+Use the `feature-development:independent-review` skill.
+
+Run `git diff $base` to see the whole change (only $scope may change). Check:
 
 1. Does the change do what the specification and plan say, and nothing unrelated?
-2. Does it keep every invariant in `INVARIANTS.md`? Look for overfills, positions that no
-   longer equal the sum of fills, transitions out of terminal states, half-applied state on
+2. If the repo has an `INVARIANTS.md`, does the change keep every invariant in it? Look for
+   state that no longer adds up, transitions out of terminal states, half-applied state on
    errors.
 3. Are the tests meaningful: do they test the specification, including property tests for the
    touched invariants, or were they weakened to pass?

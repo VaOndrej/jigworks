@@ -66,6 +66,15 @@ class WorkflowPackage:
         models = self.manifest["models"]
         return models.get("nodes", {}).get(node) or models["default"]
 
+    def plugin_dirs(self) -> tuple[str, ...]:
+        """`plugin/` of the package: a Claude Code plugin whose skills every agent call loads."""
+        plugin = self.root / "plugin"
+        return (str(plugin),) if (plugin / ".claude-plugin" / "plugin.json").is_file() else ()
+
+    def effort_for(self, node: str) -> str | None:
+        effort = self.manifest.get("effort") or {}
+        return effort.get("nodes", {}).get(node) or effort.get("default")
+
     def allowed_tools(self) -> list[str] | None:
         perms = self.manifest.get("permissions") or {}
         return list(perms["allowedTools"]) if "allowedTools" in perms else None

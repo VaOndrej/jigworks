@@ -78,6 +78,19 @@ def test_adapter_command_puts_prompt_before_variadic_flags():
     assert cmd[cmd.index("--allowedTools") :] == ["--allowedTools", "Read", "Edit", "Bash(uv run pytest:*)"]
 
 
+def test_adapter_loads_the_release_plugin_for_the_session():
+    assert "--plugin-dir" not in build_command("p", AgentOptions(model="m"))
+    cmd = build_command("p", AgentOptions(model="m", plugin_dirs=("/pkg/plugin",), allowed_tools=("Read",)))
+    assert cmd[cmd.index("--plugin-dir") + 1] == "/pkg/plugin"
+    assert cmd.index("--plugin-dir") < cmd.index("--allowedTools")  # variadic flags stay last
+
+
+def test_adapter_passes_the_effort_only_when_set():
+    assert "--effort" not in build_command("p", AgentOptions(model="m"))
+    cmd = build_command("p", AgentOptions(model="m", effort="medium"))
+    assert cmd[cmd.index("--effort") + 1] == "medium"
+
+
 def test_adapter_model_is_required_and_plan_mode_is_refused():
     with pytest.raises(ValueError, match="workflow release"):
         AgentOptions(model="")

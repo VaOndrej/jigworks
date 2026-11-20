@@ -27,6 +27,8 @@ class AgentOptions:
     resume_session_id: str | None = None
     setting_sources: str | None = "project"
     include_thinking: bool = False
+    plugin_dirs: tuple[str, ...] = ()  # Claude Code plugins of the release (its skills), for this call only
+    effort: str | None = None  # reasoning effort from the release (`[effort]`); None = the CLI default
     timeout_s: float | None = None
 
     def __post_init__(self) -> None:

@@ -1,0 +1,8 @@
+# The feature-development gate for sample-repo (paths relative to sample-repo/).
+# `python` is the runner's Python, which has pytest and Hypothesis.
+tests = [["python", "-m", "pytest", "tests", "-q", "-p", "no:cacheprovider", "--ignore=tests/test_invariants.py"]]
+property_tests = [["python", "-m", "pytest", "tests/test_invariants.py", "-q", "-p", "no:cacheprovider"]]
+pythonpath = ["."]
+# Every existing test is read-only for implement and fix, not only the ones write_tests wrote.
+protected_dirs = ["tests/"]
+protected_files = ["INVARIANTS.md", "pyproject.toml", "pytest.ini", "setup.cfg", "tox.ini"]

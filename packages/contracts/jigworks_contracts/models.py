@@ -22,6 +22,24 @@ class NodeId(RootModel[str]):
     """
 
 
+class EffortAssignment(BaseModel):
+    """
+    Reasoning effort per node, set by the release like the models. A node without one uses the CLI default.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    default: Literal["low", "medium", "high", "xhigh", "max"] | None = None
+    """
+    Reasoning effort of an agent call (`claude -p --effort`).
+    """
+    nodes: dict[str, Literal["low", "medium", "high", "xhigh", "max"]] | None = None
+    """
+    Per-node override: node name → effort.
+    """
+
+
 NodesAdditionalProperty = TypeAliasType(
     "NodesAdditionalProperty", Annotated[str, Field(min_length=1)]
 )
@@ -801,6 +819,7 @@ class WorkflowManifest(BaseModel):
     minRunnerVersion: str
     inputs: dict[str, Inputs] | None = None
     models: ModelAssignment
+    effort: EffortAssignment | None = None
     weights: dict[str, WeightsAdditionalProperty] | None = None
     """
     Fallback progress weight per node (design.md §7).
