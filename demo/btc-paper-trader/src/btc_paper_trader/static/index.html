@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BTC/USD paper trader</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1>BTC/USD <span class="muted">paper exchange</span></h1>
+    <div class="topbar-right">
+      <span class="muted">Binance ref</span> <strong id="ref-price">-</strong>
+      <span class="muted">last trade</span> <strong id="last-price">-</strong>
+      <span class="badge" data-testid="feed-status" id="feed-status">connecting</span>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="chart-panel">
+      <div class="tf-bar" id="tf-bar">
+        <button data-testid="tf-1m" data-tf="1m" class="active">1m</button>
+        <button data-testid="tf-5m" data-tf="5m">5m</button>
+        <button data-testid="tf-15m" data-tf="15m">15m</button>
+        <button data-testid="tf-1h" data-tf="1h">1h</button>
+        <button data-testid="tf-4h" data-tf="4h">4h</button>
+        <button data-testid="tf-1d" data-tf="1d">1d</button>
+        <span class="legend"><i class="dot internal"></i> internal candles <i class="dot reference"></i> Binance reference</span>
+      </div>
+      <div class="chart" data-testid="chart" id="chart"></div>
+    </section>
+
+    <aside class="side">
+      <section class="card ticket">
+        <div class="side-toggle">
+          <button data-testid="ticket-side-buy" id="side-buy" class="buy active">Buy</button>
+          <button data-testid="ticket-side-sell" id="side-sell" class="sell">Sell</button>
+        </div>
+        <label>Type
+          <select data-testid="ticket-type" id="t-type">
+            <option value="market">Market</option>
+            <option value="limit">Limit</option>
+            <option value="stop">Stop</option>
+          </select>
+        </label>
+        <div class="two">
+          <label>Qty (BTC)
+            <input data-testid="ticket-qty" id="t-qty" inputmode="decimal" placeholder="0.00000" autocomplete="off">
+          </label>
+          <label>Amount (USD)
+            <input data-testid="ticket-usd" id="t-usd" inputmode="decimal" placeholder="0.00" autocomplete="off">
+          </label>
+        </div>
+        <button type="button" data-testid="ticket-max" id="t-max" class="max" aria-pressed="false">Max</button>
+        <label id="row-price" hidden>Limit price
+          <input data-testid="ticket-price" id="t-price" inputmode="decimal" placeholder="0.00" autocomplete="off">
+        </label>
+        <label id="row-stop" hidden>Stop price
+          <input data-testid="ticket-stop-price" id="t-stop" inputmode="decimal" placeholder="0.00" autocomplete="off">
+        </label>
+        <div class="two" id="row-sltp">
+          <label>Stop loss
+            <input data-testid="ticket-sl" id="t-sl" inputmode="decimal" placeholder="optional" autocomplete="off">
+          </label>
+          <label>Take profit
+            <input data-testid="ticket-tp" id="t-tp" inputmode="decimal" placeholder="optional" autocomplete="off">
+          </label>
+        </div>
+        <label class="check" id="row-ro" hidden>
+          <input type="checkbox" data-testid="ticket-reduce-only" id="t-ro"> Reduce only
+        </label>
+        <button data-testid="ticket-submit" id="t-submit" class="submit buy">Buy BTC</button>
+        <div class="error" data-testid="ticket-error" id="t-error"></div>
+      </section>
+
+      <section class="card">
+        <h2>Order book</h2>
+        <div class="ladder" data-testid="ladder" id="ladder">
+          <div class="ladder-head"><span>Price</span><span>Qty (BTC)</span></div>
+          <div class="asks" id="asks"></div>
+          <div class="spread" id="spread">-</div>
+          <div class="bids" id="bids"></div>
+        </div>
+      </section>
+
+      <section class="card summary">
+        <h2>Account <button data-testid="reset-account" id="reset" class="link">Reset</button></h2>
+        <dl>
+          <dt>Equity</dt><dd>$<span data-testid="summary-equity" id="s-equity">100.00</span></dd>
+          <dt>Available</dt><dd>$<span data-testid="summary-available" id="s-available">100.00</span></dd>
+          <dt>BTC</dt><dd><span data-testid="summary-btc" id="s-btc">0.00000</span></dd>
+          <dt>Realized PnL</dt><dd>$<span data-testid="summary-realized" id="s-realized">0.00</span></dd>
+          <dt>Unrealized PnL</dt><dd>$<span data-testid="summary-unrealized" id="s-unrealized">0.00</span></dd>
+          <dt>Return vs $100</dt><dd><span data-testid="summary-return" id="s-return">0.00%</span></dd>
+          <dt>Fees paid</dt><dd>$<span data-testid="summary-fees" id="s-fees">0.00</span></dd>
+        </dl>
+      </section>
+    </aside>
+
+    <section class="tabs card">
+      <nav>
+        <button data-testid="tab-position" data-tab="position" class="active">Position</button>
+        <button data-testid="tab-open-orders" data-tab="open">Open orders</button>
+        <button data-testid="tab-history" data-tab="history">Trade history</button>
+      </nav>
+      <div id="panel-position" class="panel">
+        <table data-testid="position-table" id="position-table"></table>
+      </div>
+      <div id="panel-open" class="panel" hidden>
+        <table data-testid="open-orders-table" id="open-table"></table>
+      </div>
+      <div id="panel-history" class="panel" hidden>
+        <table data-testid="history-table" id="history-table"></table>
+      </div>
+    </section>
+  </main>
+
+  <footer class="muted">
+    Local paper trading with play money. Charts by
+    <a href="https://www.tradingview.com/" target="_blank" rel="noopener">TradingView Lightweight Charts&trade;</a>
+    (Apache-2.0).
+  </footer>
+
+  <script src="/static/vendor/lightweight-charts/lightweight-charts.standalone.production.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>
