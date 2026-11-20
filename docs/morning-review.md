@@ -3,9 +3,9 @@
 Reviewer: Claude Code (Opus 5.5) in the main checkout, on behalf of the human.
 Branch: `feature/hub-and-vs-code-extension`, PR [#1](https://github.com/VaOndrej/jigworks/pull/1).
 
-**Verdict: not merged.** Every gate is green after three small fixes. One security blocker
-remains, and only the human can fix it: the first merge into `main` creates the first
-**production** deploy. Its password does not protect the hub well enough (§5.1).
+**Verdict: merge.** Every gate is green after three small fixes. The one security blocker
+(§5.1) was fixed by the human before the merge: `HUB_PASSWORD` was rotated to a random value of
+type Secret for Production and Preview, so the first production deploy uses the new password.
 
 ## 1. Are the agents finished?
 
@@ -96,8 +96,9 @@ Setup notes:
   not behind Deployment Protection by default, so only `HUB_PASSWORD` would guard it.
 - Impact: whoever is logged in can publish a workflow and move the `stable` channel. Extensions
   that sync `stable` would then run that code on engineers' machines.
-- **Fix (human, ~2 min):** set a long random `HUB_PASSWORD` for Production (and Preview), update
-  `.env.local`, then merge. Rate limiting and revocable sessions are follow-ups.
+- **Fixed (human, 20 Nov):** `HUB_PASSWORD` is now a random value of type Secret for Production
+  and Preview, and `.env.local` was updated through a prompt that does not echo it. Rate
+  limiting and revocable sessions are still follow-ups.
 
 ### 5.2 Major finding (needs a design decision, not fixed): the invariant guard is editable
 
@@ -175,8 +176,8 @@ bypass they disappear. No screen is broken.
 
 Ordered by severity.
 
-1. **Not merged, on purpose.** §5.1 is a security blocker, and fixing it means changing your
-   secret in Vercel. I did not rotate it myself.
+1. **The merge waited for the human.** §5.1 was a security blocker, and fixing it meant changing
+   a secret in Vercel. The human rotated it; I did not touch the secret.
 2. **Docker Postgres was not used.** Every DB test ran on HUB's scratch Postgres 16, not the
    compose service. This is equivalent in version and credentials, but it is not the command the
    gate names.
@@ -189,9 +190,9 @@ Ordered by severity.
    this repo's pnpm toolchain. Nothing else was deleted.
 6. **The ticket verdicts lean partly on two subagents.** I verified the T05 overclaim, the gate
    path and the security points myself; the other confirmations rest on their code reading.
-7. **The build log is not folded.** Step 7 runs only on a merge. Another session has uncommitted
-   edits to `BUILD_LOG.md` and `AGENTS.md` (the public-repo secret audit), and I left them
-   untouched.
+7. **The build log is folded** into `BUILD_LOG.md` as one overnight entry plus one morning entry.
+   The public-repo secret audit (another session's `AGENTS.md` and `BUILD_LOG.md` edits) is
+   committed along with it, at the human's request.
 8. **Not verified:**
    - real VS Code screenshots (human);
    - T14 and T15 against the deployed hub;
