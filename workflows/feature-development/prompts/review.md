@@ -28,8 +28,10 @@ Do not trust the implementer's report; check the diff. The gate runs $tests afte
 
 ## Reply format
 
-A short list of findings (file:line, what is wrong, what the specification says instead), then
-**one** final line:
+Findings, one per line with a stable ID: `- F1 file:line what is wrong; what the specification
+says instead`. Every finding must be fixed before the change passes. If a finding needs a
+decision only the human can make, add `QUESTION: <question, options, your recommendation>`.
+Then **one** final line:
 
     VERDICT: PASS
 

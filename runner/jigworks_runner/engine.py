@@ -28,6 +28,7 @@ from .ledger import Ledger
 from .package import WorkflowPackage
 
 PrOpener = Callable[["WorkflowRun", str, str], str]
+FIX_LIMIT = "fix loop limit reached"
 
 # Deny rules beat allow rules, including allow rules in the target repo's own project settings
 # (`--setting-sources project` loads them). The runner owns git history, pushes and the PR.
@@ -315,6 +316,54 @@ class WorkflowRun:
                 git.git(self.cwd, "clean", "-q", "-fd")
         elif self.ledger.started is not None and not state.values:
             raise RunStateError(f"run {self.run_id} has no checkpoint to resume from")
+        return self._drive(None)
+
+    def failed_at_fix_limit(self) -> bool:
+        """The run failed only because its fix loops ran out (workflow releases before 1.7.0
+        end there; 1.7.0 asks the human instead)."""
+        if self.ledger.status != "failed":
+            return False
+        errors = [e for e in self.sink.events if e.get("kind") == "error"]
+        return bool(errors) and errors[-1]["error"]["message"].startswith(FIX_LIMIT)
+
+    def continue_fixing(self, extra: int, approver_email: str, note: str | None = None) -> Outcome:
+        """Bring a run that failed at the fix loop limit back: fork the LangGraph checkpoint taken
+        just before the fix that hit the limit, allow `extra` more fixes (`max_fix_loops` in the
+        run's options, which the CLI persists) and pass the human's note to the fixer.
+
+        Works with the run's pinned release, so runs started before 1.7.0 can be continued."""
+        if not self.failed_at_fix_limit():
+            raise RunStateError(f"run {self.run_id} did not fail at the fix loop limit")
+        if extra < 1:
+            raise RunStateError("continue fixing needs at least one more fix")
+        fork = next((s for s in self.graph.get_state_history(self.config) if s.next == ("fix",)), None)
+        if fork is None:
+            raise RunStateError(f"run {self.run_id} has no checkpoint before a fix")
+        values = fork.values
+        loops = int(values.get("fix_loops", 0))
+        self.options["max_fix_loops"] = loops + extra
+        reason = values.get("fix_reason", "review")
+        # Write as the node that routed to the fix, so its edge sends the run to `fix` again.
+        as_node = {"review": "review", "gate": "gate", "request_changes": "approve_pr"}.get(reason, "review")
+        channels = self.graph.channels
+        update: dict[str, Any] = {"fix_reason": reason}
+        if "fix_cap" in channels:
+            update["fix_cap"] = loops + extra
+        if note and note.strip():
+            if "fix_note" in channels:
+                update["fix_note"] = note.strip()
+            else:  # older releases: the fixer reads the problem text, so the note goes there
+                key = {"review": "review_findings", "gate": "gate_report", "request_changes": "comment"}.get(reason, "review_findings")
+                update[key] = f"{values.get(key, '')}\n\nNote from the human (takes precedence):\n{note.strip()}".strip()
+        self.graph.update_state(fork.config, update, as_node=as_node)
+        comment = f"Continue fixing (+{extra} fixes, {loops + extra} in total)" + (f": {note.strip()}" if note and note.strip() else "")
+        self.sink.emit(
+            "review_decision", node="fix", attempt=self.ledger.attempts.get("fix", 1),
+            reviewDecision={"interruptId": f"int_{self.run_id}_fix_limit_{loops}", "stage": "plan",
+                            "decision": "request_changes" if note and note.strip() else "approve",
+                            "approverEmail": approver_email, "comment": comment},
+            runStatus="running",
+        )
         return self._drive(None)
 
     def _journaled(self, node: str) -> dict[str, Any] | None:

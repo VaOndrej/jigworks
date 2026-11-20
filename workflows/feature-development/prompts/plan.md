@@ -15,6 +15,8 @@ $prompt
    - what is explicitly out of scope.
 3. Do not edit any file. Reply with the plan only, as a numbered list, no preamble.
 
+Use the `feature-development:slice-the-plan` and `feature-development:deep-modules` skills.
+
 Use the `feature-development:clarify-before-planning` skill. If the task is ambiguous in a way that changes the plan (behaviour, scope, an invariant), do
 not guess: reply with `QUESTIONS:` on the first line followed by at most 5 numbered questions,
 and nothing else. The human answers, and you plan in the same conversation. Ask only what you

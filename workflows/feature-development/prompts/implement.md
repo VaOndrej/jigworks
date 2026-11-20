@@ -13,6 +13,9 @@ $earlier
 
 ## Your job
 
+Use the `feature-development:test-first`, `feature-development:deep-modules` and
+`feature-development:verify-before-done` skills.
+
 1. Read the tests named above and the code you need in $scope.
 2. Implement what the plan says, milestone by milestone if the design has milestones; run the
    tests after each one.

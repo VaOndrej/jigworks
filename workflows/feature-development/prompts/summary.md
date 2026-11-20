@@ -20,5 +20,7 @@ $gate
 
 ## Reply format
 
+Use the `feature-development:pr-summary` skill.
+
 Say what changed, which invariants were checked, how many fix loops it took, and anything a
 human reviewer should still look at. No preamble.

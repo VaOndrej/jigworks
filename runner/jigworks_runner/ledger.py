@@ -106,6 +106,8 @@ class Ledger:
             self.finished_at = s.get("finishedAt", e["at"])
             self.pr_url = s.get("prUrl", self.pr_url)
         if e.get("runStatus"):
+            if self.status in ("failed", "cancelled") and e["runStatus"] == "running":
+                self.finished_at = None  # a failed run continued (retry, or more fixes)
             self.status = e["runStatus"]
 
     def _node_status(self, e: dict[str, Any]) -> None:

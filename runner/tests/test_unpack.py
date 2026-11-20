@@ -72,10 +72,10 @@ def test_unpack_our_package_bundle_roundtrip(tmp_path):
     from jigworks_runner.package import build_package_bundle
 
     data, digest = build_package_bundle(OUR_PACKAGE)
-    zip_path = tmp_path / "feature-development-1.6.0.zip"
+    zip_path = tmp_path / "feature-development-1.7.0.zip"
     zip_path.write_bytes(data)
     proc = unpack(str(zip_path), "--digest", digest, "--dest", str(tmp_path / "fd"), "--source", "hub", "--channel", "stable")
     assert proc.returncode == 0, proc.stderr
     out = json.loads(proc.stdout)
-    assert out["release"] == "feature-development@1.6.0" and out["channel"] == "stable"
+    assert out["release"] == "feature-development@1.7.0" and out["channel"] == "stable"
     assert not (tmp_path / "fd" / "package" / "tests").exists(), "tests are not part of a release bundle"

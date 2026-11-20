@@ -228,3 +228,32 @@ test("a workspace workflow that differs from the hub's release is tagged local (
   await expect(p.locator(".wf").nth(2)).toContainText("1.3.0 · local (changed)");
   await p.screenshot({ path: path.join(shots, "vscode-local-changed-1440.png") });
 });
+
+test("fix limit of a 1.6.0 run: the rounds with the trend, and Continue fixing with a hint", async ({ page: p }) => {
+  await open(p, "screen=session&run=run_md_0005&runs=run_md_0005,run_md_0006");
+  const card = p.locator("[data-gate='fix-limit']");
+  await expect(card.getByText("YOUR DECISION · FIX LIMIT")).toBeVisible();
+  await expect(card.getByText("Open review findings:")).toContainText("3 → 2 → 1 → 1");
+  await expect(card.getByRole("cell", { name: "Assert the text in the test (F3)." })).toBeVisible();
+  await expect(p.getByText(/review #2 failed · 2 open findings \(was 3\)/)).toBeVisible();
+  const box = p.getByLabel("Hint for the fixer");
+  await box.fill("Assert the remaining quantity in the test.");
+  await expect(p.getByRole("button", { name: "Continue fixing (+3) with my note" })).toBeVisible();
+  await p.screenshot({ path: path.join(shots, "vscode-fix-limit-continue-1440.png"), fullPage: true });
+  await p.keyboard.press("Enter");
+  expect(await decides(p)).toEqual([{ type: "resume", runId: "run_md_0005", moreFixes: 3, comment: "Assert the remaining quantity in the test." }]);
+  await expect(box).toBeDisabled();
+});
+
+test("approve_fix (1.7.0): the reviewer's question and the rounds, Continue / note / Stop", async ({ page: p }) => {
+  await open(p, "screen=session&run=run_md_0006&runs=run_md_0005,run_md_0006");
+  await expect(p.getByText("YOUR DECISION · FIXES")).toBeVisible();
+  await expect(p.getByRole("heading", { name: "Questions from the reviewer" })).toBeVisible();
+  await expect(p.getByText("Should describe() show EUR or USD?").first()).toBeVisible();
+  await expect(p.getByText("3 → 2 → 2").first()).toBeVisible();
+  await expect(p.getByRole("button", { name: "Continue fixing" })).toBeEnabled();
+  await expect(p.getByRole("button", { name: "Stop the run" })).toBeEnabled();
+  await p.getByLabel("Comment for the agent").fill("USD.");
+  await expect(p.getByRole("button", { name: "Continue with my note" })).toBeEnabled();
+  await p.screenshot({ path: path.join(shots, "vscode-approve-fix-question-1440.png"), fullPage: true });
+});

@@ -5,6 +5,7 @@ emits the events."""
 from __future__ import annotations
 
 import re
+import subprocess
 from pathlib import Path
 from string import Template
 from typing import Any
@@ -13,7 +14,12 @@ from . import gate as gate_checks
 from .runtime import GATE_KEY, STATUS_KEY, Runtime, step
 
 PROMPTS = Path(__file__).resolve().parent.parent / "prompts"
-MAX_FIX_LOOPS = 3
+# Fixes run on their own while they make progress. The human is asked (approve_fix), never
+# the run failed, when two fixes in a row did not lower the number of open problems, when the
+# reviewer has a question only the human can answer, or at the cap below.
+MAX_FIX_LOOPS = 8
+STALL_ROUNDS = 2
+EXTRA_FIXES = 3  # what Continue at approve_fix adds to the cap
 MAX_PLAN_ROUNDS = 5
 MAX_BRAINSTORM_ROUNDS = 15
 QUESTIONS = re.compile(r"^\s*QUESTIONS:", re.IGNORECASE)
@@ -38,6 +44,9 @@ WRITE = (
 )
 
 VERDICT = re.compile(r"^\s*VERDICT:\s*(PASS|FAIL)\b", re.IGNORECASE | re.MULTILINE)
+FINDING = re.compile(r"^\s*[-*]?\s*\**\[?F(\d+)\]?\**[:.)]?\s+(.*)$", re.MULTILINE)
+BULLET = re.compile(r"^\s*[-*]\s+\S", re.MULTILINE)
+REVIEW_QUESTION = re.compile(r"^\s*(?:[-*]\s*)?\**QUESTION\**:\s*(.+)$", re.IGNORECASE | re.MULTILINE)
 
 
 class AgentFailed(RuntimeError):
@@ -136,6 +145,142 @@ def verdict(text: str) -> bool:
     """PASS only when the reviewer says so explicitly; the last verdict line wins."""
     found = VERDICT.findall(text or "")
     return bool(found) and found[-1].upper() == "PASS"
+
+
+def is_fixed(rest: str) -> bool:
+    """`FIXED`, `— fixed`, `: Fixed.` after a finding ID; `NOT FIXED` is open."""
+    return rest.strip(" \t-—–:*").upper().startswith("FIXED")
+
+
+def open_findings(text: str) -> int:
+    """Open findings in a review reply: lines with a finding ID (`- F3 ...`) that are not marked
+    FIXED; without IDs, the bullet lines. A failed review counts at least one."""
+    ids = {}
+    for num, rest in FINDING.findall(text or ""):
+        ids[num] = not is_fixed(rest)
+    count = sum(ids.values()) if ids else len(BULLET.findall(text or ""))
+    return max(count, 0 if verdict(text) else 1)
+
+
+def first_open_finding(text: str) -> str:
+    for line in (text or "").splitlines():
+        found = FINDING.match(line)
+        if found and not is_fixed(found.group(2)):
+            return first_line(line)
+    return first_line(text)
+
+
+def review_questions(text: str) -> list[str]:
+    return [q.strip() for q in REVIEW_QUESTION.findall(text or "")]
+
+
+def gate_problems(result: dict) -> int:
+    return sum(int(c.get("findings") or 1) for c in result.get("checks", []) if not c.get("passed"))
+
+
+def fix_cap(state: dict, rt: Runtime) -> int:
+    return int(state.get("fix_cap") or rt.options.get("max_fix_loops", MAX_FIX_LOOPS))
+
+
+def stalled(history: list[dict], check: str) -> bool:
+    """Two fixes in a row did not lower the number of open problems of this check below the best
+    count before them (only rounds since the human last said Continue)."""
+    counts = [h["open"] for h in history if h.get("kind") == "check" and h.get("check") == check and not h.get("passed")]
+    if len(counts) <= STALL_ROUNDS:
+        return False
+    return min(counts[-STALL_ROUNDS:]) >= min(counts[:-STALL_ROUNDS])
+
+
+def escalation(state: dict, rt: Runtime, history: list[dict], check: str, questions: list[str]) -> str:
+    """Why the human must decide before the next fix ("" = the fixer goes on by itself)."""
+    if questions:
+        return "questions"
+    if state.get("fix_loops", 0) >= fix_cap(state, rt):
+        return "limit"
+    if stalled(history[state.get("fix_stall_from", 0):], check):
+        return "stalled"
+    return ""
+
+
+def first_line(text: str, limit: int = 100) -> str:
+    line = next((ln.strip(" #*-") for ln in (text or "").splitlines() if ln.strip()), "")
+    return line if len(line) <= limit else line[: limit - 1] + "…"
+
+
+def shortstat(cwd: Path, since: str | None) -> str:
+    """What changed since `since`, committed or not (e.g. `2 files, +14 −3`)."""
+    if not since:
+        return ""
+    try:
+        out = subprocess.run(["git", "diff", "--numstat", since], cwd=cwd, capture_output=True, text=True, check=True).stdout
+    except (subprocess.CalledProcessError, OSError):
+        return ""
+    rows = [ln.split("\t") for ln in out.splitlines() if ln.strip()]
+    if not rows:
+        return "no changes"
+    added = sum(int(r[0]) for r in rows if r[0].isdigit())
+    removed = sum(int(r[1]) for r in rows if r[1].isdigit())
+    return f"{len(rows)} file{'s' if len(rows) != 1 else ''}, +{added} −{removed}"
+
+
+def head(cwd: Path) -> str | None:
+    try:
+        return subprocess.run(["git", "rev-parse", "HEAD"], cwd=cwd, capture_output=True, text=True, check=True).stdout.strip()
+    except (subprocess.CalledProcessError, OSError):
+        return None
+
+
+CHECK_NAMES = {"review": "independent review", "gate": "gate"}
+WHY = {
+    "questions": "The reviewer has questions only you can answer. Answer them in the comment field.",
+    "stalled": f"The last {STALL_ROUNDS} fixes did not lower the number of open problems.",
+    "limit": "The fixes reached their cap.",
+}
+
+
+def fix_report(state: dict) -> str:
+    """Markdown the human reads at approve_fix: why, the reviewer's questions, every round
+    (what was found, what the fixer changed) and the trend of open problems."""
+    history = state.get("fix_history") or []
+    reason = state.get("escalation", "")
+    parts = [f"**Why you are asked:** {WHY.get(reason, reason)}"]
+    questions = state.get("review_questions") or []
+    if questions:
+        parts.append("## Questions from the reviewer\n\n" + "\n".join(f"{i}. {q}" for i, q in enumerate(questions, 1)))
+    rows = ["| # | Step | Result | What happened |", "|---|---|---|---|"]
+    n = 0
+    for h in history:
+        kind = h.get("kind")
+        if kind == "check":
+            result = "PASS" if h.get("passed") else f"FAIL · {h['open']} open"
+            rows.append(f"|  | {h['check']} | {result} | {h.get('note', '')} |")
+        elif kind == "fix":
+            n += 1
+            changed = f" ({h['changed']})" if h.get("changed") else ""
+            rows.append(f"| {n} | fix | | {h.get('summary', '')}{changed} |")
+        elif kind == "human":
+            rows.append(f"|  | you | {h.get('decision', '')} | {h.get('note', '')} |")
+    parts.append("## Rounds\n\n" + "\n".join(r.replace("\n", " ") for r in rows))
+    for check in ("review", "gate"):
+        counts = [str(h["open"]) for h in history if h.get("kind") == "check" and h.get("check") == check]
+        if len(counts) > 1:
+            parts.append(f"**Open {CHECK_NAMES[check]} problems per round:** {' → '.join(counts)}")
+    latest = state.get("review_findings") if state.get("fix_target") == "review" else state.get("gate_report")
+    if latest:
+        parts.append("## Latest findings\n\n" + latest)
+    return "\n\n".join(parts)
+
+
+def record_check(state: dict, rt: Runtime, check: str, passed: bool, problems: int, note: str,
+                 questions: list[str] | None = None) -> dict:
+    """The state update every review and gate adds: the round in the history and, on FAIL,
+    whether the human must decide before the next fix."""
+    history = [*(state.get("fix_history") or []), {"kind": "check", "check": check, "passed": passed, "open": problems,
+                                                    "note": note}]
+    update: dict[str, Any] = {"fix_history": history, "review_questions": questions or [], "escalation": ""}
+    if not passed:
+        update["escalation"] = escalation(state, rt, history, check, questions or [])
+    return update
 
 
 @step("triage")
@@ -257,31 +402,37 @@ def implement(state: dict, rt: Runtime) -> dict:
 
 @step("review")
 def review(state: dict, rt: Runtime) -> dict:
-    # Independent: a new session that did not write the code.
-    text = prompt("review", prompt=state["prompt"], spec=spec(state), earlier=earlier(state, "tests_summary", "implement_summary"),
-                  base=rt.base_commit, scope=scope_text(rt), tests=tests_text(rt))
+    # Independent: a new session that did not write the code. After a fix it re-checks the
+    # previous findings by their IDs and looks for regressions, instead of starting over.
+    previous = state.get("review_findings")
+    if previous:
+        text = prompt("rereview", prompt=state["prompt"], spec=spec(state), previous=previous,
+                      fixer=state.get("implement_summary", "(none)"), base=rt.base_commit,
+                      since=(state.get("commits") or {}).get("review", rt.base_commit), scope=scope_text(rt),
+                      tests=tests_text(rt))
+    else:
+        text = prompt("review", prompt=state["prompt"], spec=spec(state), earlier=earlier(state, "tests_summary", "implement_summary"),
+                      base=rt.base_commit, scope=scope_text(rt), tests=tests_text(rt))
     reply = call(rt, "review", text, READ_ONLY)
     passed = verdict(reply.text)
+    problems = 0 if passed else open_findings(reply.text)
+    questions = [] if passed else review_questions(reply.text)
+    note = ("all findings fixed" if previous else "") if passed else first_open_finding(reply.text)
     return {
         "review_passed": passed,
         "review_findings": "" if passed else reply.text.strip(),
         "fix_target": "review",
         "fix_reason": "review",
+        **record_check(state, rt, "review", passed, problems, note, questions),
         STATUS_KEY: "succeeded" if passed else "failed",
     }
 
 
 @step("fix")
 def fix(state: dict, rt: Runtime) -> dict:
+    # No limit here: review and gate decide whether the human is asked first (approve_fix).
     loops = state.get("fix_loops", 0)
-    limit = int(rt.options.get("max_fix_loops", MAX_FIX_LOOPS))
     reason = state.get("fix_reason", "review")
-    if loops >= limit:
-        return {
-            "outcome": "failed",
-            "failure": f"fix loop limit reached ({limit} fixes; last reason: {reason})",
-            STATUS_KEY: "failed",
-        }
     if reason == "request_changes":
         problem = "The human reviewer requested changes:\n\n" + state.get("comment", "")
     elif reason == "gate":
@@ -293,9 +444,15 @@ def fix(state: dict, rt: Runtime) -> dict:
     # adapter without sessions), the fixer gets the whole specification instead.
     context = "" if session else "\n\n".join([section("Task", state["prompt"]), spec(state),
                                                earlier(state, "tests_summary", "implement_summary")])
-    text = prompt("fix", problem=problem, context=context, scope=scope_text(rt), tests=tests_text(rt))
+    human = state.get("fix_note") or ""
+    note = section("From the human (answers and notes; they take precedence over the findings)", human)
+    before = head(Path(rt.cwd))
+    text = prompt("fix", problem=problem, context=context, note=note, scope=scope_text(rt), tests=tests_text(rt))
     reply = call(rt, "fix", text, WRITE, resume=session)
-    update: dict[str, Any] = {"fix_loops": loops + 1, "implement_summary": reply.text.strip()}
+    history = [*(state.get("fix_history") or []), {"kind": "fix", "reason": reason, "summary": first_line(reply.text),
+                                                    "changed": shortstat(Path(rt.cwd), before)}]
+    update: dict[str, Any] = {"fix_loops": loops + 1, "implement_summary": reply.text.strip(), "fix_history": history,
+                              "fix_note": ""}
     if reply.session_id:
         update["implement_session"] = reply.session_id
     return update
@@ -310,9 +467,53 @@ def gate(state: dict, rt: Runtime) -> dict:
         "gate_report": gate_checks.report(result),
         "fix_target": "gate",
         "fix_reason": "gate",
+        **record_check(state, rt, "gate", result["passed"], 0 if result["passed"] else gate_problems(result),
+                       ", ".join(c["name"] for c in result["checks"] if not c["passed"])),
         GATE_KEY: result,
         STATUS_KEY: "succeeded" if result["passed"] else "failed",
     }
+
+
+@step("approve_fix")
+def approve_fix(state: dict, rt: Runtime) -> dict:
+    """The fixes stopped making progress, hit their cap, or the reviewer has a question: the
+    human sees every round and decides. Continue (Approve) grants more fixes; a comment goes to
+    the fixer (and the reviewer) as the human's answer; Reject stops the run."""
+    reason = state.get("escalation", "")
+    loops = state.get("fix_loops", 0)
+    message = {
+        "questions": "The reviewer needs your answer before the next fix. Type it and press Enter "
+                     "(Request changes), Approve to let the fixer decide, or Reject to stop.",
+        "stalled": f"{loops} fixes so far and the last {STALL_ROUNDS} did not reduce the open problems. "
+                   f"Approve to continue ({EXTRA_FIXES} more fixes), type a hint for the fixer and press Enter, "
+                   "or Reject to stop the run.",
+        "limit": f"{loops} fixes so far: the cap is reached. Approve to continue ({EXTRA_FIXES} more fixes), "
+                 "type a hint for the fixer and press Enter, or Reject to stop the run.",
+    }.get(reason, "Approve to continue fixing, type a hint and press Enter, or Reject to stop.")
+    answer = rt.ask_human("approve_fix", "plan", message, plan=fix_report(state))
+    decision = answer["decision"]
+    if decision == "reject":
+        return {"decision": decision, "outcome": "rejected", "escalation": "",
+                "failure": f"stopped by the human after {loops} fixes", STATUS_KEY: "failed"}
+    comment = (answer.get("comment") or "").strip()
+    if not comment and reason == "questions":
+        comment = ("The human approved without answering the reviewer's questions. Decide them yourself "
+                   "(the option the reviewer recommended) and say so in your reply.")
+    history = [*(state.get("fix_history") or []),
+               {"kind": "human", "decision": "continue", "note": first_line(comment) if comment else f"+{EXTRA_FIXES} fixes"}]
+    update: dict[str, Any] = {
+        "decision": decision,
+        "escalation": "",
+        "fix_cap": loops + EXTRA_FIXES,
+        "fix_history": history,
+        "fix_stall_from": len(history),
+        "fix_note": comment,
+        STATUS_KEY: "succeeded",
+    }
+    if comment and reason == "questions":
+        talk = "\n".join(f"- {q}" for q in state.get("review_questions") or [])
+        update["clarifications"] = [*(state.get("clarifications") or []), f"Reviewer asked:\n{talk}\n\nHuman:\n{comment}"]
+    return update
 
 
 @step("approve_pr")

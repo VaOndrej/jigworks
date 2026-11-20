@@ -3,6 +3,7 @@
     jigworks run --workflow workflows/feature-development --repo sample-repo --prompt "<task>"
     jigworks approve <runId> | request-changes <runId> --comment "…" | reject <runId>
     jigworks resume <runId>          # after a crash, a kill or a usage-limit pause
+    jigworks resume <runId> --more-fixes 3 [--comment ..]   # after the fix loop limit (releases < 1.7.0)
     jigworks ls [--json]             # runs and their status
     jigworks show <runId>            # RunSummary JSON
     jigworks audit <runId>           # AuditRecord JSON (+ API-equivalent cost)
@@ -238,8 +239,20 @@ def _decide(args: argparse.Namespace, decision: str) -> int:
 
 def cmd_resume(args: argparse.Namespace) -> int:
     store = Store(home_for(args))
-    with open_run(store, args.run_id) as (_, run):
-        outcome = run.resume()
+    more = getattr(args, "more_fixes", None)
+    with open_run(store, args.run_id) as (rd, run):
+        if more is None and run.failed_at_fix_limit():
+            raise RunStateError(f"run {args.run_id} failed at the fix loop limit. Continue it with: "
+                                f"jigworks resume {args.run_id} --more-fixes 3 [--comment \"a hint for the fixer\"]")
+        if more is not None:
+            meta = rd.meta()
+            approver = getattr(args, "as_email", None) or git.user_email(Path(meta["repoRoot"])) or "unknown@localhost"
+            outcome = run.continue_fixing(more, approver, getattr(args, "comment", None))
+            # The new limit belongs to the run: a later resume or decision must not fall back to the old one.
+            meta["options"] = {**meta.get("options", {}), "max_fix_loops": run.options["max_fix_loops"]}
+            rd.write_meta(meta)
+        else:
+            outcome = run.resume()
     return report(outcome, args.run_id)
 
 
@@ -447,8 +460,13 @@ def build_parser() -> argparse.ArgumentParser:
     rc.add_argument("--as", dest="as_email")
     rc.set_defaults(fn=lambda a: _decide(a, "request_changes"))
 
-    for name, fn, help_ in (("resume", cmd_resume, "continue after a crash or a usage-limit pause"),
-                            ("show", cmd_show, "print the RunSummary"),
+    rs = with_home(sub.add_parser("resume", help="continue after a crash, a usage-limit pause or the fix loop limit"))
+    rs.add_argument("run_id")
+    rs.add_argument("--more-fixes", type=int, help="a run that failed at the fix loop limit: allow this many more fixes")
+    rs.add_argument("--comment", help="with --more-fixes: a hint for the fixer")
+    rs.add_argument("--as", dest="as_email", help="who decided to continue (default: git config user.email)")
+    rs.set_defaults(fn=cmd_resume)
+    for name, fn, help_ in (("show", cmd_show, "print the RunSummary"),
                             ("audit", cmd_audit, "print the AuditRecord and the API-equivalent cost"),
                             ("events", cmd_events, "print the event log")):
         sp = with_home(sub.add_parser(name, help=help_))

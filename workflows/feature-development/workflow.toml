@@ -1,10 +1,10 @@
 name = "feature-development"
-version = "1.6.0"
-description = "Triage (quick fix or brainstorming), brainstorming in as many rounds of questions as the design needs for larger changes, plan agreed with the human (questions and revisions in one planner session), tests from the spec by a separate agent, implement, independent review, gate (tests, property tests, secret and security scan), human approval, PR."
+version = "1.7.0"
+description = "Triage (quick fix or brainstorming), brainstorming in as many rounds of questions as the design needs for larger changes, plan agreed with the human (questions and revisions in one planner session), tests from the spec by a separate agent, implement, independent review, fix rounds while they make progress (the human decides when they stall), gate (tests, property tests, secret and security scan), human approval, PR."
 entrypoint = "graph:build_graph"
 minRunnerVersion = "0.1.0"
 plannedPath = ["triage", "plan", "approve_plan", "write_tests", "implement", "review", "gate", "approve_pr", "open_pr", "summary"]
-interruptNodes = ["approve_brainstorm", "approve_plan", "approve_pr"]
+interruptNodes = ["approve_brainstorm", "approve_plan", "approve_fix", "approve_pr"]
 
 [inputs.prompt]
 type = "text"
@@ -28,7 +28,7 @@ triage = "low"
 brainstorm = "high"
 review = "medium"
 
-# Fallback progress weights (design.md §7). fix has no planned weight.
+# Fallback progress weights (design.md §7). fix and approve_fix have no planned weight.
 # The brainstorming branch is off the planned path (like fix): its rounds add no %.
 [weights]
 triage = 1
@@ -40,6 +40,7 @@ write_tests = 15
 implement = 30
 review = 10
 fix = 0
+approve_fix = 0
 gate = 10
 approve_pr = 3
 open_pr = 5

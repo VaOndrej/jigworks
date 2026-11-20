@@ -309,7 +309,7 @@ class Host {
         break;
       case "resume":
         this.live.add(m.runId);
-        await this.bridge.resume(m.runId);
+        await this.bridge.resume(m.runId, { moreFixes: m.moreFixes, comment: m.comment });
         break;
       case "stop":
         this.bridge.stop(m.runId);
