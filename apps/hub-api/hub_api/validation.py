@@ -24,8 +24,15 @@ MARK = "JIGWORKS_RESULT "
 
 # Runs inside the sandbox only. Imports the package, builds the graph, prints get_graph().
 CHECK_SCRIPT = r'''
-import importlib, json, os, sys, traceback
+import importlib, json, os, sys, traceback, types
 pkg, entry = os.path.abspath(sys.argv[1]), sys.argv[2]
+# Like the runner (jigworks_runner/package.py): the package root is a package of its own, so
+# relative imports (`from .steps import nodes`) work; the root also stays on sys.path for
+# packages that use absolute ones (`from steps import nodes`, the T02 fixture bundles).
+root_pkg = types.ModuleType("jigworks_pkg")
+root_pkg.__path__ = [pkg]
+root_pkg.__package__ = "jigworks_pkg"
+sys.modules["jigworks_pkg"] = root_pkg
 sys.path.insert(0, pkg)
 MARK = "JIGWORKS_RESULT "
 
@@ -43,7 +50,7 @@ def fail(name, exc):
 out = {}
 module_name, _, attr = entry.partition(":")
 try:
-    target = getattr(importlib.import_module(module_name), attr)
+    target = getattr(importlib.import_module("jigworks_pkg." + module_name), attr)
     out["imports"] = {"ok": True}
 except Exception as exc:
     fail("imports", exc)

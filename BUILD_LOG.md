@@ -16,7 +16,8 @@ Time is tracked in two columns: **human** (my own time: deciding, directing, rev
 | Login rate limit, invariant guard, extension guide | 2 min | ~45 min |
 | Extension hub connection (gear, connect flow, status line) | 2 min | ~25 min |
 | Hub sample-data reset, worktree cleanup | 2 min | ~20 min |
-| **Total** | **3 h 20 min** | **~8 h 20 min** |
+| Hub validation: relative imports | 1 min | ~10 min |
+| **Total** | **3 h 21 min** | **~8 h 30 min** |
 
 ## Entries
 
@@ -243,4 +244,23 @@ Two Claude Code sessions (Opus 5.5) in their own worktrees, pushing to `feature/
 - First version was a script on the raw `DATABASE_URL`. The human rejected it: they have the
   hub URL and password, a database URL should not be needed. Replaced by the endpoint, which
   works with the hub password only; the script was deleted before it was committed.
+
+### 2026-11-20 — Hub validation: relative imports (human 1 min, agent ~10 min)
+
+**What I delegated**
+- Publishing `feature-development 1.4.0` to production failed with 409 `imports: ImportError:
+  attempted relative import with no known parent package`. The hub's sandbox check put the
+  package root on `sys.path` and imported `graph` as a top-level module; the runner wraps the
+  root in a package of its own, so it supported `from .steps import nodes` and the hub did not.
+  It never showed because the only published releases were the fixture bundles, which use
+  absolute imports. The check script now imports like the runner and keeps both styles working.
+- A regression test runs the real check script locally against the repo's workflow (red with
+  the exact production message, green after) and against the 1.3.0 fixture bundle.
+
+**What I reviewed / decided myself**
+- Ran the publish and reported the error.
+
+**What went wrong / changed course**
+- The hub's validation and the runner's loader are two copies of the same import rule. Nothing
+  tied them together; the new test is the tie for now.
 
