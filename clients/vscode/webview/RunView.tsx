@@ -114,7 +114,7 @@ function NextForYou({ s, interruptNodes, weights }: { s: SessionView; interruptN
     const i = s.interrupt;
     return (
       <section className="card next waiting" aria-label="Next for you">
-        <div className="eyebrow amber">YOUR DECISION · {i.stage === "plan" ? "PLAN" : "BEFORE THE PR"}</div>
+        <div className="eyebrow amber">YOUR DECISION · {i.node === "approve_brainstorm" ? "BRAINSTORMING" : i.stage === "plan" ? "PLAN" : "BEFORE THE PR"}</div>
         <div>{i.message}</div>
         {i.plan && <pre className="plan mono">{i.plan}</pre>}
         {i.diffStat && (
@@ -136,7 +136,7 @@ function NextForYou({ s, interruptNodes, weights }: { s: SessionView; interruptN
           <button type="button" className="link" onClick={() => host().postMessage({ type: "openAudit", runId: s.runId })}>Audit log</button>
         </div>
         <label htmlFor={`c-${s.runId}`} className="sr-only">Comment for the agent</label>
-        <textarea id={`c-${s.runId}`} className="comment" placeholder="Request changes: what should the agent change?" value={comment} onChange={(e) => setComment(e.target.value)} />
+        <textarea id={`c-${s.runId}`} className="comment" placeholder={i.stage === "plan" ? "Request changes: your answers or comments for the agent" : "Request changes: what should the agent change?"} value={comment} onChange={(e) => setComment(e.target.value)} />
         <div className="actions">
           <button type="button" className="btn approve" onClick={() => decide("approve")}>Approve</button>
           <button type="button" className="btn changes" disabled={!comment.trim()} onClick={() => decide("request_changes")}>Request changes</button>

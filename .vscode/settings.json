@@ -1,4 +1,7 @@
 {
-  // The demo works on sample-repo/; in any other repo the default is the workspace root.
-  "jigworks.repoPath": "sample-repo"
+  // Demo projects built by the workflow live in demo/ (feature-development 1.6.0). For the
+  // sample-repo demo set "jigworks.repoPath": "sample-repo" again.
+  "jigworks.repoPath": "demo",
+  // A larger build needs more than the runner's default of 40 turns per agent call.
+  "jigworks.runArgs": ["--max-turns", "150"]
 }

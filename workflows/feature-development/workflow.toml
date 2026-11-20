@@ -1,10 +1,10 @@
 name = "feature-development"
-version = "1.5.0"
-description = "Plan agreed with the human (questions and revisions in one planner session), tests from the spec by a separate agent, implement, independent review, gate (tests, property tests, secret and security scan), human approval, PR."
+version = "1.6.0"
+description = "Triage (quick fix or brainstorming), brainstorming in as many rounds of questions as the design needs for larger changes, plan agreed with the human (questions and revisions in one planner session), tests from the spec by a separate agent, implement, independent review, gate (tests, property tests, secret and security scan), human approval, PR."
 entrypoint = "graph:build_graph"
 minRunnerVersion = "0.1.0"
-plannedPath = ["plan", "approve_plan", "write_tests", "implement", "review", "gate", "approve_pr", "open_pr", "summary"]
-interruptNodes = ["approve_plan", "approve_pr"]
+plannedPath = ["triage", "plan", "approve_plan", "write_tests", "implement", "review", "gate", "approve_pr", "open_pr", "summary"]
+interruptNodes = ["approve_brainstorm", "approve_plan", "approve_pr"]
 
 [inputs.prompt]
 type = "text"
@@ -12,21 +12,28 @@ description = "What to build."
 required = true
 
 # Models are set by the release, never in VS Code (design.md §7).
-# Opus for planning, the tests from the spec and the review; Sonnet for the implementation.
+# Sonnet (low effort) for the triage; Opus for brainstorming, planning, the tests from the spec and the review; Sonnet for the implementation.
 [models]
 default = "claude-sonnet-5-5"
 
 [models.nodes]
+brainstorm = "claude-opus-5-5"
 plan = "claude-opus-5-5"
 write_tests = "claude-opus-5-5"
 review = "claude-opus-5-5"
 
 # Reasoning effort per node (claude -p --effort); nodes without one use the CLI default.
 [effort.nodes]
+triage = "low"
+brainstorm = "high"
 review = "medium"
 
 # Fallback progress weights (design.md §7). fix has no planned weight.
+# The brainstorming branch is off the planned path (like fix): its rounds add no %.
 [weights]
+triage = 1
+brainstorm = 0
+approve_brainstorm = 0
 plan = 10
 approve_plan = 2
 write_tests = 15

@@ -184,7 +184,7 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .next { flex: 2; min-width: 0; padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; line-height: 1.5; }
 .next.waiting { border-color: #8A6A1F; box-shadow: inset 3px 0 0 var(--amber); }
 .choices { display: flex; flex-direction: column; gap: 4px; color: #C9CBD1; }
-.plan { margin: 0; padding: 10px 12px; background: #17181B; border: 1px solid var(--line); border-radius: 8px; font-size: 12px; white-space: pre-wrap; max-height: 160px; overflow: auto; }
+.plan { margin: 0; padding: 10px 12px; background: #17181B; border: 1px solid var(--line); border-radius: 8px; font-size: 12px; white-space: pre-wrap; max-height: min(60vh, 640px); overflow: auto; }
 .comment { background: #17181B; color: #EDEEF1; border: 1px solid #4A4E58; border-radius: 8px; padding: 8px 10px; font: inherit; min-height: 56px; resize: vertical; }
 .actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .btn { border-radius: 6px; padding: 8px 14px; font-weight: 600; border: 1px solid; background: transparent; }

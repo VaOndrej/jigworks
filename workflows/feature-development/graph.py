@@ -1,6 +1,10 @@
 """feature-development (design.md §9).
 
-START → plan ⇄ [approve_plan]   (questions / request changes → plan, same session; round limit)
+START → triage   (keyword "brainstorm" in the prompt, or the triage agent judges the size)
+      quick      → plan
+      brainstorm → brainstorm ⇄ [approve_brainstorm]   (rounds of questions, same session,
+                   until the agent writes the design; round limit) → plan (from the design)
+      plan ⇄ [approve_plan]   (questions / request changes → plan, same session; round limit)
       [approve_plan] approve → write_tests (separate session, from the spec) → implement
       → review (independent session)
             review FAIL → fix → review        (fix loop limit)
@@ -32,6 +36,14 @@ def merge(left: dict | None, right: dict | None) -> dict:
 class State(TypedDict, total=False):
     commits: Annotated[dict[str, str], merge]  # node → git commit of its last snapshot
     prompt: str
+    route: Literal["quick", "brainstorm"]
+    route_reason: str
+    brainstorm: str  # the brainstormer's latest reply: questions or the design
+    brainstorm_session: str  # resumed on every brainstorming round
+    brainstorm_feedback: str  # the human's latest answer, consumed by brainstorm
+    brainstorm_rounds: int  # brainstormer calls so far (limit MAX_BRAINSTORM_ROUNDS)
+    brainstorm_log: list[str]  # the brainstorming conversation
+    design: str  # the approved design; the plan is made from it
     plan: str
     plan_session: str  # the planner's agent session, resumed on every planning round
     plan_feedback: str  # the human's latest answer or comment on the plan, consumed by plan
@@ -39,6 +51,7 @@ class State(TypedDict, total=False):
     clarifications: list[str]  # the planning conversation, passed on with the plan
     tests_summary: str
     implement_session: str
+    implement_summary: str  # the implementer's (or the last fixer's) report, for the reviewer
     review_passed: bool
     review_findings: str
     gate_passed: bool
@@ -52,6 +65,20 @@ class State(TypedDict, total=False):
     failure: str
     pr_url: str
     summary: str
+
+
+def after_triage(state: State) -> Literal["plan", "brainstorm"]:
+    return "brainstorm" if state.get("route") == "brainstorm" else "plan"
+
+
+def after_brainstorm(state: State) -> Literal["approve_brainstorm", "__end__"]:
+    return END if state.get("outcome") == "failed" else "approve_brainstorm"
+
+
+def after_brainstorm_approval(state: State) -> Literal["brainstorm", "plan", "__end__"]:
+    if state.get("decision") == "reject":
+        return END
+    return "brainstorm" if state.get("brainstorm_feedback") else "plan"
 
 
 def after_plan(state: State) -> Literal["approve_plan", "__end__"]:
@@ -90,6 +117,9 @@ def after_pr_review(state: State) -> Literal["open_pr", "fix", "__end__"]:
 
 def build_graph() -> StateGraph:
     g = StateGraph(State)
+    g.add_node("triage", nodes.triage)
+    g.add_node("brainstorm", nodes.brainstorm)
+    g.add_node("approve_brainstorm", nodes.approve_brainstorm)
     g.add_node("plan", nodes.plan)
     g.add_node("approve_plan", nodes.approve_plan)
     g.add_node("write_tests", nodes.write_tests)
@@ -101,7 +131,10 @@ def build_graph() -> StateGraph:
     g.add_node("open_pr", nodes.open_pr)
     g.add_node("summary", nodes.summary)
 
-    g.add_edge(START, "plan")
+    g.add_edge(START, "triage")
+    g.add_conditional_edges("triage", after_triage)
+    g.add_conditional_edges("brainstorm", after_brainstorm)
+    g.add_conditional_edges("approve_brainstorm", after_brainstorm_approval)
     g.add_conditional_edges("plan", after_plan)
     g.add_conditional_edges("approve_plan", after_plan_approval)
     g.add_edge("write_tests", "implement")

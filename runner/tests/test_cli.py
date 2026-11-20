@@ -329,7 +329,7 @@ def test_progress_weights_from_history_of_the_same_digest():
                  for n in manifest["plannedPath"]]
         return {"digest": d, "status": "succeeded", "steps": steps}
 
-    secs = {"plan": 60, "write_tests": 120, "implement": 600, "review": 60, "gate": 30, "open_pr": 5, "summary": 10}
+    secs = {"triage": 6, "plan": 60, "write_tests": 120, "implement": 600, "review": 60, "gate": 30, "open_pr": 5, "summary": 10}
     weights, source = weights_from_history(manifest, digest, [audit(digest, secs), audit("sha256:" + "b" * 64, {})])
     assert source == "history (1 runs)"
     assert weights["implement"] == 600 and weights["plan"] == 60
@@ -342,7 +342,7 @@ def test_progress_weights_from_history_of_the_same_digest():
 def test_cli_graph_prints_graph_json(env):
     out = jw(env, "graph", str(WORKFLOW))
     graph = json.loads(out.stdout)
-    assert contracts.validate("GraphJSON", graph) == [] and graph["release"] == "feature-development@1.5.0"
+    assert contracts.validate("GraphJSON", graph) == [] and graph["release"] == "feature-development@1.6.0"
 
 
 def test_runner_home_ignores_run_state_but_not_the_gate_config(tmp_path):

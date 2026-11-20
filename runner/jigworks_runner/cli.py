@@ -195,6 +195,8 @@ def cmd_run(args: argparse.Namespace) -> int:
         options["gate"] = {"scope": [rel.rstrip("/") + "/"]}
     if args.max_fix_loops is not None:
         options["max_fix_loops"] = args.max_fix_loops
+    if args.max_turns is not None:
+        options["max_turns"] = args.max_turns  # per agent call; a larger build needs more than 40
     meta = {
         "runId": run_id,
         "workflowDir": str(workflow),
@@ -428,6 +430,7 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("--pr-remote", default="origin", help="remote name or URL/path the PR branch is pushed to")
     r.add_argument("--pr-base", default="main")
     r.add_argument("--max-fix-loops", type=int)
+    r.add_argument("--max-turns", type=int, help="turn limit of every agent call (default 40)")
     r.add_argument("--hub-url", help="hub to sync events to (default: $JIGWORKS_HUB_URL); key from $HUB_PASSWORD")
     r.add_argument("--skip-preflight", action="store_true")
     r.set_defaults(fn=cmd_run)
