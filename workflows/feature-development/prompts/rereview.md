@@ -34,6 +34,10 @@ for what the fix changed.
 
 The gate runs $tests after you.
 
+A rule of the repo (AGENTS.md, CLAUDE.md, CONTRIBUTING) that needs a change outside the scope
+($scope), e.g. a build log at the root, is the human's job: mention it once at the end of
+your reply as a note for the human. It is not a finding and not a QUESTION.
+
 ## Reply format
 
 The list above, one line per finding. Every open finding must be fixed before the change

@@ -824,6 +824,28 @@ def test_the_human_can_accept_a_change_to_a_protected_test(repo):
     check_stream(run)
 
 
+def test_a_comment_does_not_accept_protected_files_and_the_screen_says_so(repo):
+    """run_20261120161021_60bbf3: the human typed "I agree with the change" instead of pressing
+    Approve; the fixer then claimed the files were accepted and the gate failed again."""
+    fixed_test = FEATURE_TEST + "\n# ruled by the human\n"
+    steps = script(
+        review=[FakeStep("- F1 the test is wrong\nVERDICT: FAIL"), FakeStep("- F1 FIXED\nVERDICT: PASS")],
+        fix=[FakeStep("changed the test", files={"sample-repo/tests/test_notes.py": fixed_test}),
+             FakeStep("NEEDS HUMAN: accept the change to sample-repo/tests/test_notes.py")],
+    )
+    run, agent = new_run(repo, steps)
+    out = approve_all(run, run.start("Add describe(order)"))
+    assert "## Changes to protected files" in out.interrupt["plan"]
+    assert "A comment does not accept them" in out.interrupt["message"]
+    out = run.decide("request_changes", APPROVER, comment="I agree with the change.")
+    assert out.interrupt["node"] == "approve_fix"
+    assert "You answered with a comment" in out.interrupt["plan"], "the screen says why it asks again"
+    assert "only Approve" in [c for c in agent.calls if c.node == "fix"][-1].prompt
+    out = run.decide("approve", APPROVER)
+    assert out.interrupt["node"] == "approve_pr"
+    check_stream(run)
+
+
 def test_an_accepted_protected_change_is_pinned_to_its_contents(repo):
     fixed_test = FEATURE_TEST + "\n# ruled by the human\n"
     steps = script(
@@ -841,6 +863,69 @@ def test_an_accepted_protected_change_is_pinned_to_its_contents(repo):
     guard = next(c for c in last["checks"] if c["name"] == "protected tests")
     assert not guard["passed"], "a later edit of the accepted file fails the gate again"
     check_stream(run)
+
+
+def test_a_new_suppression_marker_needs_the_human(repo):
+    """run_20261120161021_60bbf3: the fixer silenced bandit B608 with `# nosec` and the gate would
+    have passed without anyone approving it."""
+    silenced = FEATURE + "import subprocess  # nosec B404\n"
+    steps = script(
+        implement=[FakeStep("implemented", files={"sample-repo/sample_repo/notes.py": silenced})],
+        fix=[FakeStep("NEEDS HUMAN: accept the `# nosec B404` in notes.py (only a constant is used)")],
+    )
+    run, agent = new_run(repo, steps)
+    out = approve_all(run, run.start("Add describe(order)"))
+    assert out.interrupt["node"] == "approve_fix"
+    first = [e["gateResult"] for e in events(run) if e["kind"] == "gate_result"][0]
+    check = next(c for c in first["checks"] if c["name"] == "suppressions")
+    assert not check["passed"] and "sample-repo/sample_repo/notes.py" in check["summary"] and "nosec" in check["summary"]
+    report = out.interrupt["plan"]
+    assert "## New suppressions" in report and "# nosec B404" in report
+    out = run.decide("approve", APPROVER)
+    assert out.interrupt["node"] == "approve_pr", "the accepted suppression passes the gate"
+    check_stream(run)
+
+
+def test_suppressions_written_by_the_test_writer_are_not_flagged(repo):
+    skipping = FEATURE_TEST + '\n\nimport pytest\n\n\n@pytest.mark.skip(reason="needs network")\ndef test_feed():\n    pass\n'
+    steps = script(write_tests=[FakeStep("tests", files={"sample-repo/tests/test_notes.py": skipping})])
+    run, _ = new_run(repo, steps)
+    out = approve_all(run, run.start("Add describe(order)"))
+    assert out.status == "succeeded"
+
+
+def test_fixers_may_delete_files_and_run_the_gate_scanners(repo):
+    run, agent = new_run(repo, script(review=[*failing_review(1), FakeStep("- F1 FIXED\nVERDICT: PASS")]))
+    approve_all(run, run.start("Add describe(order)"))
+    fix_call = next(c for c in agent.calls if c.node == "fix")
+    tools = fix_call.options.allowed_tools
+    assert {"Bash(git rm:*)", "Bash(bandit:*)", "Bash(gitleaks:*)"} <= set(tools)
+    assert "bandit -q -ll -s B101" in fix_call.prompt, "the fixer is told how the gate scans"
+
+
+def test_scratch_files_of_the_test_writer_are_not_protected(repo):
+    steps = script(
+        write_tests=[FakeStep("tests", files={"sample-repo/tests/test_notes.py": FEATURE_TEST,
+                                              "sample-repo/check_tmp.py": "print(1)\n"})],
+        review=[FakeStep("- F1 sample-repo/check_tmp.py scratch file left in\nVERDICT: FAIL"),
+                FakeStep("- F1 FIXED\nVERDICT: PASS")],
+        fix=[FakeStep("removed the scratch file", files={"sample-repo/check_tmp.py": None})],
+    )
+    run, _ = new_run(repo, steps)
+    out = approve_all(run, run.start("Add describe(order)"))
+    assert out.status == "succeeded", "deleting the test writer's scratch file passes the gate"
+    gate = [e["gateResult"] for e in events(run) if e["kind"] == "gate_result"][-1]
+    assert next(c for c in gate["checks"] if c["name"] == "protected tests")["passed"]
+
+
+def test_agents_are_told_how_to_treat_scratch_files_and_rules_outside_the_scope(repo):
+    run, agent = new_run(repo, script(review=[*failing_review(1), FakeStep("- F1 FIXED\nVERDICT: PASS")]))
+    approve_all(run, run.start("Add describe(order)"))
+    prompts = {c.node: c.prompt for c in agent.calls}
+    for node in ("write_tests", "implement", "fix"):
+        assert "scratch" in prompts[node], node
+    for node in ("review", "fix"):
+        assert "outside the scope" in prompts[node] and "not a finding" in prompts[node], node
 
 
 def test_write_tests_may_extend_the_invariant_tests(repo):

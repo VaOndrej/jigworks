@@ -38,11 +38,20 @@ nothing re-checked the fixes. The human kept answering questions they had alread
 - [x] Every answer at `approve_fix` goes into the run's agreements (`spec()`), shown to the next reviewer and fixer as final decisions; the re-reviewer reports a waived finding as `ACCEPTED` (closed).
 - [x] When the gate rejects protected files, `approve_fix` shows their diff since write_tests; Approve accepts exactly that content (git blob hash) and re-runs the gate; a later edit fails it again.
 - [x] Runner: `jigworks upgrade <runId> --workflow <dir>` switches a run that is not being worked on to a newer release of the same workflow (same name, no node dropped), keeping state, sessions, commits and answers; recorded in `run.json` `upgrades`.
+- [x] Gate: a new suppression marker (`# nosec`, `noqa`, `type: ignore`, `skip`/`xfail`, `eslint-disable`, `@ts-ignore`, …) that implement or fix added since write_tests fails the gate; approve_fix lists it and Approve accepts exactly that line (file + text).
+- [x] Agents may delete files (`git rm`) and run the gate's scanners (`bandit`, `gitleaks`); the implement and fix prompts name the scanner commands.
+- [x] Only test files written by write_tests are protected (`tests/`, `test_*`, `*_test.*`, `*.test.*`, `*.spec.*`, conftest); its scratch scripts are not. No scratch files in the repo (write_tests, implement, fix prompts).
+- [x] A repo rule that needs a change outside the scope is a note for the human, not a finding or a QUESTION (review, re-review, fix prompts).
+- [x] A comment at approve_fix does not accept protected files or suppressions; the screen says so, says it again on the next round, and the fixer may not claim they were accepted.
 - [x] Rehearsed on a copy of the real run (cloned worktree, fake agent): upgrade → Approve → review → gate; protected test accepted, gate left with only bandit B608.
 - [ ] The real run upgraded and continued (human).
 - [ ] Published to the hub as 1.8.0 (human).
 
 ## Notes
+
+- Found on the real run after the upgrade: the fixer silenced bandit B608 with `# nosec` and could not run bandit itself; it could not delete scratch files (`rm`, `git rm` denied); the test writer's scratch script `check_literals_tmp.py` was "protected"; the human typed "I agree with the change" instead of pressing Approve, and the fixer then said the files were accepted.
+- The suppression list is a regex over added lines. It misses suppressions in config files (e.g. a bandit `skips` list in pyproject.toml, an `ignore` list in ruff config) and markers it does not know.
+- An accepted suppression is pinned to file and exact line text, not to the line number: the same text added again elsewhere in that file passes.
 
 - `run_started` of an upgraded run still names 1.7.0; later events carry 1.8.0. The hub keeps the run under the release it started with (its `runs.release`), so hub analytics count it as 1.7.0.
 - `upgrade` checks only that no graph node disappears. A release that renames a state key or changes what a node expects of the checkpointed state can still break a run; nothing checks that.
@@ -62,8 +71,14 @@ test_an_accepted_finding_is_closed                                              
 test_the_human_can_accept_a_change_to_a_protected_test                          no '## Changes to protected files'
 test_an_accepted_protected_change_is_pinned_to_its_contents                     'approve_fix' == 'approve_pr'
 
+# second batch (suppressions, git rm / scanners, scratch files, rules outside the scope, comment ≠ Approve), red first:
+test_a_new_suppression_marker_needs_the_human                          TypeError: 'NoneType' object is not subscriptable (no "suppressions" check)
+test_fixers_may_delete_files_and_run_the_gate_scanners                 missing 'Bash(git rm:*)', 'Bash(bandit:*)', 'Bash(gitleaks:*)'
+test_scratch_files_of_the_test_writer_are_not_protected                'waiting_human' == 'succeeded'
+test_agents_are_told_how_to_treat_scratch_files_and_rules_outside_the_scope   'scratch' not in the write_tests prompt
+
 $ uv run pytest workflows runner -q -p no:cacheprovider
-121 passed, 1 skipped, 17 warnings in 320.34s (0:05:20)
+127 passed, 1 skipped, 17 warnings in 364.81s (0:06:04)
 
 # rehearsal on a copy of run_20261120161021_60bbf3 (cloned worktree, fake agent, no hub)
 $ jigworks upgrade run_20261120161021_60bbf3 --workflow workflows/feature-development

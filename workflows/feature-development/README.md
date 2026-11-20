@@ -59,7 +59,9 @@ plan ⇄ [approve_plan]                   (questions / request changes → plan,
   docstring of `steps/gate.py` for the config format and `sample-repo/.jigworks/gate.toml` for
   an example.
 - **Tests written before implementation are read-only.** After `write_tests`, the gate's
-  *protected tests* check fails if `implement` or `fix` changed a file `write_tests` wrote, a
+  *protected tests* check fails if `implement` or `fix` changed a test file `write_tests` wrote
+  (under `tests/`, `test_*`, `*_test.*`, `*.test.*`, `*.spec.*`; a scratch script it left at the
+  root is not protected, 1.8.0), a
   file under the config's `protected_dirs` that existed then, any `conftest.py`, `pytest.ini`,
   `tox.ini`, `INVARIANTS.md`, the gate config, or the test script / pytest settings in
   `package.json` / `pyproject.toml` (the rest of those files may change: dependencies). New
@@ -69,8 +71,12 @@ plan ⇄ [approve_plan]                   (questions / request changes → plan,
   of the protected files and Approve accepts exactly that content (pinned by git blob hash; any
   later edit fails the gate again). The run goes on; nothing is built again.
 - **The gate is deterministic** (no agent): plain tests, property tests, secret scan on the
-  added lines, bandit (medium and up) on the changed Python files. Any failing check fails
-  the gate and routes to `fix`.
+  added lines, bandit (medium and up) on the changed Python files, and new suppression markers
+  (`# nosec`, `noqa`, `type: ignore`, `skip`/`xfail`, `eslint-disable`, `@ts-ignore`, …) that
+  implement or fix added since write_tests (1.8.0). Any failing check fails the gate and routes
+  to `fix`. A suppression passes only when the human accepts that exact line at
+  `[approve_fix]`. The agents may run `bandit` and `gitleaks` themselves and delete files with
+  `git rm`; scratch files go outside the repo.
 - **Request changes** at the PR review sends the comment back to the agent; the runner counts
   it as a follow-up prompt and records the first reviewed commit (`firstResultCommit`), the
   baseline of the human delta (design.md §8).

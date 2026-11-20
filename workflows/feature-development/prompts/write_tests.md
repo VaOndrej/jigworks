@@ -29,6 +29,11 @@ Use the `feature-development:tests-from-the-spec` skill.
 - Test the specification, not guesses about an implementation.
 - Existing tests keep passing in spirit: do not weaken or delete them.
 - No secrets, credentials or tokens, not even fake-looking ones.
+- Leave no scratch or debug files in the repo (one-off scripts, dumps, `dbg_*.py`): use a temporary
+  directory outside it, or delete them with `git rm` / Write before you finish. Never hide them
+  with a `.gitignore` rule.
+  Only the tests and their setup are read-only for the other agents; anything else you leave
+  behind is not.
 
 ## Reply format
 

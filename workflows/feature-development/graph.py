@@ -15,7 +15,8 @@ START → triage   (keyword "brainstorm" in the prompt, or the triage agent judg
                   approve / request changes (a note or the answers) → fix, with more fixes
                   approve after a fix that changed nothing or that
                   was blocked on the human (NEEDS HUMAN)            → review / gate again
-                  approve with protected files the gate rejects     → accept exactly that content, gate again
+                  approve with protected files or new suppressions
+                  the gate rejects                                  → accept exactly those, gate again
                   reject                                            → END
             a fix right after the human's answer always goes on to review / gate, even if it
             changed nothing (the answer settled it), so approve_fix ⇄ fix cannot loop
@@ -79,6 +80,8 @@ class State(TypedDict, total=False):
     fix_note: str  # the human's note or answers for the next fix, consumed by fix
     recheck: bool  # approve_fix: re-run the check without another fix (Approve after a no-change fix)
     protected_accepted: dict[str, str]  # protected file → content (git blob) the human accepted at approve_fix
+    suppressions_accepted: list[str]  # suppression lines (file + text) the human accepted at approve_fix
+    pending_commented: list[str]  # what waited for acceptance when the human answered with a comment instead
     outcome: Literal["succeeded", "failed", "rejected"]
     failure: str
     pr_url: str

@@ -41,7 +41,11 @@ WRITE = (
     "Bash(pnpm test:*)", "Bash(pnpm install:*)", "Bash(pnpm add:*)",
     "Bash(npm test:*)", "Bash(npm install:*)", "Bash(yarn test:*)", "Bash(yarn add:*)",
     "Bash(go test:*)", "Bash(cargo test:*)",
+    # Deleting a file (scratch files, a module the plan drops) and the gate's own scanners.
+    "Bash(git rm:*)", "Bash(bandit:*)", "Bash(gitleaks:*)",
 )
+SCANNERS = ("`bandit -q -ll -s B101 <the changed .py files>` (medium and up) and `gitleaks` on the added lines "
+            "(`git diff <base> | gitleaks stdin`)")
 
 VERDICT = re.compile(r"^\s*VERDICT:\s*(PASS|FAIL)\b", re.IGNORECASE | re.MULTILINE)
 FINDING = re.compile(r"^\s*[-*]?\s*\**\[?F(\d+)\]?\**[:.)]?\s+(.*)$", re.MULTILINE)
@@ -261,18 +265,25 @@ WHY = {
 }
 
 
-def fix_report(state: dict, protected: str = "") -> str:
+def fix_report(state: dict, protected: str = "", suppressions: str = "", commented_before: bool = False) -> str:
     """Markdown the human reads at approve_fix: why, the reviewer's questions, every round
-    (what was found, what the fixer changed) and the trend of open problems. `protected`: the
-    diff of protected files the gate rejects, which Approve accepts."""
+    (what was found, what the fixer changed) and the trend of open problems. `protected` and
+    `suppressions`: what the gate rejects and only Approve accepts."""
     history = state.get("fix_history") or []
     reason = state.get("escalation", "")
     parts = [f"**Why you are asked:** {WHY.get(reason, reason)}"]
+    if commented_before:
+        parts.append("**You answered with a comment last time.** A comment does not accept the changes below, so "
+                     "the gate rejected them again. Press **Approve** (no comment) to accept them.")
     if protected:
         parts.append("## Changes to protected files\n\nThe gate rejects these changes to files the agents may not "
                      "touch (tests from write_tests, test configuration, INVARIANTS.md). **Approve accepts exactly "
                      "this content** and re-runs the gate; any later edit of these files fails it again. To have "
                      "them restored instead, say so in the comment.\n\n" + protected)
+    if suppressions:
+        parts.append("## New suppressions\n\nimplement or fix silenced a scanner, a type check or a test instead of "
+                     "fixing the cause. **Approve accepts exactly these lines** and re-runs the gate. To have the "
+                     "cause fixed instead, say so in the comment.\n\n" + suppressions)
     questions = state.get("review_questions") or []
     if questions:
         parts.append("## Questions from the reviewer\n\n" + "\n".join(f"{i}. {q}" for i, q in enumerate(questions, 1)))
@@ -445,7 +456,7 @@ def write_tests(state: dict, rt: Runtime) -> dict:
 @step("implement")
 def implement(state: dict, rt: Runtime) -> dict:
     text = prompt("implement", prompt=state["prompt"], spec=spec(state), earlier=earlier(state, "tests_summary"),
-                  scope=scope_text(rt), tests=tests_text(rt))
+                  scope=scope_text(rt), tests=tests_text(rt), scanners=SCANNERS)
     reply = call(rt, "implement", text, WRITE)
     return {"implement_session": reply.session_id or "", "implement_summary": reply.text.strip()}
 
@@ -497,7 +508,8 @@ def fix(state: dict, rt: Runtime) -> dict:
     human = state.get("fix_note") or ""
     note = section("From the human (answers and notes; they take precedence over the findings)", human)
     before = head(Path(rt.cwd))
-    text = prompt("fix", problem=problem, context=context, note=note, scope=scope_text(rt), tests=tests_text(rt))
+    text = prompt("fix", problem=problem, context=context, note=note, scope=scope_text(rt), tests=tests_text(rt),
+                  scanners=SCANNERS)
     reply = call(rt, "fix", text, WRITE, resume=session)
     changed = shortstat(Path(rt.cwd), before)
     history = [*(state.get("fix_history") or []), {"kind": "fix", "reason": reason, "summary": first_line(reply.text),
@@ -520,7 +532,8 @@ def fix(state: dict, rt: Runtime) -> dict:
 def gate(state: dict, rt: Runtime) -> dict:
     result = gate_checks.run_gate(rt.cwd, rt.base_commit, rt.options.get("gate"),
                                   tests_base=(state.get("commits") or {}).get("write_tests"),
-                                  accepted=state.get("protected_accepted"))
+                                  accepted=state.get("protected_accepted"),
+                                  accepted_suppressions=state.get("suppressions_accepted"))
     return {
         "gate_passed": result["passed"],
         "gate_report": gate_checks.report(result),
@@ -556,6 +569,20 @@ def protected_pending(state: dict, rt: Runtime) -> tuple[dict[str, str], str]:
     return {p: gate_checks.content_id(cwd, p) for p in paths}, f"{listing}\n\n```diff\n{diff.strip()}\n```"
 
 
+def suppressions_pending(state: dict, rt: Runtime) -> tuple[list[str], str]:
+    """Suppression markers implement/fix added that the gate rejects and the human has not
+    accepted: their keys and a list for the report."""
+    tests_base = (state.get("commits") or {}).get("write_tests") or rt.base_commit
+    if state.get("fix_target") != "gate":
+        return [], ""
+    scope = rt.options.get("gate", {}).get("scope", gate_checks.DEFAULTS["scope"])
+    found = gate_checks.new_suppressions(Path(rt.cwd), tests_base, scope, state.get("suppressions_accepted"))
+    if not found:
+        return [], ""
+    keys = list(dict.fromkeys(gate_checks.suppression_key(p, ln) for p, ln in found))
+    return keys, "\n".join(f"- `{p}`: `{ln.strip()}`" for p, ln in found)
+
+
 @step("approve_fix")
 def approve_fix(state: dict, rt: Runtime) -> dict:
     """The fixes stopped making progress, hit their cap, or the reviewer has a question: the
@@ -578,11 +605,15 @@ def approve_fix(state: dict, rt: Runtime) -> dict:
                       "on the current change, type a hint for the fixer and press Enter, or Reject to stop the run.",
     }.get(reason, "Approve to continue fixing, type a hint and press Enter, or Reject to stop.")
     pending, protected = protected_pending(state, rt)
-    if pending:
-        message = ("The gate rejects changes to protected files (see the report). Approve accepts exactly these "
-                   "changes and re-runs the gate; type a comment for the fixer instead (e.g. restore them), or "
-                   "Reject to stop the run.")
-    answer = rt.ask_human("approve_fix", "plan", message, plan=fix_report(state, protected))
+    silenced, suppressions = suppressions_pending(state, rt)
+    waiting = sorted([*pending, *silenced])
+    if waiting:
+        message = ("The gate rejects changes only you can accept (protected files or new suppressions, see the "
+                   "report). Approve accepts exactly these and re-runs the gate. A comment does not accept them: it "
+                   "goes to the fixer (e.g. restore them, fix the cause). Reject stops the run.")
+    commented_before = bool(waiting) and state.get("pending_commented") == waiting
+    answer = rt.ask_human("approve_fix", "plan", message,
+                          plan=fix_report(state, protected, suppressions, commented_before))
     decision = answer["decision"]
     if decision == "reject":
         return {"decision": decision, "outcome": "rejected", "escalation": "",
@@ -591,14 +622,14 @@ def approve_fix(state: dict, rt: Runtime) -> dict:
     if not comment and reason == "questions":
         comment = ("The human approved without answering the reviewer's questions. Decide them yourself "
                    "(the option the reviewer recommended) and say so in your reply.")
-    accept = decision == "approve" and bool(pending)
+    accept = decision == "approve" and bool(waiting)
     # Approve after a fix that changed nothing or that only the human could unblock: nothing new
     # for the fixer, so check the change again (accepted protected files: the gate again).
     recheck = accept or (reason in ("no_changes", "needs_human") and not comment)
     check = state.get("fix_target", "review")
     note = first_line(comment) if comment else (f"re-run the {check}" if recheck else f"+{EXTRA_FIXES} fixes")
     if accept:
-        note = "accepted the changes to " + ", ".join(pending)
+        note = "accepted " + ", ".join([*pending, *(k.split("\t", 1)[0] + " (suppression)" for k in silenced)])
     history = [*(state.get("fix_history") or []), {"kind": "human", "decision": "continue", "note": note}]
     update: dict[str, Any] = {
         "decision": decision,
@@ -610,13 +641,17 @@ def approve_fix(state: dict, rt: Runtime) -> dict:
         "fix_note": comment,
         "fixer_requests": [],
         "review_questions": [],  # answered (or left to the fixer): never shown again
+        # A comment while something waits for acceptance: the next screen says that it is still waiting.
+        "pending_commented": waiting if waiting and not accept else [],
         STATUS_KEY: "succeeded",
     }
     if accept:
         update["protected_accepted"] = {**(state.get("protected_accepted") or {}), **pending}
+        update["suppressions_accepted"] = [*(state.get("suppressions_accepted") or []), *silenced]
+        accepted = [*pending, *(k.replace("\t", ": ") for k in silenced)]
         update["clarifications"] = [*(state.get("clarifications") or []),
-                                    "The human accepted these changes to protected files (final; do not restore "
-                                    "them): " + ", ".join(pending)]
+                                    "The human accepted these changes the gate rejects (final; do not undo them): "
+                                    + "; ".join(accepted)]
     if comment:
         # Every answer is kept for the rest of the run (spec()), so the next reviewer and fixer
         # see it too and nobody asks the same thing again.

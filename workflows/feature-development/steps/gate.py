@@ -33,6 +33,7 @@ one string; `python` as the first argument means the runner's Python):
 from __future__ import annotations
 
 import json
+import re
 import os
 import shlex
 import shutil
@@ -222,6 +223,64 @@ def _test_settings(name: str, text: str | None) -> Any:
 INVARIANTS = "INVARIANTS.md"
 
 
+TEST_DIRS = {"tests", "test", "__tests__", "spec", "specs"}
+
+
+def is_test_file(path: str) -> bool:
+    """A test, a fixture or test support: what write_tests writes for the gate. Anything else it
+    wrote (a scratch script at the root) is not protected."""
+    *dirs, name = path.split("/")
+    return (any(d in TEST_DIRS for d in dirs) or name.startswith("test_") or name == "conftest.py"
+            or name.endswith(("_test.py", "_test.go")) or ".test." in name or ".spec." in name)
+
+
+# Markers that silence a scanner, a type checker or a test instead of fixing the cause.
+SUPPRESSION = re.compile(
+    r"#\s*nosec\b|#\s*noqa\b|#\s*type:\s*ignore|#\s*pragma:\s*no\s*cover|pytest\.mark\.(?:skip|skipif|xfail)\b"
+    r"|pytest\.(?:skip|xfail)\(|unittest\.skip|eslint-disable|@ts-ignore|@ts-expect-error|istanbul\s+ignore"
+    r"|//\s*nolint|#\[allow\(|gitleaks:allow",
+    re.IGNORECASE,
+)
+
+
+def suppression_key(path: str, line: str) -> str:
+    return f"{path}\t{line.strip()}"
+
+
+def new_suppressions(cwd: Path, tests_base: str, scope: list[str], accepted: list[str] | None = None) -> list[tuple[str, str]]:
+    """(path, line) of every suppression marker implement or fix added since write_tests, except
+    the lines the human accepted at approve_fix (by file and exact text)."""
+    accepted_keys = set(accepted or [])
+    roots = [gate_root([p]) or "." for p in scope]
+    found: list[tuple[str, str]] = []
+    path = ""
+    for line in _git(cwd, "diff", "--no-color", "--unified=0", tests_base, "--", *roots).splitlines():
+        if line.startswith("+++ "):
+            path = line[6:] if line.startswith("+++ b/") else ""
+        elif line.startswith("+") and path and SUPPRESSION.search(line):
+            found.append((path, line[1:]))
+    for new in _git(cwd, "ls-files", "--others", "--exclude-standard", "--", *roots).splitlines():
+        try:
+            text = (cwd / new).read_text()
+        except (OSError, UnicodeDecodeError):
+            continue
+        found += [(new, ln) for ln in text.splitlines() if SUPPRESSION.search(ln)]
+    return [(p, ln) for p, ln in found if suppression_key(p, ln) not in accepted_keys]
+
+
+def _suppressions(cwd: Path, tests_base: str, scope: list[str], accepted: list[str] | None) -> dict[str, Any]:
+    found = new_suppressions(cwd, tests_base, scope, accepted)
+    check = {"name": "suppressions", "kind": "other", "passed": not found}
+    if found:
+        check["findings"] = len(found)
+        check["summary"] = ("added by implement or fix: " + "; ".join(f"{p}: {ln.strip()}" for p, ln in found[:10])
+                            + ". Fix the cause instead of silencing it. If it is a false positive, keep it and write"
+                            " `NEEDS HUMAN: accept the suppression in <path>` with why: only the human can accept it.")
+    else:
+        check["summary"] = "ok"
+    return check
+
+
 def written_by_tests(cwd: Path, base: str, tests_base: str) -> set[str]:
     """Files write_tests changed: read-only for implement and fix."""
     return set(_git(cwd, "diff", "--name-only", "--no-renames", base, tests_base).splitlines()) if tests_base != base else set()
@@ -257,7 +316,7 @@ def protected_changes(cwd: Path, base: str, tests_base: str, cfg: dict[str, Any]
         if name == INVARIANTS and status == "A" and path not in by_tests:
             continue  # a new INVARIANTS.md is the implementer's (the plan can give it one); an existing one is not
         if (
-            path in by_tests
+            (path in by_tests and is_test_file(path))
             or (in_dirs and status != "A")
             or path in cfg["protected_files"]
             or name in cfg["protected_names"]
@@ -360,12 +419,15 @@ def settings(cwd: Path, base: str, overrides: dict[str, Any] | None = None) -> d
 
 
 def run_gate(cwd: Path, base: str, overrides: dict[str, Any] | None = None,
-             tests_base: str | None = None, accepted: dict[str, str] | None = None) -> dict[str, Any]:
+             tests_base: str | None = None, accepted: dict[str, str] | None = None,
+             accepted_suppressions: list[str] | None = None) -> dict[str, Any]:
     """`tests_base` is the commit of write_tests; without one, the run's base commit.
-    `accepted`: protected files the human accepted at approve_fix, path → content_id()."""
+    `accepted`: protected files the human accepted at approve_fix, path → content_id();
+    `accepted_suppressions`: suppression lines the human accepted, suppression_key()."""
     cfg = settings(cwd, base, overrides)
     files = changed_files(cwd, base)
-    checks = [_scope(files, cfg["scope"]), _protected(cwd, base, tests_base or base, cfg, accepted)]
+    checks = [_scope(files, cfg["scope"]), _protected(cwd, base, tests_base or base, cfg, accepted),
+              _suppressions(cwd, tests_base or base, cfg["scope"], accepted_suppressions)]
     for cmd in _commands(cfg.get("setup")):
         checks.append(_command("setup", "other", cmd, cwd, cfg))
     tests = _commands(cfg.get("tests"))

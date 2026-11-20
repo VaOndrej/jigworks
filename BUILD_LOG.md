@@ -31,8 +31,8 @@ Time is tracked in two columns: **human** (my own time: deciding, directing, rev
 | Demo application review, case-study reply, time reconciliation | 28 min | — |
 | Hub analytics: resumed runs, missing prices (T24) | 2 min | ~25 min |
 | Blocked fixer, gate deadlocks, usage of resumed sessions (T25) | 5 min | ~1 h 10 min |
-| Fix rounds that end, answers that stick, upgrading a waiting run (T26) | 3 min | ~1 h 15 min |
-| **Total** | **5 h 40 min** | **~17 h 35 min** |
+| Fix rounds that end, answers that stick, upgrading a waiting run (T26) | 6 min | ~1 h 45 min |
+| **Total** | **5 h 43 min** | **~18 h 05 min** |
 
 ## Entries
 
@@ -533,7 +533,7 @@ Two Claude Code sessions (Opus 5.5) in their own worktrees, pushing to `feature/
 - The rule first treated two equal records as a running total that did not grow, which zeroed a contract fixture's repeated calls; a running total must grow in output.
 - New 1.7.0 behaviour broke the existing fake fixers that changed nothing; they now touch a file each round.
 
-### 2026-11-20 — Fix rounds that end, answers that stick, upgrading a waiting run (T26) (human 3 min, agent ~1 h 15 min)
+### 2026-11-20 — Fix rounds that end, answers that stick, upgrading a waiting run (T26) (human 6 min, agent ~1 h 45 min)
 
 **What I did**
 - Noticed the demo run (1.7.0) cycling through review fixes and asking questions I had already answered; asked for a diagnosis, then to fix everything and give me a way to continue the same run without building the app again.
@@ -551,4 +551,6 @@ Two Claude Code sessions (Opus 5.5) in their own worktrees, pushing to `feature/
 - T25's "a fix that changed nothing goes to the human" had no way back to the check: after the human's answer, changing nothing is the correct fix, so the run looped until Reject.
 - The first rehearsal on the real run's state got out of the loop and straight into the next dead end: the gate rejected the test change the human had approved (option b) and only offered "reject the run and start again". Added acceptance of protected files at approve_fix, pinned to their content.
 - Answers given to the fixer were consumed by one fix and never reached the reviewer; every answer is now part of the run's agreements.
+- After I upgraded the live run, the agent read its new events and found five more gaps (a `# nosec` the gate let through, no `git rm`, no scanners for the agents, protected scratch files, repo rules outside the scope); I asked to add all five to 1.8.0.
+- At the new protected-files screen I typed "I agree" instead of pressing Approve; the fixer then claimed the files were accepted and the run stopped again. The screen and the fixer prompt now say that only Approve accepts.
 
