@@ -342,7 +342,7 @@ def test_progress_weights_from_history_of_the_same_digest():
 def test_cli_graph_prints_graph_json(env):
     out = jw(env, "graph", str(WORKFLOW))
     graph = json.loads(out.stdout)
-    assert contracts.validate("GraphJSON", graph) == [] and graph["release"] == "feature-development@1.7.0"
+    assert contracts.validate("GraphJSON", graph) == [] and graph["release"] == "feature-development@1.8.0"
 
 
 def test_runner_home_ignores_run_state_but_not_the_gate_config(tmp_path):
@@ -408,3 +408,68 @@ def test_cli_continue_a_run_that_failed_at_the_fix_loop_limit(env, workflow_1_6_
     assert shown["status"] == "waiting_human"
     assert jw(env, "approve", "run_lim").returncode == 0
     assert json.loads(jw(env, "show", "run_lim").stdout)["status"] == "succeeded"
+
+
+# --- upgrade a stopped run to a newer release ---------------------------------------------------
+
+RELEASE_1_7_0 = "3682bd6"  # main with feature-development 1.7.0: approve_fix ⇄ fix loops on a no-change fix
+
+
+@pytest.fixture
+def workflow_1_7_0(tmp_path: Path) -> Path:
+    root = Path(__file__).resolve().parents[2]
+    out = tmp_path / "wf-1.7.0"
+    out.mkdir()
+    try:
+        archive = subprocess.run(["git", "archive", f"{RELEASE_1_7_0}:workflows/feature-development"], cwd=root,
+                                 capture_output=True, check=True).stdout
+    except subprocess.CalledProcessError:
+        pytest.skip(f"commit {RELEASE_1_7_0} not in this clone")
+    subprocess.run(["tar", "-x", "-C", str(out)], input=archive, check=True)
+    assert 'version = "1.7.0"' in (out / "workflow.toml").read_text()
+    return out
+
+
+def test_cli_upgrade_a_run_stuck_in_the_fix_loop_keeps_its_state(env, workflow_1_7_0):
+    """run_20261120161021_60bbf3: on 1.7.0 a fix that changed nothing after the human's answer
+    went back to approve_fix forever. Upgrading the waiting run to the current release lets the
+    same answer go on to review, without re-running anything before it."""
+    steps = script(env["tmp"],
+                   review=[{"text": "- F1 notes.py:1 scratch file left in\nVERDICT: FAIL"},
+                           {"text": "- F1 ACCEPTED: the human keeps it\nVERDICT: PASS"}],
+                   fix=[{"text": "Nothing to change."}])
+    jw(env, "run", "--workflow", str(workflow_1_7_0), "--repo", str(env["repo"] / "sample-repo"), "--prompt",
+       "Add describe(order)", "--adapter", "fake", "--fake-script", str(steps), "--run-id", "run_up",
+       "--home", str(env["home"]), "--pr-remote", str(env["remote"]))
+    jw(env, "approve", "run_up")  # plan → … → review FAIL → fix (no change) → approve_fix
+    jw(env, "request-changes", "run_up", "--comment", "Keep the scratch file.")
+    assert node_events(log(env, "run_up"), "approve_fix")[-1] == ("waiting_human", 2), "1.7.0 loops"
+    reviews_before = len(node_events(log(env, "run_up"), "review"))
+
+    up = jw(env, "upgrade", "run_up", "--workflow", str(WORKFLOW))
+    current = tomllib.loads((WORKFLOW / "workflow.toml").read_text())["version"]
+    assert f"feature-development@1.7.0 → feature-development@{current}" in up.stderr
+    meta = json.loads((env["home"] / "runs" / "run_up" / "run.json").read_text())
+    assert meta["release"] == f"feature-development@{current}" and meta["upgrades"][0]["from"] == "feature-development@1.7.0"
+
+    out = jw(env, "request-changes", "run_up", "--comment", "Keep the scratch file.")
+    events = log(env, "run_up")
+    check_log(events)
+    assert len(node_events(events, "review")) > reviews_before, "the answer led to a review"
+    assert [e for e in events if e["kind"] == "interrupt"][-1]["node"] == "approve_pr", out.stderr
+    assert node_events(events, "plan") == [("running", 1), ("succeeded", 1)], "nothing before the fix ran again"
+    assert node_events(events, "implement") == [("running", 1), ("succeeded", 1)]
+    assert jw(env, "approve", "run_up").returncode == 0
+    assert json.loads(jw(env, "show", "run_up").stdout)["status"] == "succeeded"
+
+
+def test_cli_upgrade_refuses_another_workflow(env, tmp_path):
+    jw(env, "run", "--workflow", str(WORKFLOW), "--repo", str(env["repo"] / "sample-repo"), "--prompt",
+       "Add describe(order)", "--adapter", "fake", "--fake-script", str(script(env["tmp"])), "--run-id", "run_other",
+       "--home", str(env["home"]), "--pr-remote", str(env["remote"]))
+    other = tmp_path / "other"
+    shutil.copytree(WORKFLOW, other, ignore=shutil.ignore_patterns("__pycache__", "tests", "evals"))
+    toml = other / "workflow.toml"
+    toml.write_text(toml.read_text().replace('name = "feature-development"', 'name = "something-else"', 1))
+    proc = jw(env, "upgrade", "run_other", "--workflow", str(other), check=False)
+    assert proc.returncode == 2 and "is not a release of feature-development" in proc.stderr
