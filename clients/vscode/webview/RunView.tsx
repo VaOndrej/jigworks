@@ -3,6 +3,7 @@ import type { PriceEntry } from "@jigworks/contracts";
 import prices from "../../../packages/contracts/fixtures/prices.json";
 import type { HostState } from "../src/shared/messages";
 import { apiCost, formatTokens } from "../src/shared/cost";
+import { fixButtons } from "../src/shared/fixButtons";
 import { ago, elapsed, livenessState, recentActions, stepCounters, stepGerund, type Liveness } from "../src/shared/activity";
 import { modelFor, nodeDone, type SessionView } from "../src/shared/session";
 import { Graph } from "./Graph";
@@ -151,6 +152,7 @@ function GateCard({ s, i }: { s: SessionView; i: NonNullable<SessionView["interr
     if (hasText) decide("request_changes");
   };
   const fixes = i.node === "approve_fix";
+  const fb = fixButtons(i);
   const stage = i.node === "approve_brainstorm" ? "BRAINSTORMING" : fixes ? "FIXES" : i.stage === "plan" ? "PLAN" : "BEFORE THE PR";
   return (
     <section className="card next waiting" aria-label="Next for you" data-gate={`${i.node}#${i.seq}`}>
@@ -186,17 +188,17 @@ function GateCard({ s, i }: { s: SessionView; i: NonNullable<SessionView["interr
         onKeyDown={onKeyDown}
       />
       <div className="actions">
-        <button type="button" className={hasText ? "btn approve" : "btn approve primary"} disabled={!!sent || hasText} onClick={() => decide("approve")}>{fixes ? "Continue fixing" : "Approve"}</button>
-        <button type="button" className={hasText ? "btn changes primary" : "btn changes"} disabled={!!sent || !hasText} onClick={() => decide("request_changes")}>{fixes ? "Continue with my note" : "Request changes"}</button>
-        <button type="button" className="btn reject" disabled={!!sent} onClick={() => decide("reject")}>{fixes ? "Stop the run" : "Reject"}</button>
+        <button type="button" className={hasText ? "btn approve" : "btn approve primary"} disabled={!!sent || hasText} onClick={() => decide("approve")}>{fixes ? fb.approve : "Approve"}</button>
+        <button type="button" className={hasText ? "btn changes primary" : "btn changes"} disabled={!!sent || !hasText} onClick={() => decide("request_changes")}>{fixes ? fb.note : "Request changes"}</button>
+        <button type="button" className="btn reject" disabled={!!sent} onClick={() => decide("reject")}>{fixes ? fb.stop : "Reject"}</button>
       </div>
       <div className="gate-hint small" aria-live="polite">
         {sent
           ? "Sent. Waiting for the runner…"
           : fixes
             ? hasText
-              ? "Enter sends your note to the fixer and continues · clear the text to continue without one"
-              : "Continue as it is, or type a hint or your answers and press Enter"
+              ? fb.noteHint
+              : fb.idleHint
             : hasText
               ? "Enter sends your text as Request changes · clear the text to approve"
               : "Type an answer and press Enter to request changes, or Approve as it is"}

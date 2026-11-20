@@ -385,7 +385,7 @@ def test_approve_after_a_fix_that_changed_nothing_rechecks_without_another_fix(r
     run.start("Add describe(order)")
     out = run.decide("approve", APPROVER)
     assert out.interrupt["node"] == "approve_fix"
-    assert "Approve to re-run the independent review" in out.interrupt["message"]
+    assert "Re-run the check) to re-run the independent review" in out.interrupt["message"]
     out = run.decide("approve", APPROVER)
     assert out.interrupt["node"] == "approve_pr"
     assert [c.node for c in agent.calls].count("fix") == 1, "Approve re-runs the review, not the fixer"
@@ -815,7 +815,7 @@ def test_the_human_can_accept_a_change_to_a_protected_test(repo):
     report = out.interrupt["plan"]
     assert "## Changes to protected files" in report and "sample-repo/tests/test_notes.py" in report
     assert "# ruled by the human" in report, "the human sees the diff they accept"
-    assert "Approve accepts" in out.interrupt["message"]
+    assert "Accept these changes**) accepts exactly these" in out.interrupt["message"]
     out = run.decide("approve", APPROVER)
     assert out.interrupt["node"] == "approve_pr", "the accepted change passes the gate"
     gates = [e["gateResult"] for e in events(run) if e["kind"] == "gate_result"]

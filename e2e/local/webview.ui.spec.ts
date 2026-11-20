@@ -257,3 +257,21 @@ test("approve_fix (1.7.0): the reviewer's question and the rounds, Continue / no
   await expect(p.getByRole("button", { name: "Continue with my note" })).toBeEnabled();
   await p.screenshot({ path: path.join(shots, "vscode-approve-fix-question-1440.png"), fullPage: true });
 });
+
+test("approve_fix (1.8.0): protected test change waiting for the human, the button says Accept these changes", async ({ page: p }) => {
+  await open(p, "screen=session&run=run_md_0007&runs=run_md_0006,run_md_0007");
+  await expect(p.getByText("YOUR DECISION · FIXES")).toBeVisible();
+  await expect(p.getByRole("heading", { name: "Changes to protected files" })).toBeVisible();
+  await expect(p.getByText("# ruled by the human: a new order shows (new)").first()).toBeVisible();
+  const accept = p.getByRole("button", { name: "Accept these changes" });
+  await expect(accept).toBeEnabled();
+  await expect(p.getByRole("button", { name: "Continue fixing" })).toHaveCount(0);
+  await expect(p.getByText("a note does not accept them")).toBeVisible();
+  await expect(p.getByText("Re-run the check")).toHaveCount(0);
+  await accept.scrollIntoViewIfNeeded();
+  await p.screenshot({ path: path.join(shots, "vscode-approve-fix-protected-1440.png"), fullPage: true });
+  await p.getByLabel("Comment for the agent").fill("I agree with the change.");
+  await expect(p.getByRole("button", { name: "Send my note to the fixer" })).toBeEnabled();
+  await expect(accept).toBeDisabled();
+  await expect(p.getByText("it does not accept the changes")).toBeVisible();
+});

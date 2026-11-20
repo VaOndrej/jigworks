@@ -1,0 +1,270 @@
+{
+  "nodes": [
+    {
+      "id": "__start__",
+      "kind": "start"
+    },
+    {
+      "id": "triage",
+      "kind": "step",
+      "label": "triage",
+      "weight": 1.0
+    },
+    {
+      "id": "brainstorm",
+      "kind": "step",
+      "label": "brainstorm",
+      "weight": 0.0
+    },
+    {
+      "id": "approve_brainstorm",
+      "kind": "interrupt",
+      "label": "approve brainstorm",
+      "weight": 0.0
+    },
+    {
+      "id": "plan",
+      "kind": "step",
+      "label": "plan",
+      "weight": 10.0
+    },
+    {
+      "id": "approve_plan",
+      "kind": "interrupt",
+      "label": "approve plan",
+      "weight": 2.0
+    },
+    {
+      "id": "write_tests",
+      "kind": "step",
+      "label": "write tests",
+      "weight": 15.0
+    },
+    {
+      "id": "implement",
+      "kind": "step",
+      "label": "implement",
+      "weight": 30.0
+    },
+    {
+      "id": "review",
+      "kind": "step",
+      "label": "review",
+      "weight": 10.0
+    },
+    {
+      "id": "fix",
+      "kind": "step",
+      "label": "fix",
+      "weight": 0.0
+    },
+    {
+      "id": "gate",
+      "kind": "step",
+      "label": "gate",
+      "weight": 10.0
+    },
+    {
+      "id": "approve_fix",
+      "kind": "interrupt",
+      "label": "approve fix",
+      "weight": 0.0
+    },
+    {
+      "id": "approve_pr",
+      "kind": "interrupt",
+      "label": "approve pr",
+      "weight": 3.0
+    },
+    {
+      "id": "open_pr",
+      "kind": "step",
+      "label": "open pr",
+      "weight": 5.0
+    },
+    {
+      "id": "summary",
+      "kind": "step",
+      "label": "summary",
+      "weight": 5.0
+    },
+    {
+      "id": "__end__",
+      "kind": "end"
+    }
+  ],
+  "edges": [
+    {
+      "source": "__start__",
+      "target": "triage",
+      "conditional": false
+    },
+    {
+      "source": "approve_brainstorm",
+      "target": "__end__",
+      "conditional": true
+    },
+    {
+      "source": "approve_brainstorm",
+      "target": "brainstorm",
+      "conditional": true
+    },
+    {
+      "source": "approve_brainstorm",
+      "target": "plan",
+      "conditional": true
+    },
+    {
+      "source": "approve_fix",
+      "target": "__end__",
+      "conditional": true
+    },
+    {
+      "source": "approve_fix",
+      "target": "fix",
+      "conditional": true
+    },
+    {
+      "source": "approve_fix",
+      "target": "gate",
+      "conditional": true
+    },
+    {
+      "source": "approve_fix",
+      "target": "review",
+      "conditional": true
+    },
+    {
+      "source": "approve_plan",
+      "target": "__end__",
+      "conditional": true
+    },
+    {
+      "source": "approve_plan",
+      "target": "plan",
+      "conditional": true
+    },
+    {
+      "source": "approve_plan",
+      "target": "write_tests",
+      "conditional": true
+    },
+    {
+      "source": "approve_pr",
+      "target": "__end__",
+      "conditional": true
+    },
+    {
+      "source": "approve_pr",
+      "target": "fix",
+      "conditional": true
+    },
+    {
+      "source": "approve_pr",
+      "target": "open_pr",
+      "conditional": true
+    },
+    {
+      "source": "brainstorm",
+      "target": "__end__",
+      "conditional": true
+    },
+    {
+      "source": "brainstorm",
+      "target": "approve_brainstorm",
+      "conditional": true
+    },
+    {
+      "source": "fix",
+      "target": "__end__",
+      "conditional": true
+    },
+    {
+      "source": "fix",
+      "target": "approve_fix",
+      "conditional": true
+    },
+    {
+      "source": "fix",
+      "target": "gate",
+      "conditional": true
+    },
+    {
+      "source": "fix",
+      "target": "review",
+      "conditional": true
+    },
+    {
+      "source": "gate",
+      "target": "approve_fix",
+      "conditional": true
+    },
+    {
+      "source": "gate",
+      "target": "approve_pr",
+      "conditional": true
+    },
+    {
+      "source": "gate",
+      "target": "fix",
+      "conditional": true
+    },
+    {
+      "source": "implement",
+      "target": "review",
+      "conditional": false
+    },
+    {
+      "source": "open_pr",
+      "target": "summary",
+      "conditional": false
+    },
+    {
+      "source": "plan",
+      "target": "__end__",
+      "conditional": true
+    },
+    {
+      "source": "plan",
+      "target": "approve_plan",
+      "conditional": true
+    },
+    {
+      "source": "review",
+      "target": "approve_fix",
+      "conditional": true
+    },
+    {
+      "source": "review",
+      "target": "fix",
+      "conditional": true
+    },
+    {
+      "source": "review",
+      "target": "gate",
+      "conditional": true
+    },
+    {
+      "source": "triage",
+      "target": "brainstorm",
+      "conditional": true
+    },
+    {
+      "source": "triage",
+      "target": "plan",
+      "conditional": true
+    },
+    {
+      "source": "write_tests",
+      "target": "implement",
+      "conditional": false
+    },
+    {
+      "source": "summary",
+      "target": "__end__",
+      "conditional": false
+    }
+  ],
+  "workflowId": "feature-development",
+  "release": "feature-development@1.8.0"
+}

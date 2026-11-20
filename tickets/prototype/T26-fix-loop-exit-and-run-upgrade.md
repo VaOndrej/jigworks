@@ -43,6 +43,7 @@ nothing re-checked the fixes. The human kept answering questions they had alread
 - [x] Only test files written by write_tests are protected (`tests/`, `test_*`, `*_test.*`, `*.test.*`, `*.spec.*`, conftest); its scratch scripts are not. No scratch files in the repo (write_tests, implement, fix prompts).
 - [x] A repo rule that needs a change outside the scope is a note for the human, not a finding or a QUESTION (review, re-review, fix prompts).
 - [x] A comment at approve_fix does not accept protected files or suppressions; the screen says so, says it again on the next round, and the fixer may not claim they were accepted.
+- [x] Extension: at approve_fix the Approve button is named after what it does: "Accept these changes" when protected files or suppressions wait for the human, "Re-run the check" after a no-change or blocked fix, else "Continue fixing" (`src/shared/fixButtons.ts`, read from the workflow's text). The real run stopped because the human read "Continue fixing" as "more fixes" and typed "I agree" instead.
 - [x] Rehearsed on a copy of the real run (cloned worktree, fake agent): upgrade → Approve → review → gate; protected test accepted, gate left with only bandit B608.
 - [ ] The real run upgraded and continued (human).
 - [ ] Published to the hub as 1.8.0 (human).
@@ -76,6 +77,10 @@ test_a_new_suppression_marker_needs_the_human                          TypeError
 test_fixers_may_delete_files_and_run_the_gate_scanners                 missing 'Bash(git rm:*)', 'Bash(bandit:*)', 'Bash(gitleaks:*)'
 test_scratch_files_of_the_test_writer_are_not_protected                'waiting_human' == 'succeeded'
 test_agents_are_told_how_to_treat_scratch_files_and_rules_outside_the_scope   'scratch' not in the write_tests prompt
+
+# extension (button labels), red first: units.test.ts  error TS2307: Cannot find module '../../shared/fixButtons'
+$ pnpm --filter vscode test:unit     # 26 passing
+$ pnpm --filter vscode test:ui       # 16 passed, screenshot e2e/local/screenshots/vscode-approve-fix-protected-1440.png
 
 $ uv run pytest workflows runner -q -p no:cacheprovider
 127 passed, 1 skipped, 17 warnings in 364.81s (0:06:04)

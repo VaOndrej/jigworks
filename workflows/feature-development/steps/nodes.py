@@ -257,7 +257,7 @@ CHECK_NAMES = {"review": "independent review", "gate": "gate"}
 WHY = {
     "questions": "The reviewer has questions only you can answer. Answer them in the comment field.",
     "needs_human": "The fixer is blocked on something only you can do (see below). Do it and say what you did, "
-                   "or Approve to re-run the check as it is.",
+                   "or Approve (in VS Code: Re-run the check) to check the change as it is.",
     "no_changes": "The last fix changed nothing and nobody had answered since the last check; another fix "
                   "round would cost tokens without progress.",
     "stalled": f"The last {STALL_ROUNDS} fixes did not lower the number of open problems.",
@@ -271,14 +271,20 @@ def fix_report(state: dict, protected: str = "", suppressions: str = "", comment
     `suppressions`: what the gate rejects and only Approve accepts."""
     history = state.get("fix_history") or []
     reason = state.get("escalation", "")
-    parts = [f"**Why you are asked:** {WHY.get(reason, reason)}"]
+    why = WHY.get(reason, reason)
+    if protected or suppressions:
+        why = "The gate rejects changes that only you can accept (see below); nothing else is open for the fixer."
+        if reason in ("questions", "stalled", "limit"):
+            why += " " + WHY[reason]
+    parts = [f"**Why you are asked:** {why}"]
     if commented_before:
         parts.append("**You answered with a comment last time.** A comment does not accept the changes below, so "
-                     "the gate rejected them again. Press **Approve** (no comment) to accept them.")
+                     "the gate rejected them again. Press **Approve** (in VS Code: **Accept these changes**, with "
+                     "the comment field empty) to accept them.")
     if protected:
         parts.append("## Changes to protected files\n\nThe gate rejects these changes to files the agents may not "
                      "touch (tests from write_tests, test configuration, INVARIANTS.md). **Approve accepts exactly "
-                     "this content** and re-runs the gate; any later edit of these files fails it again. To have "
+                     "this content** (in VS Code: Accept these changes) and re-runs the gate; any later edit of these files fails it again. To have "
                      "them restored instead, say so in the comment.\n\n" + protected)
     if suppressions:
         parts.append("## New suppressions\n\nimplement or fix silenced a scanner, a type check or a test instead of "
@@ -599,9 +605,9 @@ def approve_fix(state: dict, rt: Runtime) -> dict:
         "limit": f"{loops} fixes so far: the cap is reached. Approve to continue ({EXTRA_FIXES} more fixes), "
                  "type a hint for the fixer and press Enter, or Reject to stop the run.",
         "needs_human": "The fixer is blocked on something only you can do. Do it, then type what you did and "
-                       "press Enter (the fixer reads it first), Approve to re-run the "
+                       "press Enter (the fixer reads it first), Approve (in VS Code: Re-run the check) to re-run the "
                        f"{CHECK_NAMES.get(state.get('fix_target', 'review'), 'check')} as it is, or Reject to stop the run.",
-        "no_changes": f"The last fix changed nothing. Approve to re-run the {CHECK_NAMES.get(state.get('fix_target', 'review'), 'check')} "
+        "no_changes": f"The last fix changed nothing. Approve (in VS Code: Re-run the check) to re-run the {CHECK_NAMES.get(state.get('fix_target', 'review'), 'check')} "
                       "on the current change, type a hint for the fixer and press Enter, or Reject to stop the run.",
     }.get(reason, "Approve to continue fixing, type a hint and press Enter, or Reject to stop.")
     pending, protected = protected_pending(state, rt)
@@ -609,8 +615,9 @@ def approve_fix(state: dict, rt: Runtime) -> dict:
     waiting = sorted([*pending, *silenced])
     if waiting:
         message = ("The gate rejects changes only you can accept (protected files or new suppressions, see the "
-                   "report). Approve accepts exactly these and re-runs the gate. A comment does not accept them: it "
-                   "goes to the fixer (e.g. restore them, fix the cause). Reject stops the run.")
+                   "report). Approve (in VS Code: **Accept these changes**) accepts exactly these and re-runs the "
+                   "gate. A comment does not accept them: it goes to the fixer (e.g. restore them, fix the cause). "
+                   "Reject stops the run.")
     commented_before = bool(waiting) and state.get("pending_commented") == waiting
     answer = rt.ask_human("approve_fix", "plan", message,
                           plan=fix_report(state, protected, suppressions, commented_before))
