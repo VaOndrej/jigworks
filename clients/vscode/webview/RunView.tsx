@@ -150,7 +150,8 @@ function GateCard({ s, i }: { s: SessionView; i: NonNullable<SessionView["interr
     e.preventDefault();
     if (hasText) decide("request_changes");
   };
-  const stage = i.node === "approve_brainstorm" ? "BRAINSTORMING" : i.stage === "plan" ? "PLAN" : "BEFORE THE PR";
+  const fixes = i.node === "approve_fix";
+  const stage = i.node === "approve_brainstorm" ? "BRAINSTORMING" : fixes ? "FIXES" : i.stage === "plan" ? "PLAN" : "BEFORE THE PR";
   return (
     <section className="card next waiting" aria-label="Next for you" data-gate={`${i.node}#${i.seq}`}>
       <div className="eyebrow amber">YOUR DECISION · {stage}</div>
@@ -185,17 +186,101 @@ function GateCard({ s, i }: { s: SessionView; i: NonNullable<SessionView["interr
         onKeyDown={onKeyDown}
       />
       <div className="actions">
-        <button type="button" className={hasText ? "btn approve" : "btn approve primary"} disabled={!!sent || hasText} onClick={() => decide("approve")}>Approve</button>
-        <button type="button" className={hasText ? "btn changes primary" : "btn changes"} disabled={!!sent || !hasText} onClick={() => decide("request_changes")}>Request changes</button>
-        <button type="button" className="btn reject" disabled={!!sent} onClick={() => decide("reject")}>Reject</button>
+        <button type="button" className={hasText ? "btn approve" : "btn approve primary"} disabled={!!sent || hasText} onClick={() => decide("approve")}>{fixes ? "Continue fixing" : "Approve"}</button>
+        <button type="button" className={hasText ? "btn changes primary" : "btn changes"} disabled={!!sent || !hasText} onClick={() => decide("request_changes")}>{fixes ? "Continue with my note" : "Request changes"}</button>
+        <button type="button" className="btn reject" disabled={!!sent} onClick={() => decide("reject")}>{fixes ? "Stop the run" : "Reject"}</button>
       </div>
       <div className="gate-hint small" aria-live="polite">
         {sent
           ? "Sent. Waiting for the runner…"
-          : hasText
-            ? "Enter sends your text as Request changes · clear the text to approve"
-            : "Type an answer and press Enter to request changes, or Approve as it is"}
+          : fixes
+            ? hasText
+              ? "Enter sends your note to the fixer and continues · clear the text to continue without one"
+              : "Continue as it is, or type a hint or your answers and press Enter"
+            : hasText
+              ? "Enter sends your text as Request changes · clear the text to approve"
+              : "Type an answer and press Enter to request changes, or Approve as it is"}
       </div>
+      <Usage s={s} />
+    </section>
+  );
+}
+
+/** Every review, gate and fix round after the implementation, oldest first, with the trend of
+ *  open problems: the human sees whether the loop is getting anywhere. */
+function FixRounds({ s }: { s: SessionView }) {
+  if (!s.fixRounds.length) return null;
+  const trend = (node: "review" | "gate") =>
+    s.fixRounds.filter((r) => r.node === node && r.open !== undefined).map((r) => r.open).join(" → ");
+  const reviews = trend("review");
+  const gates = trend("gate");
+  return (
+    <div className="fix-rounds small" aria-label="Fix rounds">
+      <div className="md-table">
+        <table>
+          <thead><tr><th>Time</th><th>Step</th><th>Result</th><th>What happened</th></tr></thead>
+          <tbody>
+            {s.fixRounds.map((r) => (
+              <tr key={`${r.node}#${r.attempt}#${r.at}`}>
+                <td className="mono dim">{r.at.slice(11, 16)}</td>
+                <td>{r.node} #{r.attempt}</td>
+                <td className={r.status === "succeeded" ? "green" : "red"}>
+                  {r.node === "fix" ? (r.changedFiles !== undefined ? `${r.changedFiles} file${r.changedFiles === 1 ? "" : "s"}` : "done") : r.status === "succeeded" ? "PASS" : `FAIL · ${r.open ?? "?"} open`}
+                </td>
+                <td>{r.text ?? ""}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {reviews.includes("→") && <div className="muted">Open review findings: <b>{reviews}</b></div>}
+      {gates.includes("→") && <div className="muted">Failed gate checks: <b>{gates}</b></div>}
+    </div>
+  );
+}
+
+const FIX_LIMIT = "fix loop limit reached";
+const MORE_FIXES = 3;
+
+/** A run of a release before 1.7.0 that ended at the fix loop limit: show the rounds and let the
+ *  human continue it from its checkpoint with more fixes (and a hint for the fixer). */
+function FixLimitCard({ s }: { s: SessionView }) {
+  const [note, setNote] = useState("");
+  const [sent, setSent] = useState(false);
+  const go = () => {
+    if (sent) return;
+    host().postMessage({ type: "resume", runId: s.runId, moreFixes: MORE_FIXES, comment: note.trim() || undefined });
+    setSent(true);
+  };
+  return (
+    <section className="card next waiting" aria-label="Next for you" data-gate="fix-limit">
+      <div className="eyebrow amber">YOUR DECISION · FIX LIMIT</div>
+      <div>The fixes ran out {s.error?.message.replace(/^fix loop limit reached\s*/, "")}. The run keeps its checkpoint and worktree: continue it with {MORE_FIXES} more fixes, optionally with a hint for the fixer.</div>
+      <FixRounds s={s} />
+      <div className="links small">
+        <button type="button" className="link" onClick={() => host().postMessage({ type: "openDiff", runId: s.runId })}>Diff (worktree)</button>
+        <button type="button" className="link" onClick={() => host().postMessage({ type: "openAudit", runId: s.runId })}>Audit log</button>
+      </div>
+      <label htmlFor={`fl-${s.runId}`} className="sr-only">Hint for the fixer</label>
+      <textarea
+        id={`fl-${s.runId}`}
+        className="comment"
+        placeholder="Optional hint for the fixer · Enter to continue, Shift+Enter for a new line"
+        value={note}
+        disabled={sent}
+        onChange={(e) => setNote(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key !== "Enter" || e.shiftKey || e.nativeEvent.isComposing) return;
+          e.preventDefault();
+          go();
+        }}
+      />
+      <div className="actions">
+        <button type="button" className="btn approve primary" disabled={sent} onClick={go}>
+          Continue fixing (+{MORE_FIXES}){note.trim() ? " with my note" : ""}
+        </button>
+      </div>
+      <div className="gate-hint small" aria-live="polite">{sent ? "Sent. Waiting for the runner…" : "Stopping needs nothing: the run stays failed."}</div>
       <Usage s={s} />
     </section>
   );
@@ -212,7 +297,8 @@ function nextGate(s: SessionView, interruptNodes: string[], weights: Record<stri
 }
 
 function gateName(node: string): string {
-  return node === "approve_plan" ? "Approve the plan" : node === "approve_brainstorm" ? "Answer the brainstorming questions" : "Review before the PR";
+  return node === "approve_plan" ? "Approve the plan" : node === "approve_brainstorm" ? "Answer the brainstorming questions"
+    : node === "approve_fix" ? "Decide on the fixes" : "Review before the PR";
 }
 
 function LiveLine({ s, live, now }: { s: SessionView; live: Liveness; now: number }) {
@@ -280,6 +366,7 @@ function NextForYou({ s, interruptNodes, weights, now, live }: { s: SessionView;
     const i = s.interrupt;
     return <GateCard key={`${i.node}#${i.seq}`} s={s} i={i} />;
   }
+  if (s.status === "failed" && s.error?.message.startsWith(FIX_LIMIT)) return <FixLimitCard s={s} />;
   if (s.status === "running" && s.currentNode) return <NowCard s={s} interruptNodes={interruptNodes} weights={weights} now={now} live={live} />;
 
   const next = nextGate(s, interruptNodes, weights);

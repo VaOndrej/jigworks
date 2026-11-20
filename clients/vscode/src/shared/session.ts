@@ -43,6 +43,19 @@ export interface ActivityLine {
   tone: "ok" | "fail" | "human" | "info";
 }
 
+/** One review, gate or fix attempt after the implementation: what the human reads to see whether
+ *  the fix loop is getting anywhere. `open` = open findings (review) or failed checks (gate). */
+export interface FixRound {
+  node: "review" | "gate" | "fix";
+  attempt: number;
+  status: string;
+  at: string;
+  open?: number;
+  /** review: first open finding; gate: failed checks; fix: the fixer's first line. */
+  text?: string;
+  changedFiles?: number;
+}
+
 export interface SessionView {
   runId: string;
   title: string;
@@ -76,6 +89,9 @@ export interface SessionView {
   /** Time of the latest agent_output / usage event (the agent's last sign of life). */
   lastActivityAt?: string;
   authorEmail?: string;
+  fixRounds: FixRound[];
+  /** Last agent text per `node#attempt` (review and fix only), to summarise the round. */
+  lastText: Record<string, string>;
   lastSeq: number;
 }
 
@@ -102,8 +118,54 @@ export function emptySession(runId: string): SessionView {
     usageRecords: [],
     output: [],
     activity: [],
+    fixRounds: [],
+    lastText: {},
     lastSeq: -1,
   };
+}
+
+const FINDING = /^\s*[-*]?\s*\**\[?F(\d+)\]?\**[:.)]?\s+(.*)$/;
+const BULLET = /^\s*[-*]\s+\S/;
+
+/** Open findings in a review reply: lines with an ID (`- F3 ...`) not marked FIXED, otherwise the
+ *  bullet lines; at least one when the verdict is FAIL. Mirrors the workflow's own count. */
+export function reviewOpen(text: string, passed: boolean): { open: number; first?: string } {
+  if (passed) return { open: 0 };
+  const ids = new Map<string, string | undefined>();
+  let bullets = 0;
+  let firstBullet: string | undefined;
+  for (const line of text.split("\n")) {
+    const m = FINDING.exec(line);
+    if (m) ids.set(m[1], m[2].replace(/^[\s\-—–:*]+/, "").toUpperCase().startsWith("FIXED") ? undefined : line.trim().replace(/^[-*]\s*/, ""));
+    else if (BULLET.test(line)) {
+      bullets += 1;
+      firstBullet ??= line.trim().replace(/^[-*]\s*/, "");
+    }
+  }
+  if (ids.size) {
+    const open = [...ids.values()].filter((v) => v !== undefined) as string[];
+    return { open: Math.max(open.length, 1), first: open[0] };
+  }
+  return { open: Math.max(bullets, 1), first: firstBullet };
+}
+
+function firstLine(text: string, max = 110): string {
+  const line = text.split("\n").map((l) => l.trim().replace(/^[#*\-\s]+/, "")).find((l) => l) ?? "";
+  return line.length > max ? `${line.slice(0, max - 1)}…` : line;
+}
+
+/** ` · 2 open (was 3) · F2 ...` for the activity line of a review, gate or fix round. */
+function roundDetail(r: FixRound, before?: FixRound): string {
+  const parts: string[] = [];
+  if (r.node === "fix") {
+    if (r.text) parts.push(r.text);
+    if (r.changedFiles !== undefined) parts.push(`${r.changedFiles} file${r.changedFiles === 1 ? "" : "s"} changed`);
+  } else if (r.status === "failed" && r.open !== undefined) {
+    const unit = r.node === "review" ? "open finding" : "failed check";
+    parts.push(`${r.open} ${unit}${r.open === 1 ? "" : "s"}${before?.open !== undefined ? ` (was ${before.open})` : ""}`);
+    if (r.node === "review" && r.text) parts.push(r.text);
+  }
+  return parts.length ? ` · ${parts.join(" · ")}` : "";
 }
 
 function time(at: string): string {
@@ -166,10 +228,33 @@ export function applyEvent(s: SessionView, e: RunEvent): SessionView {
         s.currentNode = undefined;
       }
       if (node === "fix" && status === "succeeded") s.fixLoops += 1;
+      let detail = "";
+      const looped = node === "fix" || ((node === "review" || node === "gate") && (s.fixRounds.length > 0 || status === "failed"));
+      if (looped && (status === "succeeded" || status === "failed")) {
+        const text = s.lastText[`${node}#${attempt}`] ?? "";
+        const round: FixRound = { node: node as FixRound["node"], attempt, status, at: e.at, changedFiles: e.snapshot?.changedFiles?.length };
+        if (node === "review") {
+          const r = reviewOpen(text, status === "succeeded");
+          round.open = r.open;
+          round.text = r.first ? firstLine(r.first) : status === "succeeded" ? "passed" : undefined;
+        } else if (node === "fix") {
+          round.text = firstLine(text) || undefined;
+        } else if (s.lastGate) {
+          const failed = s.lastGate.checks.filter((c) => !c.passed).map((c) => c.name);
+          round.open = failed.length;
+          round.text = failed.length ? failed.join(", ") : "passed";
+        }
+        // A 1.6.0 fix that hit the limit did no work: it is the end of the loop, not a round.
+        if (!(node === "fix" && status === "failed" && !text)) {
+          const before = [...s.fixRounds].reverse().find((r) => r.node === node && r.open !== undefined);
+          push(s.fixRounds, round, 100);
+          detail = roundDetail(round, before);
+        }
+      }
       if (status !== "running") {
         const tone = status === "succeeded" ? "ok" : status === "waiting_human" ? "human" : status === "failed" ? "fail" : "info";
         const label = status === "waiting_human" ? "waiting for you" : status;
-        push(s.activity, { seq, at: e.at, text: `${time(e.at)} ${node}${attempt > 1 ? ` #${attempt}` : ""} ${label}`, tone }, MAX_ACTIVITY);
+        push(s.activity, { seq, at: e.at, text: `${time(e.at)} ${node}${attempt > 1 ? ` #${attempt}` : ""} ${label}${detail}`, tone }, MAX_ACTIVITY);
       }
       break;
     }
@@ -183,7 +268,9 @@ export function applyEvent(s: SessionView, e: RunEvent): SessionView {
       if (n) s.nodes[node] = { ...n, approvedBy: d.approverEmail, decision: d.decision, decidedAt: e.at };
       s.interrupt = undefined;
       const verb = d.decision === "approve" ? "approved" : d.decision === "reject" ? "rejected" : "requested changes";
-      push(s.activity, { seq, at: e.at, text: `${time(e.at)} ${d.approverEmail} ${verb} (${d.stage})${d.comment ? `: ${d.comment}` : ""}`, tone: "human" }, MAX_ACTIVITY);
+      // approve_fix and a continued fix limit use the contract's "plan" stage; name what it was.
+      const what = node === "approve_fix" || node === "fix" ? "fixes" : d.stage;
+      push(s.activity, { seq, at: e.at, text: `${time(e.at)} ${d.approverEmail} ${verb} (${what})${d.comment ? `: ${d.comment}` : ""}`, tone: "human" }, MAX_ACTIVITY);
       break;
     }
     case "gate_result": {
@@ -212,6 +299,7 @@ export function applyEvent(s: SessionView, e: RunEvent): SessionView {
         line = { seq, node, attempt, at, kind: "result", text: (o.text ?? "").split("\n").slice(0, 3).join("\n"), isError: o.isError };
       }
       if (line) push(s.output, line, MAX_OUTPUT);
+      if (o.block === "text" && o.text && (node === "review" || node === "fix")) s.lastText[`${node}#${attempt}`] = o.text;
       break;
     }
     case "usage": {
@@ -239,7 +327,11 @@ export function applyEvent(s: SessionView, e: RunEvent): SessionView {
       break;
     }
   }
-  if (e.runStatus) s.status = e.runStatus;
+  if (e.runStatus) {
+    // A failed run that is continued (a retry, or more fixes) is running again: its old error is history.
+    if (e.runStatus === "running" && (s.status === "failed" || s.status === "cancelled")) s.error = undefined;
+    s.status = e.runStatus;
+  }
   if (s.status !== "waiting_human") s.interrupt = s.status === "running" ? s.interrupt : undefined;
   return s;
 }

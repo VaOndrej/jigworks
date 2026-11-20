@@ -222,6 +222,8 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .md hr { border: none; border-top: 1px solid var(--line); margin: 14px 0; }
 .md .md-link { color: var(--blue-text); text-decoration: underline; text-decoration-color: #3B5791; }
 .md-table { overflow-x: auto; }
+/* Cells break between words, not inside them (the table scrolls instead). */
+.md-table th, .md-table td { overflow-wrap: normal; }
 .md table { border-collapse: collapse; font-size: 12px; min-width: 50%; }
 .md th, .md td { border: 1px solid var(--line-2); padding: 5px 10px; text-align: left; vertical-align: top; }
 .md th { background: #26282E; color: var(--fg-strong); font-weight: 600; }
@@ -272,3 +274,7 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 @media (prefers-reduced-motion: reduce) {
   .now-list li { animation: none; }
 }
+
+/* Fix rounds: every review / gate / fix after the implementation, with the trend of open problems. */
+.fix-rounds { display: flex; flex-direction: column; gap: 6px; margin: 8px 0; }
+.fix-rounds td { vertical-align: top; }

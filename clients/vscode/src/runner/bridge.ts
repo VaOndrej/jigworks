@@ -170,8 +170,14 @@ export class RunnerBridge extends EventEmitter {
     return this.drive(runId, args);
   }
 
-  resume(runId: string): Promise<number> {
-    return this.drive(runId, ["resume", runId, ...this.homeArgs()]);
+  /** `moreFixes`: continue a run that failed at the fix loop limit (releases before 1.7.0). */
+  resume(runId: string, opts: { moreFixes?: number; comment?: string } = {}): Promise<number> {
+    const args = ["resume", runId, ...this.homeArgs()];
+    if (opts.moreFixes) {
+      args.push("--more-fixes", String(opts.moreFixes));
+      if (opts.comment?.trim()) args.push("--comment", opts.comment.trim());
+    }
+    return this.drive(runId, args);
   }
 
   stop(runId: string): void {

@@ -65,7 +65,7 @@ export type ToHost =
   | { type: "attach" }
   | { type: "openAudit"; runId: string }
   | { type: "decide"; runId: string; decision: "approve" | "request_changes" | "reject"; comment?: string }
-  | { type: "resume"; runId: string }
+  | { type: "resume"; runId: string; moreFixes?: number; comment?: string }
   | { type: "stop"; runId: string }
   | { type: "openDiff"; runId: string }
   | { type: "importWorkflow" }
