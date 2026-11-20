@@ -10,7 +10,10 @@ Time is tracked in two columns: **human** (my own time: deciding, directing, rev
 | English pass, agent instructions, ticket plan | 20 min | ~85 min |
 | UI review and design brainstorming (v0.7) | 30 min | ~30 min |
 | Foundation T00–T02 (+ T11 Vercel setup, overnight launch) | 40 min (20 min + 10 min Vercel setup + 10 min launch) | ~35 min (+ ~8 min parallel subagent) |
-| **Total** | **3 h 00 min** | **~2 h 30 min** |
+| Public-repo secret audit | 2 min | ~5 min |
+| Overnight two-agent build (HUB + LOCAL, in parallel) | ~2 min | ~2 h 55 min (HUB ~1 h 25 min + LOCAL ~1 h 30 min; ~1 h 30 min wall clock) |
+| Morning review and merge | 10 min | ~1 h 20 min |
+| **Total** | **3 h 14 min** | **~6 h 50 min** |
 
 ## Entries
 
@@ -116,3 +119,56 @@ Time is tracked in two columns: **human** (my own time: deciding, directing, rev
 - The HUB session in the VS Code panel started in the main checkout, not in its worktree, so `JIGWORKS_AGENT` was empty. The guard and the git hooks now read the agent from the target worktree's `.claude/settings.local.json`, and the HUB kickoff pins all work to `~/Development/jigworks-hub`.
 - Worktrees `../jigworks-hub` and `../jigworks-local` created; kickoff prompts in `docs/kickoff-hub.md` and `docs/kickoff-local.md`.
 - The recorded T00 transcripts listed the recording user's claude.ai connectors; they are blanked in the fixtures and in the scrubber.
+
+### 2026-11-20 — Public-repo secret audit (human 2 min, agent ~5 min)
+
+**What I delegated**
+- A secret scan of the repo before it is shared: `gitleaks` 8.30.1 over all 73 commits on every local and remote branch (`no leaks found`), plus a scan of the working tree. The working-tree hits were only in ignored, never-committed files (`.env.local`, the downloaded VS Code under `clients/vscode/.vscode-test/`).
+- The new "the repo is public" section in `AGENTS.md`: a gitleaks scan before every push, and what to do when it finds something.
+
+**What I reviewed / decided myself**
+- That the scan becomes a written rule for every agent.
+
+**What went wrong / changed course**
+- Nothing leaked. The commit metadata carries my author email, and `docs/kickoff-hub.md` names my local home path; both are known and accepted, not secrets.
+
+### 2026-11-19/20 — Overnight two-agent build (human ~2 min, agent ~2 h 55 min)
+
+Two Claude Code sessions (Opus 5.5) in their own worktrees, pushing to `feature/hub-and-vs-code-extension`, 22:05–23:36 CET. The full agent logs are in `build-log/agent-hub.md` and `build-log/agent-local.md`; this entry folds them.
+
+| Agent | Agent time | Tickets | Blocked |
+|---|---|---|---|
+| HUB | ~1 h 25 min | T12 hub API, T13 hub web (done) | — |
+| LOCAL | ~1 h 30 min | T03, T04, T05, T06, T07, T08, T09, T10, T14, T15 (done), T16 (review), `verify:e2e` | — (T17 deferred as planned) |
+
+**What I delegated**
+- Everything in the table, end to end: implementation, tests, ticket evidence, one live `claude -p` run with a fix loop (≈ $4.90 API equivalent on the Max subscription), Vercel preview checks.
+
+**What I reviewed / decided myself**
+- Nothing during the night beyond one architecture question from LOCAL (~2 min). The morning review is the next entry.
+
+**What went wrong / changed course**
+- Both sessions started in the main checkout, so `JIGWORKS_AGENT` was empty and the ownership hook was inactive. Both ran `check-ownership.sh` before every commit; every commit passes it.
+- The disk filled up (down to ~150 MB free) and Docker Desktop stopped. HUB ran Postgres from the Homebrew binaries on port 54329; LOCAL ran its e2e on a private Postgres.
+- LOCAL broke the Vercel previews for ~10 min by adding dependencies with install scripts (pnpm 12 refuses them); fixed with `esbuild-wasm` and `pnpm dlx vsce`.
+- `vercel-sandbox` 1.x changed its API: two preview round trips for HUB.
+- Nothing ran against the deployed hub from the local side (T14/T15/e2e use a fake hub and the real hub app locally), because loading the hub password was refused.
+- The live T06 audit shows the wrong per-step models; fixed in code afterwards, not re-run.
+
+### 2026-11-20 — Morning review and merge (human 10 min, agent ~1 h 20 min)
+
+**What I delegated**
+- The whole review (`docs/morning-review.md`): ownership per commit, frozen contracts, secret scans, every ticket against its code, all gates, Playwright at 1440 px on localhost, the preview and the extension webview against the mockups.
+- Two read-only subagents checked the tickets against the code (HUB and LOCAL).
+- Three small fixes: the gitleaks branch of the gate scanned every commit of a run, so a removed secret kept failing the gate (`e275bf2`); T05 back to `review`, because `gh pr create` never ran (`375c2f3`); two hub e2e assertions that depended on today's date and on preview smoke data (`6269013`).
+- A helper that asks for the new hub password and writes it to `.env.local` without echoing it.
+
+**What I reviewed / decided myself**
+- I rotated `HUB_PASSWORD` (it was weak and guessable from this public repo) to a random value of type Secret for Production and Preview, before the first production deploy.
+- I decided to merge after the rotation.
+
+**What went wrong / changed course**
+- The first gate run had 3 red gates (`uv run pytest`, `verify:hub`, `verify:local`); all green after the fixes.
+- The disk had 226 MB free; the agent cleared the npm download cache (9.3 GB). Docker Desktop's engine still does not start, so the DB gates ran on the Postgres HUB left on port 54329.
+- Open after the merge: the invariant property tests can be edited by the `implement` and `fix` agents (design decision needed, §5.2 of the review); no rate limit on the hub login; preview DB full of `smoke-check` data; `BLOB_READ_WRITE_TOKEN` should be rotated to type Secret.
+
