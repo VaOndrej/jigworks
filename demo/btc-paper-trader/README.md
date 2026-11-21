@@ -11,14 +11,36 @@ only the reference price. You trade in the browser as one real user.
 * Everything is `Decimal`; every balance is conserved (global USD and BTC totals are exactly 0
   against the treasury).
 
+![The exchange at 1440 px with the live Binance reference and 1,000 bots](tests/e2e/screenshots/run-1440.png)
+
 ## Run
+
+You need [uv](https://docs.astral.sh/uv/getting-started/installation/) (it fetches Python 3.12
+itself if you do not have it). Nothing else: no Node, no Docker, no API keys. Start from the root
+of a fresh clone:
 
 ```
 cd demo
-uv sync
-uv run btc-paper-trader --bots 1000          # opens http://127.0.0.1:8000
-uv run btc-paper-trader --feed sim --seed 7  # no network: a seeded random-walk reference price
+uv sync                                      # creates demo/.venv with the app and its dependencies
+uv run btc-paper-trader --bots 1000          # opens http://127.0.0.1:8000 in your browser
 ```
+
+That is all. Within a few seconds the status badge in the top right turns `live`, the chart shows
+the Binance BTCUSDT price and the order book fills with bot orders. Trade with the ticket on the
+right; your browser gets its own $100 account. Stop the server with `Ctrl+C`.
+
+Variants:
+
+```
+uv run btc-paper-trader --feed sim --seed 7 --bots 1000   # no network: a seeded random-walk price
+uv run btc-paper-trader --port 8001 --no-browser          # another port, do not open a browser
+```
+
+State (accounts, orders, trades) is kept in `btc-paper-trader/data/exchange.db` (ignored by git)
+and survives a restart. To start from scratch, stop the server and delete that file.
+
+If the page shows `stale` and orders are rejected, the Binance feed is unreachable from your
+network; use `--feed sim`. If port 8000 is taken, pass `--port`.
 
 | Flag | Default | |
 |---|---|---|
@@ -133,8 +155,9 @@ The chart is [TradingView Lightweight Charts](https://www.tradingview.com/lightw
 (Apache-2.0), vendored in `src/btc_paper_trader/static/vendor/lightweight-charts/` together with its
 `LICENSE`, and keeps TradingView's attribution logo. The page footer carries the attribution too.
 
-The library file is **not in the repository yet** (agents have no network access). Without it the
-page shows a notice instead of the chart and everything else works. To vendor it:
+The library file is committed, so the chart works offline. If it were missing, the page would show
+a notice instead of the chart and everything else would still work. To update it, run from the
+repository root:
 
 ```
 D=demo/btc-paper-trader/src/btc_paper_trader/static/vendor/lightweight-charts && mkdir -p "$D" \
@@ -143,7 +166,7 @@ D=demo/btc-paper-trader/src/btc_paper_trader/static/vendor/lightweight-charts &&
   && head -c 200 "$D/lightweight-charts.standalone.production.js"
 ```
 
-Record the version from the file header here once vendored: _version: not recorded yet_.
+Vendored version: **v5.3.0** (from the file header, 21 Nov 2026).
 
 ## Design notes and deliberate trade-offs
 
