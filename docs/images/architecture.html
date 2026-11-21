@@ -1,0 +1,418 @@
+<title>Jigworks Architecture</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;600&display=swap">
+<style>
+/* Layout: one column, two wide figures. One hue per layer: hub blue, API violet, clients teal, local machine green, GitHub grey, human orange. */
+:root{--bg:#F3F2EE;--surface:#FFFFFF;--fg:#17181C;--muted:#5B5F6A;--line:#B9B5AB;
+  --hub:#2F5BB7;--hub-bg:#E8EEF9;--hub-chip:#D6E0F5;--hub-ink:#1E3F86;
+  --api:#7448B0;--api-bg:#F0E9F8;--api-ink:#55308A;
+  --cli:#0E7C74;--cli-bg:#E3F2F0;--cli-chip:#CDE8E4;--cli-ink:#0A5A54;
+  --run:#3F7A2A;--run-bg:#EAF2E3;--run-chip:#D5E7CA;--run-ink:#2C5A1C;--ag-chip:#BFDDAE;
+  --gh:#6B6F78;--gh-bg:#EFEFF0;--gh-chip:#E1E2E5;--gh-ink:#3D4048;
+  --human:#C2410C;--human-bg:#FBE4D5;
+  --head:'Space Grotesk',Inter,system-ui,sans-serif;--body:Inter,system-ui,sans-serif;--mono:'JetBrains Mono',ui-monospace,monospace}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#121316;--surface:#1A1C20;--fg:#ECEDEF;--muted:#A3A7B1;--line:#4A4D55;
+  --hub:#7FA2F0;--hub-bg:#172238;--hub-chip:#22304D;--hub-ink:#B9CCF7;--api:#B793EA;--api-bg:#261B36;--api-ink:#D7C2F5;
+  --cli:#4FC2B8;--cli-bg:#10292A;--cli-chip:#173A3A;--cli-ink:#A6E3DD;--run:#8CC46F;--run-bg:#182714;--run-chip:#22381C;--run-ink:#C3E3B1;--ag-chip:#2C4A22;
+  --gh:#9DA1AA;--gh-bg:#1F2024;--gh-chip:#2A2C31;--gh-ink:#D2D4D9;--human:#F59E5B;--human-bg:#3A2618;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#121316;--surface:#1A1C20;--fg:#ECEDEF;--muted:#A3A7B1;--line:#4A4D55;
+  --hub:#7FA2F0;--hub-bg:#172238;--hub-chip:#22304D;--hub-ink:#B9CCF7;--api:#B793EA;--api-bg:#261B36;--api-ink:#D7C2F5;
+  --cli:#4FC2B8;--cli-bg:#10292A;--cli-chip:#173A3A;--cli-ink:#A6E3DD;--run:#8CC46F;--run-bg:#182714;--run-chip:#22381C;--run-ink:#C3E3B1;--ag-chip:#2C4A22;
+  --gh:#9DA1AA;--gh-bg:#1F2024;--gh-chip:#2A2C31;--gh-ink:#D2D4D9;--human:#F59E5B;--human-bg:#3A2618;color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:32px 64px}
+main{max-width:1240px;margin:0 auto;display:grid;gap:48px}
+h1{font-family:var(--head);font-size:30px;margin:0 0 6px;text-wrap:balance}
+header p{margin:0;color:var(--muted);max-width:70ch;line-height:1.5}
+figure{margin:0;background:var(--bg);padding:20px 0}
+h2{font-family:var(--head);font-size:20px;margin:0 0 12px}
+.scroll{overflow-x:auto}
+svg{display:block;width:100%;min-width:900px;height:auto}
+figcaption{margin-top:12px;color:var(--muted);line-height:1.5;max-width:90ch}
+/* zones, components, chips per layer */
+.z-hub{fill:var(--hub-bg);stroke:var(--hub);stroke-width:1.4}
+.z-api{fill:var(--api-bg);stroke:var(--api);stroke-width:1.4}
+.z-cli{fill:var(--cli-bg);stroke:var(--cli);stroke-width:1.4}
+.z-run{fill:var(--run-bg);stroke:var(--run);stroke-width:1.4}
+.c-hub{fill:var(--surface);stroke:var(--hub);stroke-width:1.4}
+.c-cli{fill:var(--surface);stroke:var(--cli);stroke-width:1.4}
+.c-run{fill:var(--surface);stroke:var(--run);stroke-width:1.4}
+.c-ag{fill:var(--surface);stroke:var(--run);stroke-width:2.2}
+.c-gh{fill:var(--gh-bg);stroke:var(--gh);stroke-width:1.4}
+.chip-hub{fill:var(--hub-chip);stroke:none}
+.chip-cli{fill:var(--cli-chip);stroke:none}
+.chip-run{fill:var(--run-chip);stroke:none}
+.chip-ag{fill:var(--ag-chip);stroke:none}
+.chip-gh{fill:var(--gh-chip);stroke:none}
+.chip-hub.planned{fill:var(--surface);stroke:var(--hub);stroke-width:1.2}
+.node-ag{fill:var(--ag-chip);stroke:var(--run);stroke-width:1.4}
+.card{fill:var(--surface);stroke:var(--run);stroke-width:1.2}
+.card-head{fill:var(--ag-chip);stroke:none}
+.cap{font-size:10.5px;font-weight:600;letter-spacing:.08em;fill:var(--run-ink)}
+.strong{font-weight:600}
+.node-code{fill:var(--gh-chip);stroke:var(--gh);stroke-width:1.4}
+.human{fill:var(--human-bg);stroke:var(--human);stroke-width:1.8}
+.planned{stroke-dasharray:6 5}
+.edge{stroke:var(--fg);stroke-width:1.4;fill:none}
+.edge-api{stroke:var(--api);stroke-width:2;fill:none}
+.edge-human{stroke:var(--human);stroke-width:1.8;fill:none}
+.rule{stroke:var(--line);stroke-width:1.2;stroke-dasharray:4 4}
+.ah{fill:var(--fg)} .ah-api{fill:var(--api)} .ah-human{fill:var(--human)}
+text{fill:var(--fg);font-family:var(--body);font-size:13px}
+.t{font-family:var(--head);font-weight:600;font-size:15px}
+.zt{font-family:var(--head);font-weight:600;font-size:13px;letter-spacing:.06em}
+.ct{font-size:12.5px}
+.s{font-size:12px;fill:var(--muted)}
+.mono{font-family:var(--mono)}
+.lbl{font-size:12px;font-style:italic;fill:var(--muted)}
+.ink-hub{fill:var(--hub-ink)} .ink-api{fill:var(--api-ink)} .ink-cli{fill:var(--cli-ink)} .ink-run{fill:var(--run-ink)}
+.ink-ag{fill:var(--run-ink)} .ink-gh{fill:var(--gh-ink)} .ink-human{fill:var(--human)}
+</style>
+
+<main>
+<header>
+  <h1>Jigworks architecture</h1>
+  <p>A versioned workflow (the jig) is published once in the hub and runs the same way on every engineer's machine. Solid lines are built in the prototype; dashed lines are designed but not built.</p>
+</header>
+
+<figure id="system">
+  <h2>System</h2>
+  <div class="scroll">
+<svg viewBox="0 0 1200 990" role="img" aria-label="The hub on Vercel stores workflow releases, run events and analytics. Clients fetch pinned releases over an API with frozen contracts. A local runner executes the LangGraph workflow in a git worktree and drives claude -p agents, sends run events back to the hub, and opens a PR only after a human approves.">
+<defs>
+<marker id="sn" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker>
+<marker id="sh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah-human" d="M0,0 L10,5 L0,10 z"/></marker>
+<marker id="sa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah-api" d="M0,0 L10,5 L0,10 z"/></marker>
+</defs>
+<rect class="z-hub" x="40" y="24" width="880" height="290" rx="12"/>
+<text class="zt ink-hub" x="60" y="52">JIGWORKS HUB · VERCEL</text>
+<rect class="c-hub" x="56" y="68" width="206" height="230" rx="8"/>
+<text class="t ink-hub" x="70" y="94">Hub API</text>
+<text class="s" x="248" y="94" text-anchor="end">FastAPI</text>
+<rect class="chip-hub" x="68" y="108" width="182" height="34" rx="4"/>
+<text class="ct" x="78" y="129.5">Sandbox validation</text>
+<rect class="chip-hub" x="68" y="152" width="182" height="34" rx="4"/>
+<text class="ct" x="78" y="173.5">Immutable releases</text>
+<rect class="chip-hub" x="68" y="196" width="182" height="34" rx="4"/>
+<text class="ct" x="78" y="217.5">Channels: stable, beta</text>
+<rect class="chip-hub" x="68" y="240" width="182" height="34" rx="4"/>
+<text class="ct" x="78" y="261.5">Event ingest + SSE</text>
+<rect class="c-hub" x="272" y="68" width="206" height="230" rx="8"/>
+<text class="t ink-hub" x="286" y="94">Postgres</text>
+<text class="s" x="464" y="94" text-anchor="end">Neon</text>
+<rect class="chip-hub" x="284" y="108" width="182" height="34" rx="4"/>
+<text class="ct" x="294" y="129.5">Drafts + releases</text>
+<rect class="chip-hub" x="284" y="152" width="182" height="34" rx="4"/>
+<text class="ct" x="294" y="173.5">Digest per release</text>
+<rect class="chip-hub" x="284" y="196" width="182" height="34" rx="4"/>
+<text class="ct" x="294" y="217.5">Run events = audit</text>
+<rect class="chip-hub" x="284" y="240" width="182" height="34" rx="4"/>
+<text class="ct" x="294" y="261.5">Price list by date</text>
+<rect class="c-hub" x="488" y="68" width="206" height="230" rx="8"/>
+<text class="t ink-hub" x="502" y="94">Analytics</text>
+<rect class="chip-hub" x="500" y="108" width="182" height="34" rx="4"/>
+<text class="ct" x="510" y="129.5">Cost per node</text>
+<rect class="chip-hub" x="500" y="152" width="182" height="34" rx="4"/>
+<text class="ct" x="510" y="173.5">Fix rounds, duration</text>
+<rect class="chip-hub" x="500" y="196" width="182" height="34" rx="4"/>
+<text class="ct" x="510" y="217.5">Compare releases</text>
+<rect class="chip-hub planned" x="500" y="240" width="182" height="34" rx="4"/>
+<text class="ct" x="510" y="261.5">Human delta</text>
+<rect class="c-hub" x="704" y="68" width="206" height="230" rx="8"/>
+<text class="t ink-hub" x="718" y="94">Web hub</text>
+<text class="s" x="896" y="94" text-anchor="end">React Flow</text>
+<rect class="chip-hub" x="716" y="108" width="182" height="34" rx="4"/>
+<text class="ct" x="726" y="129.5">Python editor</text>
+<rect class="chip-hub" x="716" y="152" width="182" height="34" rx="4"/>
+<text class="ct" x="726" y="173.5">Read-only graph</text>
+<rect class="chip-hub" x="716" y="196" width="182" height="34" rx="4"/>
+<text class="ct" x="726" y="217.5">Publish a release</text>
+<rect class="chip-hub" x="716" y="240" width="182" height="34" rx="4"/>
+<text class="ct" x="726" y="261.5">Runs &amp; analytics</text>
+<rect class="c-gh planned" x="960" y="40" width="200" height="140" rx="8"/>
+<text class="t ink-gh" x="974" y="66">GitHub</text>
+<text class="s" x="974" y="86">one repo per workflow</text>
+<rect class="chip-gh" x="972" y="100" width="176" height="30" rx="4"/>
+<text class="ct" x="982" y="119.5">Push → updates draft</text>
+<rect class="chip-gh" x="972" y="138" width="176" height="30" rx="4"/>
+<text class="ct" x="982" y="157.5">Save → commits</text>
+<line class="edge planned" x1="958" y1="125" x2="902" y2="125" marker-start="url(#sn)" marker-end="url(#sn)"/>
+<rect class="c-gh" x="960" y="200" width="200" height="100" rx="8"/>
+<text class="t ink-gh" x="974" y="226">GitHub</text>
+<text class="s mono" x="974" y="244">VaOndrej/jigworks</text>
+<text class="s" x="974" y="262">hub source code</text>
+<text class="s" x="974" y="282">Vercel deploys on push</text>
+<line class="edge" x1="958" y1="250" x2="922" y2="250" marker-end="url(#sn)"/>
+<rect class="z-api" x="40" y="348" width="1120" height="44" rx="10"/>
+<text class="t ink-api" x="60" y="375">API · REST + SSE</text>
+<text class="s mono" x="1140" y="375" text-anchor="end">frozen contracts: packages/contracts → TS + Python types</text>
+<rect class="z-cli" x="200" y="428" width="960" height="140" rx="12"/>
+<text class="zt ink-cli" x="1140" y="452" text-anchor="end">CLIENTS</text>
+<rect class="c-cli" x="216" y="460" width="240" height="96" rx="8"/>
+<text class="t ink-cli" x="230" y="486">VS Code extension</text>
+<rect class="chip-cli" x="228" y="494" width="104" height="24" rx="4"/>
+<text class="ct" x="238" y="510.5">Prompt</text>
+<rect class="chip-cli" x="340" y="494" width="104" height="24" rx="4"/>
+<text class="ct" x="350" y="510.5">Live steps</text>
+<rect class="chip-cli" x="228" y="524" width="104" height="24" rx="4"/>
+<text class="ct" x="238" y="540.5">Approvals</text>
+<rect class="chip-cli" x="340" y="524" width="104" height="24" rx="4"/>
+<text class="ct" x="350" y="540.5">Cost per run</text>
+<rect class="c-cli" x="472" y="460" width="180" height="96" rx="8"/>
+<text class="t ink-cli" x="486" y="486">Jigworks CLI</text>
+<rect class="chip-cli" x="484" y="494" width="76" height="24" rx="4"/>
+<text class="ct" x="494" y="510.5">run</text>
+<rect class="chip-cli" x="568" y="494" width="76" height="24" rx="4"/>
+<text class="ct" x="578" y="510.5">approve</text>
+<rect class="chip-cli" x="484" y="524" width="76" height="24" rx="4"/>
+<text class="ct" x="494" y="540.5">resume</text>
+<rect class="chip-cli" x="568" y="524" width="76" height="24" rx="4"/>
+<text class="ct" x="578" y="540.5">audit</text>
+<rect class="c-cli planned" x="684" y="460" width="220" height="96" rx="8"/>
+<text class="t ink-cli" x="698" y="486">Other IDE, CI or PR bot</text>
+<text class="s" x="698" y="508">any client that speaks</text>
+<text class="s" x="698" y="526">the same contracts</text>
+<rect class="c-cli planned" x="920" y="460" width="226" height="96" rx="8"/>
+<text class="t ink-cli" x="934" y="486">Portal for non-engineers</text>
+<text class="s" x="934" y="508">same runner, a workflow</text>
+<text class="s" x="934" y="526">with team-specific checks</text>
+<rect class="human" x="40" y="470" width="140" height="76" rx="38"/>
+<text class="t ink-human" x="110" y="503" text-anchor="middle">Engineer</text>
+<text class="s" x="110" y="523" text-anchor="middle">decides at interrupts</text>
+<line class="edge-human" x1="182" y1="508" x2="212" y2="508" marker-end="url(#sh)"/>
+<rect class="z-run" x="200" y="616" width="960" height="250" rx="12"/>
+<text class="zt ink-run" x="1140" y="640" text-anchor="end">ENGINEER&#x27;S MACHINE · ONE GIT WORKTREE PER SESSION</text>
+<line class="edge" x1="240" y1="558" x2="240" y2="664" marker-end="url(#sn)"/>
+<text class="lbl" x="250" y="596">starts the runner</text>
+<rect class="c-run" x="216" y="668" width="500" height="182" rx="8"/>
+<text class="t ink-run" x="230" y="694">Local runner</text>
+<text class="s" x="702" y="694" text-anchor="end">Python · uv venv per digest</text>
+<rect class="chip-run" x="230" y="708" width="230" height="34" rx="4"/>
+<text class="ct" x="240" y="729.5">LangGraph graph (pinned)</text>
+<rect class="chip-run" x="468" y="708" width="230" height="34" rx="4"/>
+<text class="ct" x="478" y="729.5">Checkpoint + git commit</text>
+<rect class="chip-run" x="230" y="752" width="230" height="34" rx="4"/>
+<text class="ct" x="240" y="773.5">Gate: tests, invariants</text>
+<rect class="chip-run" x="468" y="752" width="230" height="34" rx="4"/>
+<text class="ct" x="478" y="773.5">Secret scan + bandit</text>
+<rect class="chip-run" x="230" y="796" width="230" height="34" rx="4"/>
+<text class="ct" x="240" y="817.5">Owns git: commit, push, PR</text>
+<rect class="chip-run" x="468" y="796" width="230" height="34" rx="4"/>
+<text class="ct" x="478" y="817.5">Audit log, offline queue</text>
+<rect class="c-ag" x="800" y="668" width="344" height="182" rx="8"/>
+<text class="t ink-ag mono" x="814" y="694">claude -p</text>
+<text class="s" x="1130" y="694" text-anchor="end">fresh session per role</text>
+<rect class="chip-ag" x="814" y="708" width="154" height="32" rx="4"/>
+<text class="ct" x="824" y="728.5">Plan · Opus</text>
+<rect class="chip-ag" x="976" y="708" width="154" height="32" rx="4"/>
+<text class="ct" x="986" y="728.5">Tests · Opus</text>
+<rect class="chip-ag" x="814" y="748" width="154" height="32" rx="4"/>
+<text class="ct" x="824" y="768.5">Implement · Sonnet</text>
+<rect class="chip-ag" x="976" y="748" width="154" height="32" rx="4"/>
+<text class="ct" x="986" y="768.5">Review · Opus</text>
+<rect class="chip-ag" x="814" y="788" width="154" height="32" rx="4"/>
+<text class="ct" x="824" y="808.5">Fix · Sonnet</text>
+<rect class="chip-ag" x="976" y="788" width="154" height="32" rx="4"/>
+<text class="ct" x="986" y="808.5">Summary · Sonnet</text>
+<text class="s" x="814" y="840">allowlisted tools · no push, gh or network</text>
+<line class="edge" x1="718" y1="740" x2="796" y2="740" marker-end="url(#sn)"/>
+<text class="lbl" x="757" y="732" text-anchor="middle">prompt</text>
+<line class="edge" x1="796" y1="790" x2="718" y2="790" marker-end="url(#sn)"/>
+<text class="lbl" x="757" y="810" text-anchor="middle">stream-json</text>
+<rect class="c-gh" x="216" y="912" width="500" height="60" rx="8"/>
+<text class="t ink-gh" x="230" y="938">Product repo on GitHub</text>
+<text class="s" x="230" y="958">a human reviews and merges; agents never merge</text>
+<line class="edge-human" x1="460" y1="852" x2="460" y2="908" marker-end="url(#sh)"/>
+<text class="lbl ink-human" x="472" y="890">branch + PR, only after the engineer approves</text>
+<line class="edge-api" x1="240" y1="316" x2="240" y2="456" marker-end="url(#sa)"/>
+<text class="lbl ink-api" x="250" y="338">release .zip + digest</text>
+<line class="edge-api" x1="668" y1="668" x2="668" y2="316" marker-end="url(#sa)"/>
+<text class="lbl ink-api" x="678" y="338">run events, usage, approvals (queued offline)</text>
+<line class="edge" x1="800" y1="926" x2="840" y2="926"/>
+<text class="s" x="850" y="930">built</text>
+<line class="edge planned" x1="910" y1="926" x2="950" y2="926"/>
+<text class="s" x="960" y="930">designed, not built</text>
+<line class="edge-human" x1="800" y1="954" x2="840" y2="954"/>
+<text class="s" x="850" y="958">a human decides</text>
+<line class="edge-api" x1="960" y1="954" x2="1000" y2="954"/>
+<text class="s" x="1010" y="958">over the API</text>
+</svg>
+  </div>
+  <figcaption>The hub never runs workflow code and never sees CLI credentials. A run is pinned to a release digest, so everyone runs the same graph, prompts, models and skills. The runner sends events to the hub over the API, and the hub turns them into the audit trail and the per-release analytics.</figcaption>
+</figure>
+
+<figure id="harness">
+  <h2>The harness: <span style="font-family:var(--mono);font-size:17px">feature-development</span> 1.8.0</h2>
+  <div class="scroll">
+<svg viewBox="0 0 1240 960" role="img" aria-label="The feature-development graph: triage picks a quick path or brainstorming, the plan is approved by the engineer, a separate agent writes tests from the plan only, another implements, an independent agent reviews, the gate runs code checks, the engineer approves the PR. Each agent is its own claude -p session with its own context and tool rules.">
+<defs>
+<marker id="hn" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker>
+<marker id="hh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah-human" d="M0,0 L10,5 L0,10 z"/></marker>
+<marker id="ha" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah-api" d="M0,0 L10,5 L0,10 z"/></marker>
+</defs>
+<rect class="node-ag" x="48" y="130" width="104" height="50" rx="6"/>
+<text class="t " x="100" y="160" text-anchor="middle">triage</text>
+<text class="s" x="100" y="200" text-anchor="middle">Sonnet, read-only</text>
+<text class="s" x="100" y="214" text-anchor="middle">quick fix or design first?</text>
+<line class="edge" x1="152" y1="155" x2="176" y2="155" marker-end="url(#hn)"/>
+<rect class="node-ag" x="178" y="130" width="104" height="50" rx="6"/>
+<text class="t " x="230" y="160" text-anchor="middle">plan</text>
+<text class="s" x="230" y="200" text-anchor="middle">Opus, read-only</text>
+<line class="edge-human" x1="282" y1="155" x2="306" y2="155" marker-end="url(#hh)"/>
+<rect class="human" x="308" y="130" width="104" height="50" rx="25"/>
+<text class="t ink-human" x="360" y="160" text-anchor="middle">approve plan</text>
+<text class="s ink-human" x="360" y="200" text-anchor="middle">engineer</text>
+<line class="edge-human" x1="412" y1="155" x2="436" y2="155" marker-end="url(#hh)"/>
+<rect class="node-ag" x="438" y="130" width="104" height="50" rx="6"/>
+<text class="t " x="490" y="160" text-anchor="middle">write tests</text>
+<text class="s" x="490" y="200" text-anchor="middle">Opus</text>
+<text class="s" x="490" y="214" text-anchor="middle">sees the plan, not code</text>
+<line class="edge" x1="542" y1="155" x2="566" y2="155" marker-end="url(#hn)"/>
+<rect class="node-ag" x="568" y="130" width="104" height="50" rx="6"/>
+<text class="t " x="620" y="160" text-anchor="middle">implement</text>
+<text class="s" x="620" y="200" text-anchor="middle">Sonnet</text>
+<text class="s" x="620" y="214" text-anchor="middle">may not edit tests</text>
+<line class="edge" x1="672" y1="155" x2="696" y2="155" marker-end="url(#hn)"/>
+<rect class="node-ag" x="698" y="130" width="104" height="50" rx="6"/>
+<text class="t " x="750" y="160" text-anchor="middle">review</text>
+<text class="s" x="750" y="200" text-anchor="middle">Opus, read-only</text>
+<text class="s" x="750" y="214" text-anchor="middle">findings with IDs</text>
+<line class="edge" x1="802" y1="155" x2="826" y2="155" marker-end="url(#hn)"/>
+<rect class="node-code" x="828" y="130" width="104" height="50" rx="6"/>
+<text class="t " x="880" y="160" text-anchor="middle">gate</text>
+<text class="s" x="880" y="200" text-anchor="middle">runner code, no LLM</text>
+<text class="s" x="880" y="214" text-anchor="middle">tests, invariants,</text>
+<text class="s" x="880" y="228" text-anchor="middle">secrets, bandit</text>
+<line class="edge-human" x1="932" y1="155" x2="956" y2="155" marker-end="url(#hh)"/>
+<rect class="human" x="958" y="130" width="104" height="50" rx="25"/>
+<text class="t ink-human" x="1010" y="160" text-anchor="middle">approve PR</text>
+<text class="s ink-human" x="1010" y="200" text-anchor="middle">engineer</text>
+<line class="edge-human" x1="1062" y1="155" x2="1086" y2="155" marker-end="url(#hh)"/>
+<rect class="node-code" x="1088" y="130" width="104" height="50" rx="6"/>
+<text class="t " x="1140" y="160" text-anchor="middle">open PR</text>
+<text class="s" x="1140" y="200" text-anchor="middle">runner</text>
+<text class="lbl" x="165" y="118" text-anchor="middle">quick</text>
+<path class="edge-human" d="M360,128 C360,76 230,76 230,124" marker-end="url(#hh)"/>
+<text class="lbl ink-human" x="295" y="66" text-anchor="middle">questions, request changes</text>
+<text class="lbl ink-human" x="295" y="82" text-anchor="middle">(same planner session)</text>
+<rect class="node-ag" x="48" y="300" width="104" height="50" rx="6"/>
+<text class="t" x="100" y="330" text-anchor="middle">brainstorm</text>
+<text class="s" x="100" y="370" text-anchor="middle">Opus, read-only</text>
+<text class="s" x="100" y="384" text-anchor="middle">rounds of questions</text>
+<rect class="human" x="178" y="300" width="104" height="50" rx="25"/>
+<text class="t ink-human" x="230" y="323" text-anchor="middle">approve</text>
+<text class="t ink-human" x="230" y="340" text-anchor="middle">design</text>
+<line class="edge" x1="100" y1="232" x2="100" y2="298" marker-end="url(#hn)"/>
+<text class="lbl" x="92" y="268" text-anchor="end">larger change</text>
+<line class="edge-human" x1="152" y1="318" x2="176" y2="318" marker-end="url(#hh)"/>
+<path class="edge-human" d="M205,298 C205,262 135,262 135,296" marker-end="url(#hh)"/>
+<text class="lbl ink-human" x="170" y="254" text-anchor="middle">more questions</text>
+<line class="edge-human" x1="260" y1="298" x2="260" y2="232" marker-end="url(#hh)"/>
+<text class="lbl ink-human" x="268" y="268">design agreed</text>
+<rect class="node-ag" x="698" y="300" width="104" height="50" rx="6"/>
+<text class="t" x="750" y="330" text-anchor="middle">fix</text>
+<text class="s" x="690" y="345" text-anchor="end">Sonnet</text>
+<line class="edge" x1="735" y1="222" x2="735" y2="298" marker-start="url(#hn)" marker-end="url(#hn)"/>
+<text class="lbl" x="727" y="268" text-anchor="end">FAIL, then re-check</text>
+<path class="edge" d="M880,236 C880,300 840,318 806,320" marker-end="url(#hn)"/>
+<text class="lbl" x="890" y="276">FAIL</text>
+<path class="edge-human" d="M1010,210 C1010,340 900,350 806,338" marker-end="url(#hh)"/>
+<text class="lbl ink-human" x="962" y="352">request changes</text>
+<rect class="human" x="698" y="410" width="104" height="50" rx="25"/>
+<text class="t ink-human" x="750" y="440" text-anchor="middle">approve fix</text>
+<line class="edge-human" x1="750" y1="352" x2="750" y2="408" marker-start="url(#hh)" marker-end="url(#hh)"/>
+<text class="lbl ink-human" x="764" y="386">no progress in 2 rounds, cap of 8, or a question</text>
+<text class="lbl ink-human" x="736" y="386" text-anchor="end">continue +3, answer, or stop</text>
+<line class="rule" x1="48" y1="500" x2="560" y2="500"/>
+<text class="s" x="48" y="492">every node: LangGraph checkpoint + git commit, so a run resumes after a crash or a usage limit</text>
+<rect class="node-ag" x="900" y="474" width="16" height="16" rx="3"/>
+<text class="s" x="924" y="487">agent (claude -p)</text>
+<rect class="node-code" x="1060" y="474" width="16" height="16" rx="3"/>
+<text class="s" x="1084" y="487">runner code</text>
+<rect class="human" x="900" y="500" width="16" height="16" rx="8"/>
+<text class="s" x="924" y="513">engineer decides</text>
+<text class="t" x="48" y="568">Separate sessions: what each building agent sees and may do</text>
+<rect class="card" x="48" y="588" width="218" height="290" rx="8"/>
+<rect class="card-head" x="48" y="588" width="218" height="34" rx="8"/>
+<rect class="card-head" x="48" y="608" width="218" height="14" rx="0"/>
+<text class="t" x="60" y="611">plan</text>
+<text class="s" x="254" y="611" text-anchor="end">Opus</text>
+<text class="cap" x="60" y="644">SESSION</text>
+<text class="ct" x="60" y="662">new; resumed for</text>
+<text class="ct" x="60" y="678">questions and changes</text>
+<text class="cap" x="60" y="708">SEES</text>
+<text class="ct" x="60" y="726">the task, the agreed design,</text>
+<text class="ct" x="60" y="742">the repo (read-only)</text>
+<text class="cap" x="60" y="772">TOOLS</text>
+<text class="ct" x="60" y="790">read, grep, git diff/log</text>
+<text class="cap" x="60" y="820">OUTPUT</text>
+<text class="ct" x="60" y="838">plan: files, checks,</text>
+<text class="ct" x="60" y="854">milestones</text>
+<rect class="card" x="278" y="588" width="218" height="290" rx="8"/>
+<rect class="card-head" x="278" y="588" width="218" height="34" rx="8"/>
+<rect class="card-head" x="278" y="608" width="218" height="14" rx="0"/>
+<text class="t" x="290" y="611">write tests</text>
+<text class="s" x="484" y="611" text-anchor="end">Opus</text>
+<text class="cap" x="290" y="644">SESSION</text>
+<text class="ct" x="290" y="662">new</text>
+<text class="cap" x="290" y="692">SEES</text>
+<text class="ct" x="290" y="710">the task + the approved plan</text>
+<text class="ct strong" x="290" y="726">never the implementation</text>
+<text class="cap" x="290" y="756">TOOLS</text>
+<text class="ct" x="290" y="774">edit, run the repo&#x27;s tests</text>
+<text class="cap" x="290" y="804">RULE</text>
+<text class="ct" x="290" y="822">tests from the spec,</text>
+<text class="ct" x="290" y="838">before any code exists</text>
+<rect class="card" x="508" y="588" width="218" height="290" rx="8"/>
+<rect class="card-head" x="508" y="588" width="218" height="34" rx="8"/>
+<rect class="card-head" x="508" y="608" width="218" height="14" rx="0"/>
+<text class="t" x="520" y="611">implement</text>
+<text class="s" x="714" y="611" text-anchor="end">Sonnet</text>
+<text class="cap" x="520" y="644">SESSION</text>
+<text class="ct" x="520" y="662">new</text>
+<text class="cap" x="520" y="692">SEES</text>
+<text class="ct" x="520" y="710">the task, the plan,</text>
+<text class="ct" x="520" y="726">the test writer&#x27;s summary</text>
+<text class="cap" x="520" y="756">TOOLS</text>
+<text class="ct" x="520" y="774">edit, run tests, scanners</text>
+<text class="cap ink-human" x="520" y="804">MAY NOT</text>
+<text class="ct" x="520" y="822">edit the tests, test config</text>
+<text class="ct" x="520" y="838">or INVARIANTS.md (gate)</text>
+<rect class="card" x="738" y="588" width="218" height="290" rx="8"/>
+<rect class="card-head" x="738" y="588" width="218" height="34" rx="8"/>
+<rect class="card-head" x="738" y="608" width="218" height="14" rx="0"/>
+<text class="t" x="750" y="611">review</text>
+<text class="s" x="944" y="611" text-anchor="end">Opus</text>
+<text class="cap" x="750" y="644">SESSION</text>
+<text class="ct" x="750" y="662">new, did not write</text>
+<text class="ct" x="750" y="678">the code</text>
+<text class="cap" x="750" y="708">SEES</text>
+<text class="ct" x="750" y="726">the plan + the diff</text>
+<text class="ct" x="750" y="742">since the base commit</text>
+<text class="cap" x="750" y="772">TOOLS</text>
+<text class="ct" x="750" y="790">read only</text>
+<text class="cap" x="750" y="820">OUTPUT</text>
+<text class="ct" x="750" y="838">PASS / FAIL, findings</text>
+<text class="ct" x="750" y="854">F1, F2 … re-checked by ID</text>
+<rect class="card" x="968" y="588" width="218" height="290" rx="8"/>
+<rect class="card-head" x="968" y="588" width="218" height="34" rx="8"/>
+<rect class="card-head" x="968" y="608" width="218" height="14" rx="0"/>
+<text class="t" x="980" y="611">fix</text>
+<text class="s" x="1174" y="611" text-anchor="end">Sonnet</text>
+<text class="cap" x="980" y="644">SESSION</text>
+<text class="ct" x="980" y="662">resumes the</text>
+<text class="ct" x="980" y="678">implementer&#x27;s session</text>
+<text class="cap" x="980" y="708">SEES</text>
+<text class="ct" x="980" y="726">its own change, the findings</text>
+<text class="ct" x="980" y="742">or gate report, your answers</text>
+<text class="cap" x="980" y="772">TOOLS</text>
+<text class="ct" x="980" y="790">edit, run tests, scanners</text>
+<text class="cap ink-human" x="980" y="820">MAY NOT</text>
+<text class="ct" x="980" y="838">the same protected files;</text>
+<text class="ct" x="980" y="854">blocked → asks the human</text>
+<text class="s" x="48" y="912">Every agent: allowlisted tools only. Denied to all: git push, commit, reset, checkout, gh, curl, web fetch and search.</text>
+<text class="s" x="48" y="930">The runner, not an agent, owns git and opens the PR.</text>
+</svg>
+  </div>
+  <figcaption>Orange marks the LangGraph interrupts where the engineer decides. Triage sends a small change straight to planning and a larger one through rounds of design questions first. Every agent is a separate session with its own context and tools: the test writer never sees the code, and the implementer cannot edit the tests or the invariants. The gate is plain code, not a model. Fixing never loops silently: when it stops making progress, the run waits for a person.</figcaption>
+</figure>
+</main>

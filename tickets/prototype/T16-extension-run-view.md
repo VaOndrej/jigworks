@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | review |
+| Status | done |
 | Owner | local |
 | Label | `milestone-2` |
 | Size | M |

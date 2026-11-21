@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | todo |
+| Status | review |
 | Owner | human |
 | Label | `presentation` |
 | Size | M |
@@ -38,4 +38,4 @@ A slides deck or document that answers all 9 questions from the brief and goes d
 
 ## Evidence
 
-_Paste command output, screenshots or links here when the ticket is done._
+[`docs/case-study-answers.md`](../../docs/case-study-answers.md): all nine questions, deep dives Q3, Q5, Q6, time spent; diagrams in `docs/images/`. Not yet: a separate "what I cut" slide and a timed run-through of the 35–40 min slot.

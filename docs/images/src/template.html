@@ -1,0 +1,92 @@
+<title>Jigworks Architecture</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;600&display=swap">
+<style>
+/* Layout: one column, two wide figures. One hue per layer: hub blue, API violet, clients teal, local machine green, GitHub grey, human orange. */
+:root{--bg:#F3F2EE;--surface:#FFFFFF;--fg:#17181C;--muted:#5B5F6A;--line:#B9B5AB;
+  --hub:#2F5BB7;--hub-bg:#E8EEF9;--hub-chip:#D6E0F5;--hub-ink:#1E3F86;
+  --api:#7448B0;--api-bg:#F0E9F8;--api-ink:#55308A;
+  --cli:#0E7C74;--cli-bg:#E3F2F0;--cli-chip:#CDE8E4;--cli-ink:#0A5A54;
+  --run:#3F7A2A;--run-bg:#EAF2E3;--run-chip:#D5E7CA;--run-ink:#2C5A1C;--ag-chip:#BFDDAE;
+  --gh:#6B6F78;--gh-bg:#EFEFF0;--gh-chip:#E1E2E5;--gh-ink:#3D4048;
+  --human:#C2410C;--human-bg:#FBE4D5;
+  --head:'Space Grotesk',Inter,system-ui,sans-serif;--body:Inter,system-ui,sans-serif;--mono:'JetBrains Mono',ui-monospace,monospace}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#121316;--surface:#1A1C20;--fg:#ECEDEF;--muted:#A3A7B1;--line:#4A4D55;
+  --hub:#7FA2F0;--hub-bg:#172238;--hub-chip:#22304D;--hub-ink:#B9CCF7;--api:#B793EA;--api-bg:#261B36;--api-ink:#D7C2F5;
+  --cli:#4FC2B8;--cli-bg:#10292A;--cli-chip:#173A3A;--cli-ink:#A6E3DD;--run:#8CC46F;--run-bg:#182714;--run-chip:#22381C;--run-ink:#C3E3B1;--ag-chip:#2C4A22;
+  --gh:#9DA1AA;--gh-bg:#1F2024;--gh-chip:#2A2C31;--gh-ink:#D2D4D9;--human:#F59E5B;--human-bg:#3A2618;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#121316;--surface:#1A1C20;--fg:#ECEDEF;--muted:#A3A7B1;--line:#4A4D55;
+  --hub:#7FA2F0;--hub-bg:#172238;--hub-chip:#22304D;--hub-ink:#B9CCF7;--api:#B793EA;--api-bg:#261B36;--api-ink:#D7C2F5;
+  --cli:#4FC2B8;--cli-bg:#10292A;--cli-chip:#173A3A;--cli-ink:#A6E3DD;--run:#8CC46F;--run-bg:#182714;--run-chip:#22381C;--run-ink:#C3E3B1;--ag-chip:#2C4A22;
+  --gh:#9DA1AA;--gh-bg:#1F2024;--gh-chip:#2A2C31;--gh-ink:#D2D4D9;--human:#F59E5B;--human-bg:#3A2618;color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:32px 64px}
+main{max-width:1240px;margin:0 auto;display:grid;gap:48px}
+h1{font-family:var(--head);font-size:30px;margin:0 0 6px;text-wrap:balance}
+header p{margin:0;color:var(--muted);max-width:70ch;line-height:1.5}
+figure{margin:0;background:var(--bg);padding:20px 0}
+h2{font-family:var(--head);font-size:20px;margin:0 0 12px}
+.scroll{overflow-x:auto}
+svg{display:block;width:100%;min-width:900px;height:auto}
+figcaption{margin-top:12px;color:var(--muted);line-height:1.5;max-width:90ch}
+/* zones, components, chips per layer */
+.z-hub{fill:var(--hub-bg);stroke:var(--hub);stroke-width:1.4}
+.z-api{fill:var(--api-bg);stroke:var(--api);stroke-width:1.4}
+.z-cli{fill:var(--cli-bg);stroke:var(--cli);stroke-width:1.4}
+.z-run{fill:var(--run-bg);stroke:var(--run);stroke-width:1.4}
+.c-hub{fill:var(--surface);stroke:var(--hub);stroke-width:1.4}
+.c-cli{fill:var(--surface);stroke:var(--cli);stroke-width:1.4}
+.c-run{fill:var(--surface);stroke:var(--run);stroke-width:1.4}
+.c-ag{fill:var(--surface);stroke:var(--run);stroke-width:2.2}
+.c-gh{fill:var(--gh-bg);stroke:var(--gh);stroke-width:1.4}
+.chip-hub{fill:var(--hub-chip);stroke:none}
+.chip-cli{fill:var(--cli-chip);stroke:none}
+.chip-run{fill:var(--run-chip);stroke:none}
+.chip-ag{fill:var(--ag-chip);stroke:none}
+.chip-gh{fill:var(--gh-chip);stroke:none}
+.chip-hub.planned{fill:var(--surface);stroke:var(--hub);stroke-width:1.2}
+.node-ag{fill:var(--ag-chip);stroke:var(--run);stroke-width:1.4}
+.card{fill:var(--surface);stroke:var(--run);stroke-width:1.2}
+.card-head{fill:var(--ag-chip);stroke:none}
+.cap{font-size:10.5px;font-weight:600;letter-spacing:.08em;fill:var(--run-ink)}
+.strong{font-weight:600}
+.node-code{fill:var(--gh-chip);stroke:var(--gh);stroke-width:1.4}
+.human{fill:var(--human-bg);stroke:var(--human);stroke-width:1.8}
+.planned{stroke-dasharray:6 5}
+.edge{stroke:var(--fg);stroke-width:1.4;fill:none}
+.edge-api{stroke:var(--api);stroke-width:2;fill:none}
+.edge-human{stroke:var(--human);stroke-width:1.8;fill:none}
+.rule{stroke:var(--line);stroke-width:1.2;stroke-dasharray:4 4}
+.ah{fill:var(--fg)} .ah-api{fill:var(--api)} .ah-human{fill:var(--human)}
+text{fill:var(--fg);font-family:var(--body);font-size:13px}
+.t{font-family:var(--head);font-weight:600;font-size:15px}
+.zt{font-family:var(--head);font-weight:600;font-size:13px;letter-spacing:.06em}
+.ct{font-size:12.5px}
+.s{font-size:12px;fill:var(--muted)}
+.mono{font-family:var(--mono)}
+.lbl{font-size:12px;font-style:italic;fill:var(--muted)}
+.ink-hub{fill:var(--hub-ink)} .ink-api{fill:var(--api-ink)} .ink-cli{fill:var(--cli-ink)} .ink-run{fill:var(--run-ink)}
+.ink-ag{fill:var(--run-ink)} .ink-gh{fill:var(--gh-ink)} .ink-human{fill:var(--human)}
+</style>
+
+<main>
+<header>
+  <h1>Jigworks architecture</h1>
+  <p>A versioned workflow (the jig) is published once in the hub and runs the same way on every engineer's machine. Solid lines are built in the prototype; dashed lines are designed but not built.</p>
+</header>
+
+<figure id="system">
+  <h2>System</h2>
+  <div class="scroll">
+%%SYSTEM%%
+  </div>
+  <figcaption>The hub never runs workflow code and never sees CLI credentials. A run is pinned to a release digest, so everyone runs the same graph, prompts, models and skills. The runner sends events to the hub over the API, and the hub turns them into the audit trail and the per-release analytics.</figcaption>
+</figure>
+
+<figure id="harness">
+  <h2>The harness: <span style="font-family:var(--mono);font-size:17px">feature-development</span> 1.8.0</h2>
+  <div class="scroll">
+%%HARNESS%%
+  </div>
+  <figcaption>Orange marks the LangGraph interrupts where the engineer decides. Triage sends a small change straight to planning and a larger one through rounds of design questions first. Every agent is a separate session with its own context and tools: the test writer never sees the code, and the implementer cannot edit the tests or the invariants. The gate is plain code, not a model. Fixing never loops silently: when it stops making progress, the run waits for a person.</figcaption>
+</figure>
+</main>

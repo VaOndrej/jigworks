@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | review |
+| Status | done |
 | Owner | hub |
 | Label | `milestone-1` |
 | Size | S |
